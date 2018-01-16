@@ -51,7 +51,7 @@ class PublisherListener;
  */
 class Publisher::impl
 {
-    using map = std::map<InstanceHandle_t, std::set<SequenceNumber_t>>;
+    using map = std::map<rtps::InstanceHandle_t, std::set<rtps::SequenceNumber_t>>;
 
     public:
 
@@ -70,7 +70,7 @@ class Publisher::impl
      * @param  Data
      * @return
      */
-    bool create_new_change(ChangeKind_t change_kind, void* data);
+    bool create_new_change(rtps::ChangeKind_t change_kind, void* data);
 
     /**
      * 
@@ -79,7 +79,7 @@ class Publisher::impl
      * @param wparams
      * @return
      */
-    bool create_new_change_with_params(ChangeKind_t change_kind, void* data, WriteParams &wparams);
+    bool create_new_change_with_params(rtps::ChangeKind_t change_kind, void* data, rtps::WriteParams &wparams);
 
     /**
      * Removes the cache change with the minimum sequence number
@@ -103,7 +103,7 @@ class Publisher::impl
      * 
      * @return
      */
-    const GUID_t& getGuid();
+    const rtps::GUID_t& getGuid();
 
     /**
      * Update the Attributes of the publisher;
@@ -116,7 +116,7 @@ class Publisher::impl
      * Get the Attributes of the Subscriber.
      * @return Attributes of the Subscriber.
      */
-    inline const PublisherAttributes& getAttributes(){ return att_; };
+    inline const PublisherAttributes& getAttributes() const { return att_; };
 
     /**
      * Get topic data type
@@ -126,7 +126,7 @@ class Publisher::impl
 
     bool try_remove_change(std::unique_lock<std::recursive_mutex>& lock);
 
-    bool wait_for_all_acked(const Time_t& max_wait);
+    bool wait_for_all_acked(const rtps::Time_t& max_wait);
 
     private:
 
@@ -134,8 +134,9 @@ class Publisher::impl
 
     //TODO Make private again
     public:
+
     //! Pointer to the associated Data Writer.
-    RTPSWriter* writer_;
+    rtps::RTPSWriter* writer_;
 
     //! Pointer to the TopicDataType object.
     TopicDataType* type_;
@@ -143,20 +144,20 @@ class Publisher::impl
     //!Attributes of the Publisher
     PublisherAttributes att_;
 
-    WriterHistory history_;
+    rtps::WriterHistory history_;
 
     //!PublisherListener
     PublisherListener* listener_;
 
     //!Listener to capture the events of the Writer
-    class PublisherWriterListener: public WriterListener
+    class PublisherWriterListener: public rtps::WriterListener
     {
         public:
             PublisherWriterListener(Publisher& publisher): publisher_(publisher){};
 
             virtual ~PublisherWriterListener(){};
 
-            void onWriterMatched(RTPSWriter* writer,MatchingInfo& info);
+            void onWriterMatched(rtps::RTPSWriter* writer, rtps::MatchingInfo& info);
 
             Publisher& publisher_;
     } writer_listener_;
@@ -169,6 +170,8 @@ class Publisher::impl
 };
 
 inline Publisher::impl& get_implementation(Publisher& publisher) { return *publisher.impl_; }
+
+inline const Publisher::impl& get_implementation(const Publisher& publisher) { return *publisher.impl_; }
 
 } /* namespace  */
 } /* namespace eprosima */

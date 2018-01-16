@@ -73,7 +73,11 @@ class SecurityManager
 
         bool register_local_writer(const GUID_t& writer_guid, const PropertySeq& writer_properties);
 
+        bool unregister_local_writer(const GUID_t& writer_guid);
+
         bool register_local_reader(const GUID_t& reader_guid, const PropertySeq& reader_properties);
+
+        bool unregister_local_reader(const GUID_t& reader_guid);
 
         bool discovered_reader(const GUID_t& writer_guid, const GUID_t& remote_participant,
                 ReaderProxyData& remote_reader_data);
@@ -244,7 +248,7 @@ class SecurityManager
 
             private:
 
-                ParticipantStatelessMessageListener& operator=(const ParticipantStatelessMessageListener&) NON_COPYABLE_CXX11;
+                ParticipantStatelessMessageListener& operator=(const ParticipantStatelessMessageListener&) = delete;
 
                 SecurityManager &manager_;
         } participant_stateless_message_listener_;
@@ -260,7 +264,7 @@ class SecurityManager
 
             private:
 
-                ParticipantVolatileMessageListener& operator=(const ParticipantVolatileMessageListener&) NON_COPYABLE_CXX11;
+                ParticipantVolatileMessageListener& operator=(const ParticipantVolatileMessageListener&) = delete;
 
                 SecurityManager &manager_;
         } participant_volatile_message_secure_listener_;

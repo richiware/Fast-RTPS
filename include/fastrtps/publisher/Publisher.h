@@ -74,26 +74,26 @@ class RTPS_DllAPI Publisher
      * @par Calling example:
      * @snippet fastrtps_example.cpp ex_PublisherWrite
      */
-    bool write(void*Data, WriteParams &wparams);
+    bool write(void* Data, rtps::WriteParams& wparams);
 
     /**
      * Dispose of a previously written data.
      * @param Data Pointer to the data.
      * @return True if correct.
      */
-    bool dispose(void*Data);
+    bool dispose(void* Data);
     /**
      * Unregister a previously written data.
      * @param Data Pointer to the data.
      * @return True if correct.
      */
-    bool unregister(void*Data);
+    bool unregister(void* Data);
     /**
      * Dispose and unregister a previously written data.
      * @param Data Pointer to the data.
      * @return True if correct.
      */
-    bool dispose_and_unregister(void*Data);
+    bool dispose_and_unregister(void* Data);
 
     /**
      * Remove all the Changes in the associated RTPSWriter.
@@ -102,23 +102,25 @@ class RTPS_DllAPI Publisher
      */
     bool removeAllChange(size_t* removed = nullptr);
 
-    bool wait_for_all_acked(const Time_t& max_wait);
+    bool wait_for_all_acked(const rtps::Time_t& max_wait);
 
     /**
      * Get the GUID_t of the associated RTPSWriter.
      * @return GUID_t.
      */
-    const GUID_t& getGuid();
+    const rtps::GUID_t& getGuid();
 
     /**
      * Get the Attributes of the Publisher.
      * @return Attributes of the publisher
      */
-    PublisherAttributes getAttributes();
+    PublisherAttributes getAttributes() const;
 
     private:
 
     friend impl& get_implementation(Publisher& publisher);
+
+    friend const impl& get_implementation(const Publisher& publisher);
 
     std::unique_ptr<impl> impl_;
 };

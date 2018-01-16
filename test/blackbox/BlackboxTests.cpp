@@ -98,7 +98,7 @@ void default_send_print(const Data1mb& data)
 #include <fastrtps/transport/test_UDPv4Transport.h>
 #include <fastrtps/rtps/resources/AsyncWriterThread.h>
 #include <fastrtps/rtps/common/Locator.h>
-#include <fastrtps/xmlparser/XMLProfileParser.h>
+#include <fastrtps/xmlparser/XMLParser.h>
 
 
 #include <thread>
@@ -106,6 +106,9 @@ void default_send_print(const Data1mb& data)
 #include <cstdlib>
 #include <string>
 #include <gtest/gtest.h>
+
+using namespace eprosima::fastrtps;
+using namespace eprosima::fastrtps::rtps;
 
 #if defined(PREALLOCATED_WITH_REALLOC_MEMORY_MODE_TEST)
 #define MEMORY_MODE_STRING ReallocMem
@@ -741,7 +744,7 @@ BLACKBOXTEST(BlackBox, ParticipantRemoval)
     writer.destroy();
 
     // Check that reader receives the unmatched.
-    reader.waitRemoval();
+    reader.wait_participant_undiscovery();
 }
 
 BLACKBOXTEST(BlackBox, PubSubAsReliableData64kb)
@@ -1780,6 +1783,46 @@ BLACKBOXTEST(BlackBox, PubSubAsReliableHelloworldUserData)
     ASSERT_TRUE(reader.getDiscoveryResult());
 }
 
+BLACKBOXTEST(BlackBox, PubSubAsReliableHelloworldParticipantDiscovery)
+{
+    PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
+    PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
+
+    GUID_t participant_guid;
+    reader.setOnDiscoveryFunction([&participant_guid](const ParticipantDiscoveryInfo& info) -> bool{
+            if(info.rtps.m_status == DISCOVERED_RTPSPARTICIPANT)
+            {
+                std::cout << "Discovered participant " << info.rtps.m_guid << std::endl;
+                participant_guid = info.rtps.m_guid;
+            }
+            else if(info.rtps.m_status == REMOVED_RTPSPARTICIPANT)
+            {
+                std::cout << "Removed participant " << info.rtps.m_guid << std::endl;
+                return participant_guid == info.rtps.m_guid;
+            }
+
+            return false;
+        });
+
+    reader.history_depth(100).
+        reliability(eprosima::fastrtps::RELIABLE_RELIABILITY_QOS).init();
+
+    ASSERT_TRUE(reader.isInitialized());
+
+    writer.history_depth(100).init();
+
+    ASSERT_TRUE(writer.isInitialized());
+
+    reader.waitDiscovery();
+    writer.waitDiscovery();
+
+    writer.destroy();
+
+    reader.wait_participant_undiscovery();
+
+    ASSERT_TRUE(reader.getDiscoveryResult());
+}
+
 BLACKBOXTEST(BlackBox, EDPSlaveReaderAttachment)
 {
     PubSubWriter<HelloWorldType> checker(TEST_TOPIC_NAME);
@@ -1847,7 +1890,7 @@ BLACKBOXTEST(BlackBox, EndpointRediscovery)
 
     test_UDPv4Transport::ShutdownAllNetwork = true;
 
-    writer.waitRemoval();
+    writer.wait_reader_undiscovery();
 
     test_UDPv4Transport::ShutdownAllNetwork = false;
 
@@ -2439,7 +2482,7 @@ BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_besteffort_rtps_data
     // When doing fragmentation, it is necessary to have some degree of
     // flow control not to overrun the receive buffer.
     uint32_t bytesPerPeriod = 65536;
-    uint32_t periodInMs = 50;
+    uint32_t periodInMs = 500;
 
     writer.history_depth(5).
         reliability(eprosima::fastrtps::BEST_EFFORT_RELIABILITY_QOS).
@@ -2881,7 +2924,7 @@ BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_besteffort_submessag
     // When doing fragmentation, it is necessary to have some degree of
     // flow control not to overrun the receive buffer.
     uint32_t bytesPerPeriod = 65536;
-    uint32_t periodInMs = 50;
+    uint32_t periodInMs = 500;
 
     writer.history_depth(5).
         reliability(eprosima::fastrtps::BEST_EFFORT_RELIABILITY_QOS).
@@ -3327,7 +3370,7 @@ BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_besteffort_payload_d
     // When doing fragmentation, it is necessary to have some degree of
     // flow control not to overrun the receive buffer.
     uint32_t bytesPerPeriod = 65536;
-    uint32_t periodInMs = 50;
+    uint32_t periodInMs = 500;
 
     writer.history_depth(5).
         reliability(eprosima::fastrtps::BEST_EFFORT_RELIABILITY_QOS).
@@ -3751,7 +3794,7 @@ BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_besteffort_all_data3
     // When doing fragmentation, it is necessary to have some degree of
     // flow control not to overrun the receive buffer.
     uint32_t bytesPerPeriod = 65536;
-    uint32_t periodInMs = 50;
+    uint32_t periodInMs = 1000;
 
     writer.history_depth(5).
         reliability(eprosima::fastrtps::BEST_EFFORT_RELIABILITY_QOS).

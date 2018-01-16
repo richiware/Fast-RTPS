@@ -51,18 +51,18 @@ class PubSubWriterReader
             ~ParticipantListener() {}
 
 #if HAVE_SECURITY
-            void onParticipantAuthentication(Participant*, const ParticipantAuthenticationInfo& info)
+            void onParticipantAuthentication(eprosima::fastrtps::Participant*, const eprosima::fastrtps::ParticipantAuthenticationInfo& info)
             {
-                if(info.rtps.status() == AUTHORIZED_RTPSPARTICIPANT)
+                if(info.rtps.status() == eprosima::fastrtps::rtps::AUTHORIZED_RTPSPARTICIPANT)
                     wreader_.authorized();
-                else if(info.rtps.status() == UNAUTHORIZED_RTPSPARTICIPANT)
+                else if(info.rtps.status() == eprosima::fastrtps::rtps::UNAUTHORIZED_RTPSPARTICIPANT)
                     wreader_.unauthorized();
             }
 #endif
 
         private:
 
-            ParticipantListener& operator=(const ParticipantListener&) NON_COPYABLE_CXX11;
+            ParticipantListener& operator=(const ParticipantListener&) = delete;
 
             PubSubWriterReader& wreader_;
     } participant_listener_;
@@ -75,9 +75,9 @@ class PubSubWriterReader
 
             ~PubListener(){};
 
-            void onPublicationMatched(eprosima::fastrtps::Publisher* /*pub*/, MatchingInfo &info)
+            void onPublicationMatched(eprosima::fastrtps::Publisher* /*pub*/, eprosima::fastrtps::rtps::MatchingInfo &info)
             {
-                if (info.status == MATCHED_MATCHING)
+                if (info.status == eprosima::fastrtps::rtps::MATCHED_MATCHING)
                     wreader_.matched();
                 else
                     wreader_.unmatched();
@@ -85,7 +85,7 @@ class PubSubWriterReader
 
         private:
 
-            PubListener& operator=(const PubListener&) NON_COPYABLE_CXX11;
+            PubListener& operator=(const PubListener&) = delete;
 
             PubSubWriterReader &wreader_;
 
@@ -106,9 +106,9 @@ class PubSubWriterReader
                 wreader_.receive_one(sub, ret);
             }
 
-            void onSubscriptionMatched(eprosima::fastrtps::Subscriber* /*sub*/, MatchingInfo& info)
+            void onSubscriptionMatched(eprosima::fastrtps::Subscriber* /*sub*/, eprosima::fastrtps::rtps::MatchingInfo& info)
             {
-                if (info.status == MATCHED_MATCHING)
+                if (info.status == eprosima::fastrtps::rtps::MATCHED_MATCHING)
                     wreader_.matched();
                 else
                     wreader_.unmatched();
@@ -116,7 +116,7 @@ class PubSubWriterReader
 
         private:
 
-            SubListener& operator=(const SubListener&) NON_COPYABLE_CXX11;
+            SubListener& operator=(const SubListener&) = delete;
 
             PubSubWriterReader& wreader_;
     } sub_listener_;
@@ -146,14 +146,14 @@ class PubSubWriterReader
         topic_name_ = t.str();
 
 #if defined(PREALLOCATED_WITH_REALLOC_MEMORY_MODE_TEST)
-        publisher_attr_.historyMemoryPolicy = PREALLOCATED_WITH_REALLOC_MEMORY_MODE;
-        subscriber_attr_.historyMemoryPolicy = PREALLOCATED_WITH_REALLOC_MEMORY_MODE;
+        publisher_attr_.historyMemoryPolicy = eprosima::fastrtps::rtps::PREALLOCATED_WITH_REALLOC_MEMORY_MODE;
+        subscriber_attr_.historyMemoryPolicy = eprosima::fastrtps::rtps::PREALLOCATED_WITH_REALLOC_MEMORY_MODE;
 #elif defined(DYNAMIC_RESERVE_MEMORY_MODE_TEST)
-        publisher_attr_.historyMemoryPolicy = DYNAMIC_RESERVE_MEMORY_MODE;
-        subscriber_attr_.historyMemoryPolicy = DYNAMIC_RESERVE_MEMORY_MODE;
+        publisher_attr_.historyMemoryPolicy = eprosima::fastrtps::rtps::DYNAMIC_RESERVE_MEMORY_MODE;
+        subscriber_attr_.historyMemoryPolicy = eprosima::fastrtps::rtps::DYNAMIC_RESERVE_MEMORY_MODE;
 #else
-        publisher_attr_.historyMemoryPolicy = PREALLOCATED_MEMORY_MODE;
-        subscriber_attr_.historyMemoryPolicy = PREALLOCATED_MEMORY_MODE;
+        publisher_attr_.historyMemoryPolicy = eprosima::fastrtps::rtps::PREALLOCATED_MEMORY_MODE;
+        subscriber_attr_.historyMemoryPolicy = eprosima::fastrtps::rtps::PREALLOCATED_MEMORY_MODE;
 #endif
 
         // By default, heartbeat period and nack response delay are 100 milliseconds.
@@ -355,7 +355,7 @@ class PubSubWriterReader
         if(receiving_)
         {
             type data;
-            SampleInfo_t info;
+            eprosima::fastrtps::SampleInfo_t info;
 
             if(subscriber->takeNextData((void*)&data, &info))
             {
@@ -365,7 +365,7 @@ class PubSubWriterReader
                 ASSERT_LT(last_seq, info.sample_identity.sequence_number());
                 last_seq = info.sample_identity.sequence_number();
 
-                if(info.sampleKind == ALIVE)
+                if(info.sampleKind == eprosima::fastrtps::rtps::ALIVE)
                 {
                     auto it = std::find(total_msgs_.begin(), total_msgs_.end(), data);
                     ASSERT_NE(it, total_msgs_.end());
@@ -410,7 +410,7 @@ class PubSubWriterReader
     }
 #endif
 
-    PubSubWriterReader& operator=(const PubSubWriterReader&)NON_COPYABLE_CXX11;
+    PubSubWriterReader& operator=(const PubSubWriterReader&)= delete;
 
     eprosima::fastrtps::Participant *participant_;
     eprosima::fastrtps::ParticipantAttributes participant_attr_;
@@ -428,7 +428,7 @@ class PubSubWriterReader
     unsigned int matched_;
     bool receiving_;
     type_support type_;
-    SequenceNumber_t last_seq;
+	eprosima::fastrtps::rtps::SequenceNumber_t last_seq;
     size_t current_received_count_;
     size_t number_samples_expected_;
 #if HAVE_SECURITY

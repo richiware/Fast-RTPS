@@ -199,7 +199,7 @@ namespace eprosima
 
                 CleanupEvent* cleanup_event_;
 
-                StatefulWriter& operator=(const StatefulWriter&) NON_COPYABLE_CXX11;
+                StatefulWriter& operator=(const StatefulWriter&) = delete;
             };
         } /* namespace rtps */
     } /* namespace fastrtps */

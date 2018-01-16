@@ -109,6 +109,8 @@ class CacheChangePoolDeleter
 
         CacheChangePoolDeleter(CacheChangePoolDeleter&& other) = default;
 
+        CacheChangePoolDeleter& operator=(CacheChangePoolDeleter&&) = default;
+
         void operator()(CacheChange_t* cachechange)
         {
             if(pool_)
@@ -138,6 +140,8 @@ class CacheChange_ptr : protected std::unique_ptr<CacheChange_t, CacheChangePool
             Base(cachechange, CacheChangePoolDeleter(pool)) {}
 
         CacheChange_ptr(CacheChange_ptr&& other) = default;
+
+        CacheChange_ptr& operator=(CacheChange_ptr&&) = default;
 };
 
 }

@@ -68,13 +68,13 @@ class RTPSWithRegistrationReader
 
                 void onReaderMatched(eprosima::fastrtps::rtps::RTPSReader* /*reader*/, eprosima::fastrtps::rtps::MatchingInfo& info)
                 {
-                    if (info.status == MATCHED_MATCHING)
+                    if (info.status == eprosima::fastrtps::rtps::MATCHED_MATCHING)
                         reader_.matched();
                 }
 
             private:
 
-                Listener& operator=(const Listener&) NON_COPYABLE_CXX11;
+                Listener& operator=(const Listener&) = delete;
 
                 RTPSWithRegistrationReader &reader_;
         } listener_;
@@ -98,7 +98,7 @@ class RTPSWithRegistrationReader
         virtual ~RTPSWithRegistrationReader()
         {
             if(participant_ != nullptr)
-                RTPSDomain::removeRTPSParticipant(participant_);
+                eprosima::fastrtps::rtps::RTPSDomain::removeRTPSParticipant(participant_);
             if(history_ != nullptr)
                 delete(history_);
         }
@@ -109,7 +109,7 @@ class RTPSWithRegistrationReader
             pattr.builtin.use_SIMPLE_RTPSParticipantDiscoveryProtocol = true;
             pattr.builtin.use_WriterLivelinessProtocol = true;
             pattr.builtin.domainId = (uint32_t)GET_PID() % 230;
-            participant_ = RTPSDomain::createParticipant(pattr);
+            participant_ = eprosima::fastrtps::rtps::RTPSDomain::createParticipant(pattr);
             ASSERT_NE(participant_, nullptr);
 
             //Create readerhistory
@@ -234,7 +234,7 @@ class RTPSWithRegistrationReader
 
         RTPSWithRegistrationReader& add_to_multicast_locator_list(const std::string& ip, uint32_t port)
         {
-            Locator_t loc;
+            eprosima::fastrtps::rtps::Locator_t loc;
             loc.set_IP4_address(ip);
             loc.port = port;
             reader_attr_.endpoint.multicastLocatorList.push_back(loc);
@@ -274,11 +274,11 @@ class RTPSWithRegistrationReader
                 eprosima::fastrtps::rtps::ReaderHistory *history = reader->getHistory();
                 ASSERT_NE(history, nullptr);
 
-                history->remove_change((CacheChange_t*)change);
+                history->remove_change((eprosima::fastrtps::rtps::CacheChange_t*)change);
             }
         }
 
-        RTPSWithRegistrationReader& operator=(const RTPSWithRegistrationReader&) NON_COPYABLE_CXX11;
+        RTPSWithRegistrationReader& operator=(const RTPSWithRegistrationReader&) = delete;
 
         eprosima::fastrtps::rtps::RTPSParticipant *participant_;
         eprosima::fastrtps::rtps::RTPSReader* reader_;
@@ -295,7 +295,7 @@ class RTPSWithRegistrationReader
         std::condition_variable cvDiscovery_;
         bool receiving_;
         unsigned int matched_;
-        SequenceNumber_t last_seq_;
+		eprosima::fastrtps::rtps::SequenceNumber_t last_seq_;
         size_t current_received_count_;
         size_t number_samples_expected_;
         type_support type_;

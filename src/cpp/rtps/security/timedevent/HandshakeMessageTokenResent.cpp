@@ -21,7 +21,7 @@
 #include <fastrtps/log/Log.h>
 
 using namespace eprosima::fastrtps::rtps;
-using namespace ::security;
+using namespace eprosima::fastrtps::rtps::security;
 
 HandshakeMessageTokenResent::HandshakeMessageTokenResent(SecurityManager& security_manager,
         const GUID_t& remote_participant_key, double interval) :
@@ -62,6 +62,8 @@ void HandshakeMessageTokenResent::event(EventCode code, const char* msg)
                     if(p_change)
                     {
                         security_manager_.participant_stateless_message_writer_->reuse_change(p_change);
+                        logInfo(SECURITY, "Authentication handshake resent to participant " <<
+                                remote_participant_key_);
                         if(security_manager_.participant_stateless_message_writer_history_->add_change(p_change))
                         {
                             remote_participant_info->change_sequence_number_ = p_change->sequence_number;

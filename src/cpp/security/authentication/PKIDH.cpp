@@ -46,8 +46,8 @@
 #define _SecurityException_(str) SecurityException(std::string(str) + LOCATION)
 
 using namespace eprosima::fastrtps;
-using namespace ::rtps;
-using namespace ::security;
+using namespace eprosima::fastrtps::rtps;
+using namespace eprosima::fastrtps::rtps::security;
 
 static size_t alignment(size_t current_alignment, size_t dataSize) { return (dataSize - (current_alignment % dataSize)) & (dataSize-1);}
 
@@ -414,15 +414,21 @@ bool store_certificate_in_buffer(X509* certificate, BUF_MEM** ptr, SecurityExcep
                 returnedValue = true;
             }
             else
+            {
                 exception = _SecurityException_("OpenSSL library cannot retrieve mem ptr");
+            }
         }
         else
+        {
             exception = _SecurityException_("OpenSSL library cannot write cert");
+        }
 
         BIO_free(out);
     }
     else
+    {
         exception = _SecurityException_("OpenSSL library cannot allocate mem");
+    }
 
     return returnedValue;
 }

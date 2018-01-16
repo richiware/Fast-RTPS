@@ -32,8 +32,8 @@
 #include "fastrtps/attributes/TopicAttributes.h"
 #include "fastrtps/qos/ReaderQos.h"
 
-using namespace eprosima;
-using namespace fastrtps;
+using namespace eprosima::fastrtps;
+using namespace eprosima::fastrtps::rtps;
 
 TestReaderRegistered::TestReaderRegistered():
 mp_participant(nullptr),
@@ -94,7 +94,7 @@ void TestReaderRegistered::run()
 
 void TestReaderRegistered::MyListener::onNewCacheChangeAdded(RTPSReader* reader,const CacheChange_t* const change)
 {
-    printf("Received: %s\n",change->serializedPayload.data);
+    printf("Received: %s\n",change->serialized_payload.data);
     reader->getHistory()->remove_change((CacheChange_t*)change);
     n_received++;
 }

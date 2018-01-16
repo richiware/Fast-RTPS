@@ -28,6 +28,8 @@
 
 #include "XMLProfilesExampleSubscriber.h"
 
+using namespace eprosima::fastrtps;
+using namespace eprosima::fastrtps::rtps;
 
 XMLProfilesExampleSubscriber::XMLProfilesExampleSubscriber() : mp_participant(nullptr), mp_subscriber(nullptr) {}
 

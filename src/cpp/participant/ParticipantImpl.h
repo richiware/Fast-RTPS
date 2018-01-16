@@ -46,6 +46,7 @@ class SubscriberImpl;
 class SubscriberAttributes;
 class SubscriberListener;
 
+
 /**
  * This is the implementation class of the Participant.
  * @ingroup FASTRTPS_MODULE
@@ -56,7 +57,7 @@ class Participant::impl
     typedef std::vector<Publisher*> v_publishers;
     typedef std::vector<t_p_SubscriberPair> t_v_SubscriberPairs;
 
-    class MyRTPSParticipantListener : public RTPSParticipantListener
+    class MyRTPSParticipantListener : public rtps::RTPSParticipantListener
     {
         public:
 
@@ -64,10 +65,10 @@ class Participant::impl
 
             virtual ~MyRTPSParticipantListener(){};
 
-            void onRTPSParticipantDiscovery(RTPSParticipant* part, RTPSParticipantDiscoveryInfo info);
+            void onRTPSParticipantDiscovery(rtps::RTPSParticipant* part, rtps::RTPSParticipantDiscoveryInfo info);
 
 #if HAVE_SECURITY
-            void onRTPSParticipantAuthentication(RTPSParticipant* part, const RTPSParticipantAuthenticationInfo& info);
+            void onRTPSParticipantAuthentication(rtps::RTPSParticipant* part, const rtps::RTPSParticipantAuthenticationInfo& info);
 #endif
 
             Participant& participant_;
@@ -130,7 +131,7 @@ class Participant::impl
      * Get the GUID_t of the associated RTPSParticipant.
      * @return GUID_t.
      */
-    const GUID_t& getGuid() const;
+    const rtps::GUID_t& getGuid() const;
 
     /**
      * Get the participant attributes
@@ -138,9 +139,9 @@ class Participant::impl
      */
     inline const ParticipantAttributes& getAttributes() const {return m_att;};
 
-    std::pair<StatefulReader*,StatefulReader*> getEDPReaders();
+    std::pair<rtps::StatefulReader*,rtps::StatefulReader*> getEDPReaders();
 
-    std::vector<std::string> getParticipantNames();
+    std::vector<std::string> getParticipantNames() const;
 
     /**
      * This method can be used when using a StaticEndpointDiscovery mechanism differnet that the one
@@ -152,21 +153,21 @@ class Participant::impl
      * @param kind EndpointKind (WRITER or READER)
      * @return True if correctly found and activated.
      */
-    bool newRemoteEndpointDiscovered(const GUID_t& partguid, uint16_t userId,
-            EndpointKind_t kind);
+    bool newRemoteEndpointDiscovered(const rtps::GUID_t& partguid, uint16_t userId,
+            rtps::EndpointKind_t kind);
 
-    bool get_remote_writer_info(const GUID_t& writerGuid, WriterProxyData& returnedInfo);
+    bool get_remote_writer_info(const rtps::GUID_t& writerGuid, rtps::WriterProxyData& returnedInfo);
 
-    bool get_remote_reader_info(const GUID_t& readerGuid, ReaderProxyData& returnedInfo);
+    bool get_remote_reader_info(const rtps::GUID_t& readerGuid, rtps::ReaderProxyData& returnedInfo);
 
     MyRTPSParticipantListener* rtps_listener() { return &rtps_listener_; }
 
-    void rtps_participant(RTPSParticipant* rtps_participant)
+    void rtps_participant(rtps::RTPSParticipant* rtps_participant)
     {
         mp_rtpsParticipant = rtps_participant;
     }
 
-    RTPSParticipant* rtps_participant()
+    rtps::RTPSParticipant* rtps_participant()
     {
         return mp_rtpsParticipant;
     }
@@ -179,7 +180,7 @@ class Participant::impl
     ParticipantAttributes m_att;
 
     //!RTPSParticipant
-    RTPSParticipant* mp_rtpsParticipant;
+    rtps::RTPSParticipant* mp_rtpsParticipant;
 
     //!Participant Listener
     ParticipantListener* mp_listener;

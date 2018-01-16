@@ -29,6 +29,8 @@
 
 #include "fastrtps/rtps/history/WriterHistory.h"
 
+using namespace eprosima::fastrtps;
+using namespace eprosima::fastrtps::rtps;
 
 TestWriterSocket::TestWriterSocket():
 mp_participant(nullptr),
@@ -41,55 +43,63 @@ mp_history(nullptr)
 
 TestWriterSocket::~TestWriterSocket()
 {
-	RTPSDomain::removeRTPSParticipant(mp_participant);
-	delete(mp_history);
+    RTPSDomain::removeRTPSParticipant(mp_participant);
+    delete(mp_history);
 }
 
 bool TestWriterSocket::init(std::string ip, uint32_t port)
 {
-	//CREATE PARTICIPANT
-	RTPSParticipantAttributes PParam;
-	PParam.builtin.use_SIMPLE_RTPSParticipantDiscoveryProtocol = false;
-	PParam.builtin.use_WriterLivelinessProtocol = false;
-	mp_participant = RTPSDomain::createParticipant(PParam);
-	if(mp_participant==nullptr)
-		return false;
+    //CREATE PARTICIPANT
+    RTPSParticipantAttributes PParam;
+    PParam.builtin.use_SIMPLE_RTPSParticipantDiscoveryProtocol = false;
+    PParam.builtin.use_WriterLivelinessProtocol = false;
+    mp_participant = RTPSDomain::createParticipant(PParam);
+    if(mp_participant==nullptr)
+        return false;
 
-	//CREATE WRITERHISTORY
-	HistoryAttributes hatt;
-	hatt.payloadMaxSize = 255;
-	mp_history = new WriterHistory(hatt);
+    //CREATE WRITERHISTORY
+    HistoryAttributes hatt;
+    hatt.payloadMaxSize = 255;
+    mp_history = new WriterHistory(hatt);
 
-	//CREATE WRITER
-	WriterAttributes watt;
-	watt.endpoint.reliabilityKind = BEST_EFFORT;
-	mp_writer = RTPSDomain::createRTPSWriter(mp_participant,watt,mp_history);
-	if(mp_writer == nullptr)
-		return false;
+    //CREATE WRITER
+    WriterAttributes watt;
+    watt.endpoint.reliabilityKind = BEST_EFFORT;
+    mp_writer = RTPSDomain::createRTPSWriter(mp_participant, watt, *mp_history);
+    if(mp_writer == nullptr)
+        return false;
 
-	//ADD REMOTE READER (IN THIS CASE A READER IN THE SAME MACHINE)
-	RemoteReaderAttributes ratt;
-	Locator_t loc;
-	loc.set_IP4_address(ip);
-	loc.port = port;
-	ratt.endpoint.multicastLocatorList.push_back(loc);
-	mp_writer->matched_reader_add(ratt);
-	return true;
+    //ADD REMOTE READER (IN THIS CASE A READER IN THE SAME MACHINE)
+    RemoteReaderAttributes ratt;
+    Locator_t loc;
+    loc.set_IP4_address(ip);
+    loc.port = port;
+    ratt.endpoint.multicastLocatorList.push_back(loc);
+    mp_writer->matched_reader_add(ratt);
+    return true;
 }
 
 void TestWriterSocket::run(uint16_t nmsgs)
 {
-	for(int i = 0;i<nmsgs;++i )
-	{
-		CacheChange_t * ch = mp_writer->new_change([]() -> uint32_t { return 255; }, ALIVE);
+    for(int i = 0;i<nmsgs;++i )
+    {
+        CacheChange_ptr ch = mp_writer->new_change([]() -> uint32_t { return 255; }, ALIVE);
+
+        if(ch)
+        {
 #if defined(_WIN32)
-		ch->serializedPayload.length =
-			sprintf_s((char*)ch->serializedPayload.data,255, "My example string %d", i)+1;
+            ch->serialized_payload.length =
+                sprintf_s((char*)ch->serialized_payload.data,255, "My example string %d", i)+1;
 #else
-		ch->serializedPayload.length =
-			sprintf((char*)ch->serializedPayload.data,"My example string %d",i)+1;
+            ch->serialized_payload.length =
+                sprintf((char*)ch->serialized_payload.data,"My example string %d",i)+1;
 #endif
-		printf("Sending: %s\n",(char*)ch->serializedPayload.data);
-		mp_history->add_change(ch);
-	}
+            printf("Sending: %s\n",(char*)ch->serialized_payload.data);
+            mp_history->add_change(ch);
+        }
+        else
+        {
+            std::cout << "Cannot write sample" << std::endl;
+        }
+    }
 }

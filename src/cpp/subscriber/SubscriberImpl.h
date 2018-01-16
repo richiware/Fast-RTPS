@@ -37,7 +37,7 @@ namespace rtps
     class RTPSParticipant;
 }
 
-using namespace rtps;
+
 
 class TopicDataType;
 class SubscriberListener;
@@ -76,8 +76,8 @@ class SubscriberImpl
 
     ///@{
 
-    bool readNextData(void* data,SampleInfo_t* info);
-    bool takeNextData(void* data,SampleInfo_t* info);
+    bool readNextData(void* data, SampleInfo_t* info);
+    bool takeNextData(void* data, SampleInfo_t* info);
 
     ///@}
 
@@ -92,7 +92,7 @@ class SubscriberImpl
      * Get associated GUID
      * @return Associated GUID
      */
-    const GUID_t& getGuid();
+    const rtps::GUID_t& getGuid();
 
     /**
      * Get the Attributes of the Subscriber.
@@ -115,32 +115,40 @@ class SubscriberImpl
     bool isInCleanState() const;
 
     private:
+
     //!Participant
     Participant::impl& participant_;
 
     //!Pointer to associated RTPSReader
-    RTPSReader* mp_reader;
+    rtps::RTPSReader* mp_reader;
+
     //! Pointer to the TopicDataType object.
     TopicDataType* mp_type;
+
     //!Attributes of the Subscriber
     SubscriberAttributes m_att;
+
     //!History
     SubscriberHistory m_history;
+
     //!Listener
     SubscriberListener* mp_listener;
-    class SubscriberReaderListener : public ReaderListener
+    class SubscriberReaderListener : public rtps::ReaderListener
     {
         public:
             SubscriberReaderListener(SubscriberImpl* s): mp_subscriberImpl(s){};
+
             virtual ~SubscriberReaderListener(){};
-            void onReaderMatched(RTPSReader* reader,MatchingInfo& info);
-            void onNewCacheChangeAdded(RTPSReader * reader,const CacheChange_t* const change);
+
+            void onReaderMatched(rtps::RTPSReader* reader, rtps::MatchingInfo& info);
+
+            void onNewCacheChangeAdded(rtps::RTPSReader* reader, const rtps::CacheChange_t* const change);
             SubscriberImpl* mp_subscriberImpl;
     }m_readerListener;
 
     Subscriber* mp_userSubscriber;
     //!RTPSParticipant
-    RTPSParticipant* mp_rtpsParticipant;
+    rtps::RTPSParticipant* mp_rtpsParticipant;
 };
 
 

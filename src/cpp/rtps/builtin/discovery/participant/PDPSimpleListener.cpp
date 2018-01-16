@@ -140,14 +140,19 @@ void PDPSimpleListener::onNewCacheChangeAdded(RTPSReader* reader, const CacheCha
         GUID_t guid;
         iHandle2GUID(guid, change->instance_handle);
 
-        this->mp_SPDP->removeRemoteParticipant(guid);
-        RTPSParticipantDiscoveryInfo info;
-        info.m_status = REMOVED_RTPSPARTICIPANT;
-        info.m_guid = guid;
-        if(this->mp_SPDP->getRTPSParticipant()->getListener()!=nullptr)
-            this->mp_SPDP->getRTPSParticipant()->getListener()->onRTPSParticipantDiscovery(
-                    this->mp_SPDP->getRTPSParticipant()->getUserRTPSParticipant(),
-                    info);
+        if(this->mp_SPDP->removeRemoteParticipant(guid))
+        {
+            if(this->mp_SPDP->getRTPSParticipant()->getListener()!=nullptr)
+            {
+                RTPSParticipantDiscoveryInfo info;
+                info.m_status = REMOVED_RTPSPARTICIPANT;
+                info.m_guid = guid;
+                if(this->mp_SPDP->getRTPSParticipant()->getListener()!=nullptr)
+                    this->mp_SPDP->getRTPSParticipant()->getListener()->onRTPSParticipantDiscovery(
+                            this->mp_SPDP->getRTPSParticipant()->getUserRTPSParticipant(),
+                            info);
+            }
+        }
     }
 
     //Remove change form history.
@@ -180,13 +185,13 @@ bool PDPSimpleListener::getKey(CacheChange_t* change)
         }
         if(pid == PID_PARTICIPANT_GUID)
         {
-            valid &= CDRMessage::readData(&aux_msg, change->instance_handle.value,16);
+            valid &= CDRMessage::readData(&aux_msg, change->instance_handle.value, 16);
             aux_msg.buffer = nullptr;
             return true;
         }
         if(pid == PID_KEY_HASH)
         {
-            valid &= CDRMessage::readData(&aux_msg, change->instance_handle.value,16);
+            valid &= CDRMessage::readData(&aux_msg, change->instance_handle.value, 16);
             aux_msg.buffer = nullptr;
             return true;
         }

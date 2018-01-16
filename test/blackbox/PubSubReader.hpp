@@ -54,25 +54,37 @@ class PubSubReader
 
                 ~ParticipantListener() {}
 
-                void onParticipantDiscovery(Participant*, ParticipantDiscoveryInfo info){
-                    if(reader_.onDiscovery_!=nullptr){
+                void onParticipantDiscovery(eprosima::fastrtps::Participant*, eprosima::fastrtps::ParticipantDiscoveryInfo info)
+                {
+                    if(reader_.onDiscovery_!=nullptr)
+                    {
                         reader_.discovery_result_ = reader_.onDiscovery_(info);
+
+                    }
+
+                    if(info.rtps.m_status == eprosima::fastrtps::rtps::DISCOVERED_RTPSPARTICIPANT)
+                    {
+                        reader_.participant_matched();
+                    }
+                    else if(info.rtps.m_status == eprosima::fastrtps::rtps::REMOVED_RTPSPARTICIPANT)
+                    {
+                        reader_.participant_unmatched();
                     }
                 }
 
 #if HAVE_SECURITY
-                void onParticipantAuthentication(Participant*, const ParticipantAuthenticationInfo& info)
+                void onParticipantAuthentication(eprosima::fastrtps::Participant*, const eprosima::fastrtps::ParticipantAuthenticationInfo& info)
                 {
-                    if(info.rtps.status() == AUTHORIZED_RTPSPARTICIPANT)
+                    if(info.rtps.status() == eprosima::fastrtps::rtps::AUTHORIZED_RTPSPARTICIPANT)
                         reader_.authorized();
-                    else if(info.rtps.status() == UNAUTHORIZED_RTPSPARTICIPANT)
+                    else if(info.rtps.status() == eprosima::fastrtps::rtps::UNAUTHORIZED_RTPSPARTICIPANT)
                         reader_.unauthorized();
                 }
 #endif
 
             private:
 
-                ParticipantListener& operator=(const ParticipantListener&) NON_COPYABLE_CXX11;
+                ParticipantListener& operator=(const ParticipantListener&) = delete;
 
                 PubSubReader& reader_;
         } participant_listener_;
@@ -92,9 +104,9 @@ class PubSubReader
                     reader_.receive_one(sub, ret);
                 }
 
-                void onSubscriptionMatched(eprosima::fastrtps::Subscriber* /*sub*/, MatchingInfo& info)
+                void onSubscriptionMatched(eprosima::fastrtps::Subscriber* /*sub*/, eprosima::fastrtps::rtps::MatchingInfo& info)
                 {
-                    if (info.status == MATCHED_MATCHING)
+                    if (info.status == eprosima::fastrtps::rtps::MATCHED_MATCHING)
                         reader_.matched();
                     else
                         reader_.unmatched();
@@ -102,7 +114,7 @@ class PubSubReader
 
             private:
 
-                Listener& operator=(const Listener&) NON_COPYABLE_CXX11;
+                Listener& operator=(const Listener&) = delete;
 
                 PubSubReader& reader_;
         } listener_;
@@ -111,8 +123,9 @@ class PubSubReader
 
     public:
 
-        PubSubReader(const std::string& topic_name) : participant_listener_(*this), listener_(*this), participant_(nullptr), subscriber_(nullptr),
-        topic_name_(topic_name), initialized_(false), matched_(0), receiving_(false), current_received_count_(0),
+        PubSubReader(const std::string& topic_name) : participant_listener_(*this), listener_(*this),
+        participant_(nullptr), subscriber_(nullptr), topic_name_(topic_name), initialized_(false),
+        matched_(0), participant_matched_(0), receiving_(false), current_received_count_(0),
         number_samples_expected_(0), discovery_result_(false), onDiscovery_(nullptr)
 #if HAVE_SECURITY
         , authorized_(0), unauthorized_(0)
@@ -125,11 +138,11 @@ class PubSubReader
             subscriber_attr_.topic.topicName = t.str();
 
 #if defined(PREALLOCATED_WITH_REALLOC_MEMORY_MODE_TEST)
-            subscriber_attr_.historyMemoryPolicy = PREALLOCATED_WITH_REALLOC_MEMORY_MODE;
+            subscriber_attr_.historyMemoryPolicy = eprosima::fastrtps::rtps::PREALLOCATED_WITH_REALLOC_MEMORY_MODE;
 #elif defined(DYNAMIC_RESERVE_MEMORY_MODE_TEST)
-            subscriber_attr_.historyMemoryPolicy = DYNAMIC_RESERVE_MEMORY_MODE;
+            subscriber_attr_.historyMemoryPolicy = eprosima::fastrtps::rtps::DYNAMIC_RESERVE_MEMORY_MODE;
 #else
-            subscriber_attr_.historyMemoryPolicy = PREALLOCATED_MEMORY_MODE;
+            subscriber_attr_.historyMemoryPolicy = eprosima::fastrtps::rtps::PREALLOCATED_MEMORY_MODE;
 #endif
 
             // By default, heartbeat period delay is 100 milliseconds.
@@ -140,7 +153,7 @@ class PubSubReader
         ~PubSubReader()
         {
             if(participant_ != nullptr)
-                Domain::removeParticipant(participant_);
+                eprosima::fastrtps::Domain::removeParticipant(participant_);
         }
 
         void init()
@@ -166,7 +179,7 @@ class PubSubReader
         {
             if(participant_ != nullptr)
             {
-                Domain::removeParticipant(participant_);
+                eprosima::fastrtps::Domain::removeParticipant(participant_);
                 participant_ = nullptr;
             }
         }
@@ -240,23 +253,30 @@ class PubSubReader
 
             std::cout << "Reader is waiting discovery..." << std::endl;
 
-            if(matched_ == 0)
-                cvDiscovery_.wait(lock);
+            cvDiscovery_.wait(lock, [&](){return matched_ != 0;});
 
-            ASSERT_NE(matched_, 0u);
             std::cout << "Reader discovery finished..." << std::endl;
         }
 
-        void waitRemoval()
+        void wait_participant_undiscovery()
+        {
+            std::unique_lock<std::mutex> lock(mutexDiscovery_);
+
+            std::cout << "Reader is waiting undiscovery..." << std::endl;
+
+            cvDiscovery_.wait(lock, [&](){return participant_matched_ == 0;});
+
+            std::cout << "Reader undiscovery finished..." << std::endl;
+        }
+
+        void wait_writer_undiscovery()
         {
             std::unique_lock<std::mutex> lock(mutexDiscovery_);
 
             std::cout << "Reader is waiting removal..." << std::endl;
 
-            if(matched_ != 0)
-                cvDiscovery_.wait(lock);
+            cvDiscovery_.wait(lock, [&](){return matched_ == 0;});
 
-            ASSERT_EQ(matched_, 0u);
             std::cout << "Reader removal finished..." << std::endl;
         }
 
@@ -318,7 +338,7 @@ class PubSubReader
             return *this;
         }
 
-        PubSubReader& add_user_transport_to_pparams(std::shared_ptr<TransportDescriptorInterface> userTransportDescriptor)
+        PubSubReader& add_user_transport_to_pparams(std::shared_ptr<eprosima::fastrtps::rtps::TransportDescriptorInterface> userTransportDescriptor)
         {
             participant_attr_.rtps.userTransports.push_back(userTransportDescriptor);
             return *this;
@@ -343,31 +363,31 @@ class PubSubReader
             return *this;
         }
 
-        PubSubReader& unicastLocatorList(LocatorList_t unicastLocators)
+        PubSubReader& unicastLocatorList(eprosima::fastrtps::rtps::LocatorList_t unicastLocators)
         {
             subscriber_attr_.unicastLocatorList = unicastLocators;
             return *this;
         }
 
-        PubSubReader& multicastLocatorList(LocatorList_t multicastLocators)
+        PubSubReader& multicastLocatorList(eprosima::fastrtps::rtps::LocatorList_t multicastLocators)
         {
             subscriber_attr_.multicastLocatorList = multicastLocators;
             return *this;
         }
 
-        PubSubReader& metatraffic_unicast_locator_list(LocatorList_t unicastLocators)
+        PubSubReader& metatraffic_unicast_locator_list(eprosima::fastrtps::rtps::LocatorList_t unicastLocators)
         {
             participant_attr_.rtps.builtin.metatrafficUnicastLocatorList = unicastLocators;
             return *this;
         }
 
-        PubSubReader& initial_peers(LocatorList_t initial_peers)
+        PubSubReader& initial_peers(eprosima::fastrtps::rtps::LocatorList_t initial_peers)
         {
             participant_attr_.rtps.builtin.initialPeersList = initial_peers;
             return *this;
         }
 
-        PubSubReader& outLocatorList(LocatorList_t outLocators)
+        PubSubReader& outLocatorList(eprosima::fastrtps::rtps::LocatorList_t outLocators)
         {
             subscriber_attr_.outLocatorList = outLocators;
             return *this;
@@ -405,13 +425,13 @@ class PubSubReader
         {
             participant_attr_.rtps.participantID = participantId;
 
-            LocatorList_t default_unicast_locators;
-            Locator_t default_unicast_locator;
+            eprosima::fastrtps::rtps::LocatorList_t default_unicast_locators;
+            eprosima::fastrtps::rtps::Locator_t default_unicast_locator;
 
             default_unicast_locators.push_back(default_unicast_locator);
             participant_attr_.rtps.builtin.metatrafficUnicastLocatorList = default_unicast_locators;
 
-            Locator_t loopback_locator;
+            eprosima::fastrtps::rtps::Locator_t loopback_locator;
             loopback_locator.set_IP4_address(127, 0, 0, 1);
             participant_attr_.rtps.builtin.initialPeersList.push_back(loopback_locator);
             return *this;
@@ -435,13 +455,13 @@ class PubSubReader
             return *this;
         }
 
-        PubSubReader& userData(std::vector<octet> user_data)
+        PubSubReader& userData(std::vector<eprosima::fastrtps::rtps::octet> user_data)
         {
             participant_attr_.rtps.userData = user_data;
             return *this;
         }
 
-        PubSubReader& lease_duration(Duration_t lease_duration, Duration_t announce_period)
+        PubSubReader& lease_duration(eprosima::fastrtps::rtps::Duration_t lease_duration, eprosima::fastrtps::rtps::Duration_t announce_period)
         {
             participant_attr_.rtps.builtin.leaseDuration = lease_duration;
             participant_attr_.rtps.builtin.leaseDuration_announcementperiod = announce_period;
@@ -454,7 +474,7 @@ class PubSubReader
             return discovery_result_;
         }
 
-        void setOnDiscoveryFunction(std::function<bool(const ParticipantDiscoveryInfo&)> f){
+        void setOnDiscoveryFunction(std::function<bool(const eprosima::fastrtps::ParticipantDiscoveryInfo&)> f){
             onDiscovery_ = f;
         }
 
@@ -467,7 +487,7 @@ class PubSubReader
             if(receiving_.load())
             {
                 type data;
-                SampleInfo_t info;
+                eprosima::fastrtps::SampleInfo_t info;
 
                 if(subscriber->takeNextData((void*)&data, &info))
                 {
@@ -479,7 +499,7 @@ class PubSubReader
                     ASSERT_LT(last_seq, info.sample_identity.sequence_number());
                     last_seq = info.sample_identity.sequence_number();
 
-                    if(info.sampleKind == ALIVE)
+                    if(info.sampleKind == eprosima::fastrtps::rtps::ALIVE)
                     {
                         auto it = std::find(total_msgs_.begin(), total_msgs_.end(), data);
                         ASSERT_NE(it, total_msgs_.end());
@@ -490,6 +510,20 @@ class PubSubReader
                     }
                 }
             }
+        }
+
+        void participant_matched()
+        {
+            std::unique_lock<std::mutex> lock(mutexDiscovery_);
+            ++participant_matched_;
+            cvDiscovery_.notify_one();
+        }
+
+        void participant_unmatched()
+        {
+            std::unique_lock<std::mutex> lock(mutexDiscovery_);
+            --participant_matched_;
+            cvDiscovery_.notify_one();
         }
 
         void matched()
@@ -524,7 +558,7 @@ class PubSubReader
         }
 #endif
 
-        PubSubReader& operator=(const PubSubReader&)NON_COPYABLE_CXX11;
+        PubSubReader& operator=(const PubSubReader&)= delete;
 
         eprosima::fastrtps::Participant *participant_;
         eprosima::fastrtps::ParticipantAttributes participant_attr_;
@@ -538,14 +572,15 @@ class PubSubReader
         std::mutex mutexDiscovery_;
         std::condition_variable cvDiscovery_;
         unsigned int matched_;
+        unsigned int participant_matched_;
         std::atomic<bool> receiving_;
         type_support type_;
-        SequenceNumber_t last_seq;
+		eprosima::fastrtps::rtps::SequenceNumber_t last_seq;
         size_t current_received_count_;
         size_t number_samples_expected_;
         bool discovery_result_;
 
-        std::function<bool(const ParticipantDiscoveryInfo& info)> onDiscovery_;
+        std::function<bool(const eprosima::fastrtps::ParticipantDiscoveryInfo& info)> onDiscovery_;
 
 #if HAVE_SECURITY
         std::mutex mutexAuthentication_;

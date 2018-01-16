@@ -34,8 +34,8 @@
 
 #include "fastrtps/utils/eClock.h"
 
-using namespace eprosima;
-using namespace fastrtps;
+using namespace eprosima::fastrtps;
+using namespace eprosima::fastrtps::rtps;
 
 
 TestWriterRegistered::TestWriterRegistered():
@@ -72,7 +72,7 @@ bool TestWriterRegistered::init()
     //CREATE WRITER
     WriterAttributes watt;
     watt.endpoint.reliabilityKind = BEST_EFFORT;
-    mp_writer = RTPSDomain::createRTPSWriter(mp_participant,watt,mp_history,&m_listener);
+    mp_writer = RTPSDomain::createRTPSWriter(mp_participant, watt, *mp_history, &m_listener);
     if(mp_writer == nullptr)
         return false;
 
@@ -101,22 +101,31 @@ void TestWriterRegistered::run(uint16_t samples)
 
     for(int i = 0;i<samples;++i )
     {
-        CacheChange_t * ch = mp_writer->new_change([]() -> uint32_t { return 255;}, ALIVE);
-        if(!ch){	// In the case history is full, remove some old changes
+        CacheChange_ptr ch = mp_writer->new_change([]() -> uint32_t { return 255;}, ALIVE);
+
+        if(!ch)
+        {	// In the case history is full, remove some old changes
             std::cout << "cleaning history...";
-            //TODO(Ricardo) Remove from history instead of writer.
-            mp_writer->remove_older_changes(20);
+            mp_history->remove_min_change();
+
             ch = mp_writer->new_change([]() -> uint32_t { return 255;}, ALIVE);
         }
 
+        if(ch)
+        {
 #if defined(_WIN32)
-        ch->serializedPayload.length =
-            sprintf_s((char*)ch->serializedPayload.data,255, "My example string %d", i)+1;
+            ch->serialized_payload.length =
+                sprintf_s((char*)ch->serialized_payload.data,255, "My example string %d", i)+1;
 #else
-        ch->serializedPayload.length =
-            sprintf((char*)ch->serializedPayload.data,"My example string %d",i)+1;
+            ch->serialized_payload.length =
+                sprintf((char*)ch->serialized_payload.data,"My example string %d",i)+1;
 #endif
-        printf("Sending: %s\n",(char*)ch->serializedPayload.data);
-        mp_history->add_change(ch);
+            printf("Sending: %s\n",(char*)ch->serialized_payload.data);
+            mp_history->add_change(ch);
+        }
+        else
+        {
+            std::cout << "Cannot write sample" << std::endl;
+        }
     }
 }

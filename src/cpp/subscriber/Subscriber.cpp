@@ -20,8 +20,8 @@
 #include <fastrtps/subscriber/Subscriber.h>
 #include "SubscriberImpl.h"
 
-namespace eprosima {
-namespace fastrtps {
+using namespace eprosima::fastrtps;
+using namespace eprosima::fastrtps::rtps;
 
 const GUID_t& Subscriber::getGuid()
 {
@@ -47,7 +47,7 @@ bool Subscriber::updateAttributes(SubscriberAttributes& att)
     return mp_impl->updateAttributes(att);
 }
 
-SubscriberAttributes Subscriber::getAttributes()
+SubscriberAttributes Subscriber::getAttributes() const
 {
     return mp_impl->getAttributes();
 }
@@ -56,6 +56,3 @@ bool Subscriber::isInCleanState() const
 {
     return mp_impl->isInCleanState();
 }
-
-} /* namespace fastrtps */
-} /* namespace eprosima */

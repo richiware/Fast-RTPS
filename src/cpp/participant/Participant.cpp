@@ -19,8 +19,8 @@
 
 #include "ParticipantImpl.h"
 
-namespace eprosima {
-namespace fastrtps {
+using namespace eprosima::fastrtps;
+using namespace eprosima::fastrtps::rtps;
 
 Participant::Participant(const ParticipantAttributes& attr, ParticipantListener* listener) :
     impl_(new Participant::impl(*this, attr, listener))
@@ -36,7 +36,7 @@ const GUID_t& Participant::getGuid() const
     return impl_->getGuid();
 }
 
-const ParticipantAttributes& Participant::getAttributes()
+const ParticipantAttributes& Participant::getAttributes() const
 {
     return impl_->getAttributes();
 }
@@ -53,7 +53,8 @@ std::pair<StatefulReader*,StatefulReader*> Participant::getEDPReaders(){
     return impl_->getEDPReaders();
 }
 
-std::vector<std::string> Participant::getParticipantNames(){
+std::vector<std::string> Participant::getParticipantNames() const
+{
     return impl_->getParticipantNames();
 }
 
@@ -66,6 +67,3 @@ bool Participant::get_remote_reader_info(const GUID_t& readerGuid, ReaderProxyDa
 {
     return impl_->get_remote_reader_info(readerGuid, returnedInfo);
 }
-
-} /* namespace pubsub */
-} /* namespace eprosima */

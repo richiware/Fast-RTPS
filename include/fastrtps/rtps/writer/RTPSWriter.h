@@ -209,7 +209,7 @@ class RTPSWriter : public Endpoint
 
     CacheChangePool cachechange_pool_;
 
-    RTPSWriter& operator=(const RTPSWriter&) NON_COPYABLE_CXX11;
+    RTPSWriter& operator=(const RTPSWriter&) = delete;
 };
 }
 } /* namespace rtps */

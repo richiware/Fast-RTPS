@@ -21,9 +21,8 @@
 
 #include <fastrtps/log/Log.h>
 
-namespace eprosima {
-namespace fastrtps {
-
+using namespace eprosima::fastrtps;
+using namespace eprosima::fastrtps::rtps;
 
 Publisher::Publisher(Participant::impl& participant, TopicDataType* ptype,
             PublisherAttributes& att, PublisherListener* p_listen) :
@@ -81,10 +80,7 @@ const GUID_t& Publisher::getGuid()
     return get_implementation(*this).getGuid();
 }
 
-PublisherAttributes Publisher::getAttributes()
+PublisherAttributes Publisher::getAttributes() const
 {
     return get_implementation(*this).getAttributes();
 }
-
-} /* namespace pubsub */
-} /* namespace eprosima */

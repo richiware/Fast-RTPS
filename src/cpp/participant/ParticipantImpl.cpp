@@ -41,11 +41,8 @@
 
 #include <fastrtps/log/Log.h>
 
+using namespace eprosima::fastrtps;
 using namespace eprosima::fastrtps::rtps;
-
-namespace eprosima {
-namespace fastrtps {
-
 
 Participant::impl::impl(Participant& participant, const ParticipantAttributes& patt,
         ParticipantListener* listener) :
@@ -195,12 +192,13 @@ Publisher* Participant::impl::createPublisher(PublisherAttributes& att,
 }
 
 
-std::pair<StatefulReader*,StatefulReader*> Participant::impl::getEDPReaders(){
-
+std::pair<StatefulReader*,StatefulReader*> Participant::impl::getEDPReaders()
+{
     return mp_rtpsParticipant->getEDPReaders();
 }
 
-std::vector<std::string> Participant::impl::getParticipantNames(){
+std::vector<std::string> Participant::impl::getParticipantNames() const
+{
     return mp_rtpsParticipant->getParticipantNames();
 }
 
@@ -424,6 +422,3 @@ bool Participant::impl::get_remote_reader_info(const GUID_t& readerGuid, ReaderP
 {
     return mp_rtpsParticipant->get_remote_reader_info(readerGuid, returnedInfo);
 }
-
-} /* namespace pubsub */
-} /* namespace eprosima */
