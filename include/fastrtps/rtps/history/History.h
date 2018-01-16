@@ -17,15 +17,11 @@
  *
  */
 
-#ifndef HISTORY_H_
-#define HISTORY_H_
-
-#include <mutex>
+#ifndef __RTPS_HISTORY_H__
+#define __RTPS_HISTORY_H__
 
 #include "../../fastrtps_dll.h"
-
 #include "CacheChangePool.h"
-
 #include "../common/SequenceNumber.h"
 #include "../common/Guid.h"
 #include "../attributes/HistoryAttributes.h"
@@ -55,19 +51,19 @@ class History
          */
         RTPS_DllAPI inline bool reserve_Cache(CacheChange_t** change, const std::function<uint32_t()>& calculateSizeFunc)
         {
-            return m_changePool.reserve_Cache(change, calculateSizeFunc);
+            return m_changePool.reserve_cache(change, calculateSizeFunc);
         }
 
         RTPS_DllAPI inline bool reserve_Cache(CacheChange_t** change, uint32_t dataSize)
         {
-            return m_changePool.reserve_Cache(change, dataSize);
+            return m_changePool.reserve_cache(change, dataSize);
         }
 
         /**
          * release a previously reserved CacheChange_t.
          * @param ch Pointer to the CacheChange_t.
          */
-        RTPS_DllAPI inline void release_Cache(CacheChange_t* ch) { return m_changePool.release_Cache(ch); }
+        RTPS_DllAPI inline void release_Cache(CacheChange_t* ch) { return m_changePool.release_cache(ch); }
 
         /**
          * Check if the history is full
@@ -123,7 +119,7 @@ class History
          * Get the maximum serialized payload size
          * @return Maximum serialized payload size
          */
-        RTPS_DllAPI inline uint32_t getTypeMaxSerialized(){ return m_changePool.getInitialPayloadSize(); }
+        RTPS_DllAPI inline uint32_t getTypeMaxSerialized(){ return m_changePool.get_initial_payload_size(); }
 
         /*!
          * Get the mutex
@@ -156,4 +152,4 @@ class History
 } /* namespace rtps */
 } /* namespace eprosima */
 
-#endif /* HISTORY_H_ */
+#endif /*__RTPS HISTORY_H__ */

@@ -15,6 +15,7 @@
 #include "HandshakeMessageTokenResent.h"
 #include "../SecurityManager.h"
 #include <rtps/participant/RTPSParticipantImpl.h>
+#include <fastrtps/rtps/writer/StatelessWriter.h>
 #include <fastrtps/rtps/history/WriterHistory.h>
 #include <fastrtps/rtps/resources/ResourceEvent.h>
 #include <fastrtps/log/Log.h>
@@ -53,15 +54,17 @@ void HandshakeMessageTokenResent::event(EventCode code, const char* msg)
             {
                 if(remote_participant_info->change_sequence_number_ != SequenceNumber_t::unknown())
                 {
-                    CacheChange_t* p_change = security_manager_.participant_stateless_message_writer_history_->remove_change_and_reuse(
+                    CacheChange_ptr p_change =
+                        security_manager_.participant_stateless_message_writer_history_->remove_change(
                             remote_participant_info->change_sequence_number_);
                     remote_participant_info->change_sequence_number_ = SequenceNumber_t::unknown();
 
-                    if(p_change != nullptr)
+                    if(p_change)
                     {
+                        security_manager_.participant_stateless_message_writer_->reuse_change(p_change);
                         if(security_manager_.participant_stateless_message_writer_history_->add_change(p_change))
                         {
-                            remote_participant_info->change_sequence_number_ = p_change->sequenceNumber;
+                            remote_participant_info->change_sequence_number_ = p_change->sequence_number;
                         }
                         //TODO (Ricardo) What to do if not added?
                     }

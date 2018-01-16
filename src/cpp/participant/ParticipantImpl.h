@@ -17,9 +17,11 @@
  *
  */
 
-#ifndef PARTICIPANTIMPL_H_
-#define PARTICIPANTIMPL_H_
+#ifndef __PARTICIPANT_PARTICIPANTIMPL_H__
+#define __PARTICIPANT_PARTICIPANTIMPL_H__
+
 #ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
+#include <fastrtps/participant/Participant.h>
 #include <fastrtps/rtps/common/Guid.h>
 #include <fastrtps/rtps/participant/RTPSParticipantListener.h>
 #include <fastrtps/attributes/ParticipantAttributes.h>
@@ -34,14 +36,9 @@ class WriterProxyData;
 class ReaderProxyData;
 }
 
-using namespace rtps;
-
-class Participant;
 class ParticipantListener;
-
 class TopicDataType;
 class Publisher;
-class PublisherImpl;
 class PublisherAttributes;
 class PublisherListener;
 class Subscriber;
@@ -53,19 +50,37 @@ class SubscriberListener;
  * This is the implementation class of the Participant.
  * @ingroup FASTRTPS_MODULE
  */
-class ParticipantImpl
+class Participant::impl
 {
-    friend class Domain;
-    typedef std::pair<Publisher*,PublisherImpl*> t_p_PublisherPair;
     typedef std::pair<Subscriber*,SubscriberImpl*> t_p_SubscriberPair;
-    typedef std::vector<t_p_PublisherPair> t_v_PublisherPairs;
+    typedef std::vector<Publisher*> v_publishers;
     typedef std::vector<t_p_SubscriberPair> t_v_SubscriberPairs;
 
-    private:
-    ParticipantImpl(ParticipantAttributes& patt,Participant* pspart,ParticipantListener* listen = nullptr);
-    virtual ~ParticipantImpl();
+    class MyRTPSParticipantListener : public RTPSParticipantListener
+    {
+        public:
+
+            MyRTPSParticipantListener(Participant& participant): participant_(participant) {};
+
+            virtual ~MyRTPSParticipantListener(){};
+
+            void onRTPSParticipantDiscovery(RTPSParticipant* part, RTPSParticipantDiscoveryInfo info);
+
+#if HAVE_SECURITY
+            void onRTPSParticipantAuthentication(RTPSParticipant* part, const RTPSParticipantAuthenticationInfo& info);
+#endif
+
+            Participant& participant_;
+
+    } rtps_listener_;
+
 
     public:
+
+    impl(Participant& participant, const ParticipantAttributes& attr,
+            ParticipantListener* listen = nullptr);
+
+    virtual ~impl();
 
     /**
      * Register a type in this participant.
@@ -144,45 +159,49 @@ class ParticipantImpl
 
     bool get_remote_reader_info(const GUID_t& readerGuid, ReaderProxyData& returnedInfo);
 
-    private:
-    //!Participant Attributes
-    ParticipantAttributes m_att;
-    //!RTPSParticipant
-    RTPSParticipant* mp_rtpsParticipant;
-    //!Participant*
-    Participant* mp_participant;
-    //!Participant Listener
-    ParticipantListener* mp_listener;
-    //!Publisher Vector
-    t_v_PublisherPairs m_publishers;
-    //!Subscriber Vector
-    t_v_SubscriberPairs m_subscribers;
-    //!TOpicDatType vector
-    std::vector<TopicDataType*> m_types;
+    MyRTPSParticipantListener* rtps_listener() { return &rtps_listener_; }
+
+    void rtps_participant(RTPSParticipant* rtps_participant)
+    {
+        mp_rtpsParticipant = rtps_participant;
+    }
+
+    RTPSParticipant* rtps_participant()
+    {
+        return mp_rtpsParticipant;
+    }
 
     bool getRegisteredType(const char* typeName, TopicDataType** type);
 
-    class MyRTPSParticipantListener : public RTPSParticipantListener
-    {
-        public:
+    private:
 
-            MyRTPSParticipantListener(ParticipantImpl* impl): mp_participantimpl(impl){};
+    //!Participant Attributes
+    ParticipantAttributes m_att;
 
-            virtual ~MyRTPSParticipantListener(){};
+    //!RTPSParticipant
+    RTPSParticipant* mp_rtpsParticipant;
 
-            void onRTPSParticipantDiscovery(RTPSParticipant* part, RTPSParticipantDiscoveryInfo info);
+    //!Participant Listener
+    ParticipantListener* mp_listener;
 
-#if HAVE_SECURITY
-            void onRTPSParticipantAuthentication(RTPSParticipant* part, const RTPSParticipantAuthenticationInfo& info);
-#endif
+    //!Publisher Vector
+    v_publishers m_publishers;
 
-            ParticipantImpl* mp_participantimpl;
+    //!Subscriber Vector
+    t_v_SubscriberPairs m_subscribers;
 
-    } m_rtps_listener;
-
+    //!TOpicDatType vector
+    std::vector<TopicDataType*> m_types;
 };
 
-} /* namespace  */
-} /* namespace eprosima */
+inline Participant::impl& get_implementation(Participant& participant)
+{
+    return *participant.impl_;
+}
+
+} //namespace fastrtps
+} //namespace eprosima
+
 #endif
-#endif /* PARTICIPANTIMPL_H_ */
+
+#endif /* __PARTICIPANT_PARTICIPANTIMPL_H__ */

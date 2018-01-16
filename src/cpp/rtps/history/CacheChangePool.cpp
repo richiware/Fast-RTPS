@@ -60,10 +60,12 @@ CacheChangePool::CacheChangePool(int32_t pool_size, uint32_t payload_size, int32
             m_max_pool_size = (uint32_t)abs(pool_size);
         }
         else
-            m_max_pool_size = (uint32_t)abs(max_pool_size + 1);
+            m_max_pool_size = (uint32_t)abs(max_pool_size);
     }
     else
+    {
         m_max_pool_size = 0;
+    }
 
     switch(memoryMode)
     {
@@ -81,17 +83,17 @@ CacheChangePool::CacheChangePool(int32_t pool_size, uint32_t payload_size, int32
     }
 }
 
-bool CacheChangePool::reserve_Cache(CacheChange_t** chan, const std::function<uint32_t()>& calculateSizeFunc)
+bool CacheChangePool::reserve_cache(CacheChange_t** chan, const std::function<uint32_t()>& calculateSizeFunc)
 {
     uint32_t dataSize = 0;
 
     if(memoryMode != PREALLOCATED_MEMORY_MODE)
         dataSize = calculateSizeFunc();
 
-    return reserve_Cache(chan, dataSize);
+    return reserve_cache(chan, dataSize);
 }
 
-bool CacheChangePool::reserve_Cache(CacheChange_t** chan, uint32_t dataSize)
+bool CacheChangePool::reserve_cache(CacheChange_t** chan, uint32_t dataSize)
 {
     std::lock_guard<std::mutex> guard(*this->mp_mutex);
 
@@ -123,7 +125,7 @@ bool CacheChangePool::reserve_Cache(CacheChange_t** chan, uint32_t dataSize)
             // TODO(Ricardo) Improve reallocation.
             try
             {
-                (*chan)->serializedPayload.reserve(dataSize);
+                (*chan)->serialized_payload.reserve(dataSize);
             }
             catch(std::bad_alloc& ex)
             {
@@ -144,44 +146,44 @@ bool CacheChangePool::reserve_Cache(CacheChange_t** chan, uint32_t dataSize)
     return true;
 }
 
-void CacheChangePool::release_Cache(CacheChange_t* ch)
+void CacheChangePool::release_cache(CacheChange_t* cachechange)
 {
     std::lock_guard<std::mutex> guard(*this->mp_mutex);
 
     switch(memoryMode)
     {
         case PREALLOCATED_MEMORY_MODE:
-            ch->kind = ALIVE;
-            ch->sequenceNumber.high = 0;
-            ch->sequenceNumber.low = 0;
-            ch->writerGUID = c_Guid_Unknown;
-            ch->serializedPayload.length = 0;
-            ch->serializedPayload.pos = 0;
+            cachechange->kind = ALIVE;
+            cachechange->sequence_number.high = 0;
+            cachechange->sequence_number.low = 0;
+            cachechange->writer_guid = c_Guid_Unknown;
+            cachechange->serialized_payload.length = 0;
+            cachechange->serialized_payload.pos = 0;
             for(uint8_t i=0;i<16;++i)
-                ch->instanceHandle.value[i] = 0;
-            ch->isRead = 0;
-            ch->sourceTimestamp.seconds = 0;
-            ch->sourceTimestamp.fraction = 0;
-            m_freeCaches.push_back(ch);
+                cachechange->instance_handle.value[i] = 0;
+            cachechange->is_read = 0;
+            cachechange->source_timestamp.seconds = 0;
+            cachechange->source_timestamp.fraction = 0;
+            m_freeCaches.push_back(cachechange);
             break;
         case PREALLOCATED_WITH_REALLOC_MEMORY_MODE:
-            ch->kind = ALIVE;
-            ch->sequenceNumber.high = 0;
-            ch->sequenceNumber.low = 0;
-            ch->writerGUID = c_Guid_Unknown;
-            ch->serializedPayload.length = 0;
-            ch->serializedPayload.pos = 0;
+            cachechange->kind = ALIVE;
+            cachechange->sequence_number.high = 0;
+            cachechange->sequence_number.low = 0;
+            cachechange->writer_guid = c_Guid_Unknown;
+            cachechange->serialized_payload.length = 0;
+            cachechange->serialized_payload.pos = 0;
             for(uint8_t i=0;i<16;++i)
-                ch->instanceHandle.value[i] = 0;
-            ch->isRead = 0;
-            ch->sourceTimestamp.seconds = 0;
-            ch->sourceTimestamp.fraction = 0;
-            m_freeCaches.push_back(ch);
+                cachechange->instance_handle.value[i] = 0;
+            cachechange->is_read = 0;
+            cachechange->source_timestamp.seconds = 0;
+            cachechange->source_timestamp.fraction = 0;
+            m_freeCaches.push_back(cachechange);
             break;
         case DYNAMIC_RESERVE_MEMORY_MODE:
             // Find pointer in CacheChange vector, remove element, then delete it
             std::vector<CacheChange_t*>::iterator target = m_allCaches.begin();	
-            target = find(m_allCaches.begin(),m_allCaches.end(), ch);
+            target = find(m_allCaches.begin(),m_allCaches.end(), cachechange);
             if(target != m_allCaches.end())
             {
                 m_allCaches.erase(target);
@@ -189,7 +191,7 @@ void CacheChangePool::release_Cache(CacheChange_t* ch)
                 logInfo(RTPS_UTILS,"Tried to release a CacheChange that is not logged in the Pool");
                 break;
             }
-            delete(ch);
+            delete(cachechange);
             --m_pool_size;
             break;
 

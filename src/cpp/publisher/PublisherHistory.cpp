@@ -19,15 +19,10 @@
 
 #include <mutex>
 
-#include <fastrtps/publisher/PublisherHistory.h>
-
 #include "PublisherImpl.h"
-
+#include <fastrtps/publisher/PublisherHistory.h>
 #include <fastrtps/rtps/writer/RTPSWriter.h>
-
 #include <fastrtps/log/Log.h>
-
-#include <mutex>
 
 extern ::rtps::WriteParams WRITE_PARAM_DEFAULT;
 

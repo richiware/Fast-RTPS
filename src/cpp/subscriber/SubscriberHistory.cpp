@@ -34,7 +34,7 @@ namespace fastrtps {
 
 inline bool sort_ReaderHistoryCache(CacheChange_t*c1,CacheChange_t*c2)
 {
-    return c1->sequenceNumber < c2->sequenceNumber;
+    return c1->sequence_number < c2->sequence_number;
 }
 
 SubscriberHistory::SubscriberHistory(SubscriberImpl* simpl,uint32_t payloadMaxSize,
@@ -95,8 +95,8 @@ bool SubscriberHistory::received_change(CacheChange_t* a_change, size_t unknown_
 
                 for(auto it = m_changes.begin(); it != m_changes.end(); ++it)
                 {
-                    if((*it)->writerGUID == a_change->writerGUID &&
-                            (*it)->sequenceNumber < a_change->sequenceNumber)
+                    if((*it)->writer_guid == a_change->writer_guid &&
+                            (*it)->sequence_number < a_change->sequence_number)
                     {
                         older = *it;
                         break;
@@ -105,7 +105,7 @@ bool SubscriberHistory::received_change(CacheChange_t* a_change, size_t unknown_
 
                 if(older != nullptr)
                 {
-                    bool read = older->isRead;
+                    bool read = older->is_read;
 
                     if(this->remove_change_sub(older))
                     {
@@ -134,8 +134,8 @@ bool SubscriberHistory::received_change(CacheChange_t* a_change, size_t unknown_
                 if((int32_t)m_changes.size()==m_resourceLimitsQos.max_samples)
                     m_isHistoryFull = true;
                 logInfo(SUBSCRIBER,this->mp_subImpl->getGuid().entityId
-                        <<": Change "<< a_change->sequenceNumber << " added from: "
-                        << a_change->writerGUID;);
+                        <<": Change "<< a_change->sequence_number << " added from: "
+                        << a_change->writer_guid;);
                 //print_changes_seqNum();
                 return true;
             }
@@ -144,15 +144,15 @@ bool SubscriberHistory::received_change(CacheChange_t* a_change, size_t unknown_
     //HISTORY WITH KEY
     else if(mp_subImpl->getAttributes().topic.getTopicKind() == WITH_KEY)
     {
-        if(!a_change->instanceHandle.isDefined() && mp_subImpl->getType() !=nullptr)
+        if(!a_change->instance_handle.is_unknown() && mp_subImpl->getType() !=nullptr)
         {
             logInfo(RTPS_HISTORY,"Getting Key of change with no Key transmitted")
-                mp_subImpl->getType()->deserialize(&a_change->serializedPayload,mp_getKeyObject);
-            if(!mp_subImpl->getType()->getKey(mp_getKeyObject,&a_change->instanceHandle))
+                mp_subImpl->getType()->deserialize(&a_change->serialized_payload, mp_getKeyObject);
+            if(!mp_subImpl->getType()->getKey(mp_getKeyObject, &a_change->instance_handle))
                 return false;
 
         }
-        else if(!a_change->instanceHandle.isDefined())
+        else if(!a_change->instance_handle.is_unknown())
         {
             logWarning(RTPS_HISTORY,"NO KEY in topic: "<< this->mp_subImpl->getAttributes().topic.topicName
                     << " and no method to obtain it";);
@@ -188,19 +188,19 @@ bool SubscriberHistory::received_change(CacheChange_t* a_change, size_t unknown_
                     for(auto it = m_changes.rbegin(); it != m_changes.rend(); ++it)
                     {
 
-                        if((*it)->writerGUID == a_change->writerGUID)
+                        if((*it)->writer_guid == a_change->writer_guid)
                         {
-                            if((*it)->sequenceNumber < a_change->sequenceNumber)
+                            if((*it)->sequence_number < a_change->sequence_number)
                                 older_sample = it;
                             // Already received
-                            else if((*it)->sequenceNumber == a_change->sequenceNumber)
+                            else if((*it)->sequence_number == a_change->sequence_number)
                                 return false;
                         }
                     }
 
                     if(older_sample != m_changes.rend())
                     {
-                        bool read = (*older_sample)->isRead;
+                        bool read = (*older_sample)->is_read;
 
                         if(this->remove_change_sub(*older_sample, &vit))
                         {
@@ -233,7 +233,7 @@ bool SubscriberHistory::received_change(CacheChange_t* a_change, size_t unknown_
                     {
                         vit->second.push_back(a_change);
                     }
-                    else if(vit->second.back()->sequenceNumber < a_change->sequenceNumber)
+                    else if(vit->second.back()->sequence_number < a_change->sequence_number)
                     {
                         vit->second.push_back(a_change);
                     }
@@ -243,8 +243,8 @@ bool SubscriberHistory::received_change(CacheChange_t* a_change, size_t unknown_
                         std::sort(vit->second.begin(),vit->second.end(),sort_ReaderHistoryCache);
                     }
                     logInfo(SUBSCRIBER,this->mp_reader->getGuid().entityId
-                            <<": Change "<< a_change->sequenceNumber << " added from: "
-                            << a_change->writerGUID<< " with KEY: "<< a_change->instanceHandle;);
+                            <<": Change "<< a_change->sequence_number << " added from: "
+                            << a_change->writer_guid<< " with KEY: "<< a_change->instance_handle;);
                     //	print_changes_seqNum();
                     return true;
                 }
@@ -269,26 +269,27 @@ bool SubscriberHistory::readNextData(void* data, SampleInfo_t* info)
     WriterProxy * wp;
     if(this->mp_reader->nextUnreadCache(&change,&wp))
     {
-        change->isRead = true;
+        change->is_read = true;
         this->decreaseUnreadCount();
-        logInfo(SUBSCRIBER,this->mp_reader->getGuid().entityId<<": reading "<< change->sequenceNumber );
+        logInfo(SUBSCRIBER,this->mp_reader->getGuid().entityId <<": reading "<<
+                change->sequence_number );
         if(change->kind == ALIVE)
-            this->mp_subImpl->getType()->deserialize(&change->serializedPayload,data);
+            this->mp_subImpl->getType()->deserialize(&change->serialized_payload, data);
         if(info!=nullptr)
         {
             info->sampleKind = change->kind;
-            info->sample_identity.writer_guid(change->writerGUID);
-            info->sample_identity.sequence_number(change->sequenceNumber);
-            info->sourceTimestamp = change->sourceTimestamp;
+            info->sample_identity.writer_guid(change->writer_guid);
+            info->sample_identity.sequence_number(change->sequence_number);
+            info->sourceTimestamp = change->source_timestamp;
             if(this->mp_subImpl->getAttributes().qos.m_ownership.kind == EXCLUSIVE_OWNERSHIP_QOS)
                 info->ownershipStrength = wp->m_att.ownershipStrength;
             if(this->mp_subImpl->getAttributes().topic.topicKind == WITH_KEY &&
-                    change->instanceHandle == c_InstanceHandle_Unknown &&
+                    change->instance_handle == c_InstanceHandle_Unknown &&
                     change->kind == ALIVE)
             {
-                this->mp_subImpl->getType()->getKey(data,&change->instanceHandle);
+                this->mp_subImpl->getType()->getKey(data, &change->instance_handle);
             }
-            info->iHandle = change->instanceHandle;
+            info->iHandle = change->instance_handle;
             info->related_sample_identity = change->write_params.sample_identity();
         }
         return true;
@@ -311,28 +312,28 @@ bool SubscriberHistory::takeNextData(void* data, SampleInfo_t* info)
     WriterProxy * wp;
     if(this->mp_reader->nextUntakenCache(&change,&wp))
     {
-        if(!change->isRead)
+        if(!change->is_read)
             this->decreaseUnreadCount();
-        change->isRead = true;
-        logInfo(SUBSCRIBER,this->mp_reader->getGuid().entityId<<": taking seqNum"<< change->sequenceNumber <<
-                " from writer: "<< change->writerGUID);
+        change->is_read = true;
+        logInfo(SUBSCRIBER,this->mp_reader->getGuid().entityId <<": taking seqNum" <<
+                change->sequence_number << " from writer: "<< change->writer_guid);
         if(change->kind == ALIVE)
-            this->mp_subImpl->getType()->deserialize(&change->serializedPayload,data);
+            this->mp_subImpl->getType()->deserialize(&change->serialized_payload, data);
         if(info!=nullptr)
         {
             info->sampleKind = change->kind;
-            info->sample_identity.writer_guid(change->writerGUID);
-            info->sample_identity.sequence_number(change->sequenceNumber);
-            info->sourceTimestamp = change->sourceTimestamp;
+            info->sample_identity.writer_guid(change->writer_guid);
+            info->sample_identity.sequence_number(change->sequence_number);
+            info->sourceTimestamp = change->source_timestamp;
             if(this->mp_subImpl->getAttributes().qos.m_ownership.kind == EXCLUSIVE_OWNERSHIP_QOS)
                 info->ownershipStrength = wp->m_att.ownershipStrength;
             if(this->mp_subImpl->getAttributes().topic.topicKind == WITH_KEY &&
-                    change->instanceHandle == c_InstanceHandle_Unknown &&
+                    change->instance_handle == c_InstanceHandle_Unknown &&
                     change->kind == ALIVE)
             {
-                this->mp_subImpl->getType()->getKey(data,&change->instanceHandle);
+                this->mp_subImpl->getType()->getKey(data, &change->instance_handle);
             }
-            info->iHandle = change->instanceHandle;
+            info->iHandle = change->instance_handle;
             info->related_sample_identity = change->write_params.sample_identity();
         }
         this->remove_change_sub(change);
@@ -348,7 +349,7 @@ bool SubscriberHistory::find_Key(CacheChange_t* a_change, t_v_Inst_Caches::itera
     bool found = false;
     for (vit = m_keyedChanges.begin(); vit != m_keyedChanges.end(); ++vit)
     {
-        if (a_change->instanceHandle == vit->first)
+        if (a_change->instance_handle == vit->first)
         {
             *vit_out = vit;
             return true;
@@ -359,7 +360,7 @@ bool SubscriberHistory::find_Key(CacheChange_t* a_change, t_v_Inst_Caches::itera
         if ((int)m_keyedChanges.size() < m_resourceLimitsQos.max_instances)
         {
             t_p_I_Change newpair;
-            newpair.first = a_change->instanceHandle;
+            newpair.first = a_change->instance_handle;
             m_keyedChanges.push_back(newpair);
             *vit_out = m_keyedChanges.end() - 1;
             return true;
@@ -372,7 +373,7 @@ bool SubscriberHistory::find_Key(CacheChange_t* a_change, t_v_Inst_Caches::itera
                 {
                     m_keyedChanges.erase(vit);
                     t_p_I_Change newpair;
-                    newpair.first = a_change->instanceHandle;
+                    newpair.first = a_change->instance_handle;
                     m_keyedChanges.push_back(newpair);
                     *vit_out = m_keyedChanges.end() - 1;
                     return true;
@@ -419,8 +420,8 @@ bool SubscriberHistory::remove_change_sub(CacheChange_t* change,t_v_Inst_Caches:
         for(auto chit = vit->second.begin();
                 chit!= vit->second.end();++chit)
         {
-            if((*chit)->sequenceNumber == change->sequenceNumber
-                    && (*chit)->writerGUID == change->writerGUID)
+            if((*chit)->sequence_number == change->sequence_number
+                    && (*chit)->writer_guid == change->writer_guid)
             {
                 if(remove_change(change))
                 {

@@ -65,18 +65,18 @@ class RTPSParticipantImpl
 
         MOCK_METHOD1(setGuid, void(GUID_t&));
 
-        MOCK_METHOD6(createWriter_mock, bool (RTPSWriter** writer, WriterAttributes& param, WriterHistory* hist,WriterListener* listen,
-                const EntityId_t& entityId, bool isBuiltin));
+        MOCK_METHOD6(createWriter_mock, bool (RTPSWriter** writer, WriterAttributes& param, WriterHistory& hist,
+                    WriterListener* listen, const EntityId_t& entityId, bool isBuiltin));
 
         MOCK_METHOD7(createReader_mock, bool (RTPSReader** reader, ReaderAttributes& param, ReaderHistory* hist,ReaderListener* listen,
                 const EntityId_t& entityId, bool isBuiltin, bool enable));
 
-        bool createWriter(RTPSWriter** writer, WriterAttributes& param, WriterHistory* hist, WriterListener* listen,
+        bool createWriter(RTPSWriter** writer, WriterAttributes& param, WriterHistory& hist, WriterListener* listen,
                 const EntityId_t& entityId, bool isBuiltin)
         {
             bool ret = createWriter_mock(writer, param , hist, listen, entityId, isBuiltin);
             if(*writer != nullptr)
-                (*writer)->history_ = hist;
+                (*writer)->history_ = &hist;
             return ret;
         }
 

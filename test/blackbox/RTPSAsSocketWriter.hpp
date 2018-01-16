@@ -92,7 +92,7 @@ class RTPSAsSocketWriter
             history_ = new eprosima::fastrtps::rtps::WriterHistory(hattr_);
 
             //Create writer
-            writer_ = eprosima::fastrtps::rtps::RTPSDomain::createRTPSWriter(participant_, writer_attr_, history_);
+            writer_ = eprosima::fastrtps::rtps::RTPSDomain::createRTPSWriter(participant_, writer_attr_, *history_);
             ASSERT_NE(writer_, nullptr);
 
             register_reader();
@@ -108,22 +108,30 @@ class RTPSAsSocketWriter
 
             while(it != msgs.end())
             {
-                CacheChange_t * ch = writer_->new_change([&]() -> uint32_t
-                                {
-                                   size_t current_alignment =  4 + magicword_.size() + 1;
-				   return (uint32_t)(current_alignment + type::getCdrSerializedSize(*it, current_alignment));
-                                }
-                                , ALIVE);
+                CacheChange_ptr ch = writer_->new_change([&]() -> uint32_t
+                        {
+                        size_t current_alignment =  4 + magicword_.size() + 1;
+                        return (uint32_t)(current_alignment + type::getCdrSerializedSize(*it, current_alignment));
+                        }
+                        , ALIVE);
 
-                eprosima::fastcdr::FastBuffer buffer((char*)ch->serializedPayload.data, ch->serializedPayload.max_size);
-                eprosima::fastcdr::Cdr cdr(buffer);
+                if(ch)
+                {
+                    eprosima::fastcdr::FastBuffer buffer((char*)ch->serialized_payload.data,
+                            ch->serialized_payload.max_size);
+                    eprosima::fastcdr::Cdr cdr(buffer);
 
-                cdr << magicword_;
-                cdr << *it;
-                ch->serializedPayload.length = static_cast<uint32_t>(cdr.getSerializedDataLength());
+                    cdr << magicword_;
+                    cdr << *it;
+                    ch->serialized_payload.length = static_cast<uint32_t>(cdr.getSerializedDataLength());
 
-                history_->add_change(ch);
-                it = msgs.erase(it);
+                    history_->add_change(ch);
+                    it = msgs.erase(it);
+                }
+                else
+                {
+                    std::cout << "ERROR: Writer doesn't return a new CacheChange" << std::endl;
+                }
             }
         }
 
@@ -153,7 +161,9 @@ class RTPSAsSocketWriter
         void register_reader()
         {
             if(port_ == 0)
+            {
                 std::cout << "ERROR: locator has to be registered previous to call this" << std::endl;
+            }
 
             //Add remote reader (in this case a reader in the same machine)
             GUID_t guid = participant_->getGuid();

@@ -1,4 +1,4 @@
-// Copyright 2016 Proyectos y Sistemas de Mantenimiento SL (eProsima).
+// Copyright 2018 Proyectos y Sistemas de Mantenimiento SL (eProsima).
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -13,14 +13,14 @@
 // limitations under the License.
 
 /**
- * @file InitialHeartbeat.cpp
+ * @file CleanupEvent.cpp
  *
  */
 
-#include <fastrtps/rtps/writer/timedevent/InitialHeartbeat.h>
+#include "CleanupEvent.h"
 #include <fastrtps/rtps/resources/ResourceEvent.h>
-#include <fastrtps/rtps/writer/ReaderProxy.h>
 #include "../../participant/RTPSParticipantImpl.h"
+#include <fastrtps/rtps/writer/StatefulWriter.h>
 #include <fastrtps/log/Log.h>
 
 #include <mutex>
@@ -30,20 +30,20 @@ namespace fastrtps{
 namespace rtps{
 
 
-InitialHeartbeat::~InitialHeartbeat()
+CleanupEvent::~CleanupEvent()
 {
-    logInfo(RTPS_WRITER,"Destroying InitialHB");
+    logInfo(RTPS_WRITER,"Destroying Cleanup Event");
     destroy();
 }
 
-InitialHeartbeat::InitialHeartbeat(const ReaderProxy& remote_reader, double interval) :
-    TimedEvent(remote_reader.mp_SFW->getRTPSParticipant()->getEventResource().getIOService(),
-            remote_reader.mp_SFW->getRTPSParticipant()->getEventResource().getThread(), interval),
-    remote_reader_(remote_reader)
+CleanupEvent::CleanupEvent(StatefulWriter& writer, double interval) :
+    TimedEvent(writer.getRTPSParticipant()->getEventResource().getIOService(),
+            writer.getRTPSParticipant()->getEventResource().getThread(), interval),
+    writer_(writer)
 {
 }
 
-void InitialHeartbeat::event(EventCode code, const char* msg)
+void CleanupEvent::event(EventCode code, const char* msg)
 {
 
     // Unused in release mode.
@@ -51,7 +51,7 @@ void InitialHeartbeat::event(EventCode code, const char* msg)
 
     if(code == EVENT_SUCCESS)
     {
-        remote_reader_.mp_SFW->send_heartbeat_to(remote_reader_, false);
+        writer_.cleanup_();
     }
     else if(code == EVENT_ABORT)
     {
@@ -66,3 +66,4 @@ void InitialHeartbeat::event(EventCode code, const char* msg)
 }
 }
 } /* namespace eprosima */
+

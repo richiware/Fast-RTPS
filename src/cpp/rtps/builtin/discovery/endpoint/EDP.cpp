@@ -583,15 +583,14 @@ bool EDP::pairing_reader_proxy_with_any_local_writer(ParticipantProxyData* pdata
     logInfo(RTPS_EDP, rdata->guid() <<" in topic: \"" << rdata->topicName() <<"\"");
     std::lock_guard<std::recursive_mutex> guard(*mp_RTPSParticipant->getParticipantMutex());
     for(std::vector<RTPSWriter*>::iterator wit = mp_RTPSParticipant->userWritersListBegin();
-            wit!=mp_RTPSParticipant->userWritersListEnd();++wit)
+            wit != mp_RTPSParticipant->userWritersListEnd();++wit)
     {
-        (*wit)->getMutex()->lock();
+        //TODO(Ricardo) will protected again
         GUID_t writerGUID = (*wit)->getGuid();
 #if HAVE_SECURITY
         bool is_submessage_protected = (*wit)->is_submessage_protected();
         bool is_payload_protected = (*wit)->is_payload_protected();
 #endif
-        (*wit)->getMutex()->unlock();
         ParticipantProxyData wpdata;
         WriterProxyData wdata;
         if(mp_PDP->lookupWriterProxyData(writerGUID, wdata, wpdata))
@@ -661,11 +660,10 @@ bool EDP::pairing_reader_proxy_with_local_writer(const GUID_t& local_writer, con
     for(std::vector<RTPSWriter*>::iterator wit = mp_RTPSParticipant->userWritersListBegin();
             wit!=mp_RTPSParticipant->userWritersListEnd();++wit)
     {
-        (*wit)->getMutex()->lock();
+        //TODO(Ricardo) will protected again
         GUID_t writerGUID = (*wit)->getGuid();
         bool is_submessage_protected = (*wit)->is_submessage_protected();
         bool is_payload_protected = (*wit)->is_payload_protected();
-        (*wit)->getMutex()->lock();
 
         if(local_writer == writerGUID)
         {
@@ -732,9 +730,8 @@ bool EDP::pairing_remote_reader_with_local_writer_after_crypto(const GUID_t& loc
     for(std::vector<RTPSWriter*>::iterator wit = mp_RTPSParticipant->userWritersListBegin();
             wit!=mp_RTPSParticipant->userWritersListEnd();++wit)
     {
-        (*wit)->getMutex()->lock();
+        //TODO(Ricardo) will protected again
         GUID_t writerGUID = (*wit)->getGuid();
-        (*wit)->getMutex()->unlock();
 
         if(local_writer == writerGUID)
         {

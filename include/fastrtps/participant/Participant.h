@@ -21,19 +21,17 @@
 #define PARTICIPANT_H_
 
 #include "../rtps/common/Guid.h"
-
 #include "../rtps/attributes/RTPSParticipantAttributes.h"
-
 #include "../rtps/reader/StatefulReader.h"
-#include <utility>
+#include "ParticipantListener.h"
 
-using namespace eprosima::fastrtps::rtps;
+#include <memory>
+#include <utility>
 
 namespace eprosima {
 namespace fastrtps{
 
 
-class ParticipantImpl;
 class ParticipantAttributes;
 
 namespace rtps {
@@ -45,18 +43,13 @@ class ReaderProxyData;
  * Class Participant used to group Publishers and Subscribers into a single working unit.
  * @ingroup FASTRTPS_MODULE
  */
-class RTPS_DllAPI Participant {
-    friend class Domain;
-    friend class ParticipantImpl;
-    private:
-
-    Participant();
-
-    virtual ~Participant();
-
-    ParticipantImpl* mp_impl;
-
+class RTPS_DllAPI Participant
+{
     public:
+
+    //TODO(Ricardo) Review friendship
+    friend class Domain;
+    class impl;
 
     /**
      *	Get the GUID_t of the associated RTPSParticipant.
@@ -98,6 +91,17 @@ class RTPS_DllAPI Participant {
     bool get_remote_writer_info(const GUID_t& writerGuid, WriterProxyData& returnedInfo);
 
     bool get_remote_reader_info(const GUID_t& readerGuid, ReaderProxyData& returnedInfo);
+
+    private:
+
+    //TODO(Ricardo) Constructor to public
+    Participant(const ParticipantAttributes& attr, ParticipantListener* listen = nullptr);
+
+    virtual ~Participant();
+
+    std::unique_ptr<impl> impl_;
+
+    friend impl& get_implementation(Participant& participant);
 };
 
 }

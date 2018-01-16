@@ -184,8 +184,9 @@ class RTPSWithRegistrationReader
         std::list<type> block(const std::chrono::seconds &max_wait)
         {
             std::unique_lock<std::mutex> lock(mutex_);
-            if(current_received_count_ != number_samples_expected_)
-                cv_.wait_for(lock, max_wait);
+            cv_.wait_for(lock, max_wait, [this]() -> bool {
+                    return number_samples_expected_ == current_received_count_;
+                    });
 
             return total_msgs_;
         }
@@ -195,7 +196,7 @@ class RTPSWithRegistrationReader
             std::unique_lock<std::mutex> lock(mutexDiscovery_);
 
             if(matched_ == 0)
-                cvDiscovery_.wait_for(lock, std::chrono::seconds(10));
+                cvDiscovery_.wait(lock);
 
             ASSERT_NE(matched_, 0u);
         }
@@ -250,12 +251,13 @@ class RTPSWithRegistrationReader
             if(receiving_)
             {
                 type data;
-                eprosima::fastcdr::FastBuffer buffer((char*)change->serializedPayload.data, change->serializedPayload.length);
+                eprosima::fastcdr::FastBuffer buffer((char*)change->serialized_payload.data,
+                        change->serialized_payload.length);
                 eprosima::fastcdr::Cdr cdr(buffer);
 
                 // Check order of changes.
-                ASSERT_LT(last_seq_, change->sequenceNumber);
-                last_seq_ = change->sequenceNumber;
+                ASSERT_LT(last_seq_, change->sequence_number);
+                last_seq_ = change->sequence_number;
 
                 cdr >> data;
 
@@ -265,7 +267,9 @@ class RTPSWithRegistrationReader
                 ++current_received_count_;
 
                 if(current_received_count_ == number_samples_expected_)
+                {
                     cv_.notify_one();
+                }
 
                 eprosima::fastrtps::rtps::ReaderHistory *history = reader->getHistory();
                 ASSERT_NE(history, nullptr);
@@ -282,7 +286,7 @@ class RTPSWithRegistrationReader
         eprosima::fastrtps::TopicAttributes topic_attr_;
         eprosima::fastrtps::ReaderQos reader_qos_;
         eprosima::fastrtps::rtps::ReaderHistory* history_;
-	eprosima::fastrtps::rtps::HistoryAttributes hattr_;
+        eprosima::fastrtps::rtps::HistoryAttributes hattr_;
         bool initialized_;
         std::list<type> total_msgs_;
         std::mutex mutex_;

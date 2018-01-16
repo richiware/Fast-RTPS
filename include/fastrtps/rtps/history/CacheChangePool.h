@@ -17,32 +17,33 @@
  *
  */
 
-
-
-#ifndef CACHECHANGEPOOL_H_
-#define CACHECHANGEPOOL_H_
+#ifndef _RTPS_HISTORY_CACHECHANGEPOOL_H_
+#define _RTPS_HISTORY_CACHECHANGEPOOL_H_
 
 #include "../resources/ResourceManagement.h"
+#include "../common/CacheChange.h"
 
 #include <vector>
 #include <functional>
 #include <cstdint>
 #include <cstddef>
 #include <mutex>
+#include <memory>
+#include <cassert>
 
 
 namespace eprosima {
 namespace fastrtps{
 namespace rtps {
 
-struct CacheChange_t;
-
 /**
  * Class CacheChangePool, used by the HistoryCache to pre-reserve a number of CacheChange_t to avoid dynamically reserving memory in the middle of execution loops.
  * @ingroup COMMON_MODULE
  */
-class CacheChangePool {
+class CacheChangePool
+{
     public:
+
         virtual ~CacheChangePool();
         /**
          * Constructor.
@@ -61,7 +62,7 @@ class CacheChangePool {
          * PREALLOCATED_WITH_REALLOC_MEMORY_MODE)
          * @return True whether the CacheChange could be allocated. In other case returns false.
          */
-        bool reserve_Cache(CacheChange_t** chan, const std::function<uint32_t()>& calculateSizeFunc);
+        bool reserve_cache(CacheChange_t** chan, const std::function<uint32_t()>& calculateSizeFunc);
 
         /*!
          * @brief Reserves a CacheChange from the pool.
@@ -70,17 +71,22 @@ class CacheChangePool {
          * policy DYNAMIC_RESERVE_MEMORY_MODE and PREALLOCATED_WITH_REALLOC_MEMORY_MODE). In other case this variable is not used.
          * @return True whether the CacheChange could be allocated. In other case returns false.
          */
-        bool reserve_Cache(CacheChange_t** chan, uint32_t dataSize);
+        bool reserve_cache(CacheChange_t** chan, uint32_t dataSize);
 
         //!Release a Cache back to the pool.
-        void release_Cache(CacheChange_t*);
+        void release_cache(CacheChange_t*);
+
         //!Get the size of the cache vector; all of them (reserved and not reserved).
         size_t get_allCachesSize(){return m_allCaches.size();}
+
         //!Get the number of frre caches.
         size_t get_freeCachesSize(){return m_freeCaches.size();}
+
         //!Get the initial payload size associated with the Pool.
-        inline uint32_t getInitialPayloadSize(){return m_initial_payload_size;};
+        uint32_t get_initial_payload_size() const { return m_initial_payload_size; }
+
     private:
+
         uint32_t m_initial_payload_size;
         uint32_t m_payload_size;
         uint32_t m_pool_size;
@@ -92,9 +98,50 @@ class CacheChangePool {
         std::mutex* mp_mutex;
         MemoryManagementPolicy_t memoryMode;
 };
+
+class CacheChangePoolDeleter
+{
+    public:
+
+        CacheChangePoolDeleter() : pool_(nullptr) {}
+
+        CacheChangePoolDeleter(CacheChangePool* pool) : pool_(pool) {}
+
+        CacheChangePoolDeleter(CacheChangePoolDeleter&& other) = default;
+
+        void operator()(CacheChange_t* cachechange)
+        {
+            if(pool_)
+            {
+                pool_->release_cache(cachechange);
+            }
+        }
+
+    private:
+
+        CacheChangePool* pool_;
+};
+
+class CacheChange_ptr : protected std::unique_ptr<CacheChange_t, CacheChangePoolDeleter>
+{
+    public:
+
+        typedef std::unique_ptr<CacheChange_t, CacheChangePoolDeleter> Base;
+
+        using Base::operator->;
+        using Base::operator*;
+        using Base::operator bool;
+
+        CacheChange_ptr() {}
+
+        CacheChange_ptr(CacheChangePool* pool, CacheChange_t* cachechange) :
+            Base(cachechange, CacheChangePoolDeleter(pool)) {}
+
+        CacheChange_ptr(CacheChange_ptr&& other) = default;
+};
+
 }
 } /* namespace rtps */
 } /* namespace eprosima */
 
-
-#endif /* CACHECHANGEPOOL_H_ */
+#endif /* _RTPS_HISTORY_CACHECHANGEPOOL_H_ */

@@ -32,7 +32,7 @@ CacheChange_t* FragmentedChangePitStop::process(CacheChange_t* incoming_change, 
     {
         for(; original_change_cit != range.second; ++original_change_cit)
         {
-            if(original_change_cit->getChange()->writerGUID == incoming_change->writerGUID)
+            if(original_change_cit->getChange()->writer_guid == incoming_change->writer_guid)
                 break;
         }
     }
@@ -47,16 +47,16 @@ CacheChange_t* FragmentedChangePitStop::process(CacheChange_t* incoming_change, 
         if(!parent_->reserveCache(&original_change, sampleSize))
             return nullptr;
 
-        if(original_change->serializedPayload.max_size < sampleSize)
+        if(original_change->serialized_payload.max_size < sampleSize)
         {
             parent_->releaseCache(original_change);
             return nullptr;
         }
 
         //Change comes preallocated (size sampleSize)
-        original_change->copy_not_memcpy(incoming_change);
+        original_change->copy_not_memcpy(*incoming_change);
         // The length of the serialized payload has to be sample size.
-        original_change->serializedPayload.length = sampleSize;
+        original_change->serialized_payload.length = sampleSize;
         original_change->setFragmentSize(incoming_change->getFragmentSize());
 
         // Insert
@@ -71,14 +71,14 @@ CacheChange_t* FragmentedChangePitStop::process(CacheChange_t* incoming_change, 
             // All cases minus last fragment.
             if (count + 1 != original_change_cit->getChange()->getFragmentCount())
             {
-                memcpy(original_change_cit->getChange()->serializedPayload.data + count * original_change_cit->getChange()->getFragmentSize(),
-                        incoming_change->serializedPayload.data + (count - (fragmentStartingNum - 1)) * incoming_change->getFragmentSize(), incoming_change->getFragmentSize());
+                memcpy(original_change_cit->getChange()->serialized_payload.data + count * original_change_cit->getChange()->getFragmentSize(),
+                        incoming_change->serialized_payload.data + (count - (fragmentStartingNum - 1)) * incoming_change->getFragmentSize(), incoming_change->getFragmentSize());
             }
             // Last fragment is a special case when copying.
             else
             {
-                memcpy(original_change_cit->getChange()->serializedPayload.data + count * original_change_cit->getChange()->getFragmentSize(),
-                        incoming_change->serializedPayload.data + (count - (fragmentStartingNum - 1)) * incoming_change->getFragmentSize(), original_change_cit->getChange()->serializedPayload.length - (count * original_change_cit->getChange()->getFragmentSize()));
+                memcpy(original_change_cit->getChange()->serialized_payload.data + count * original_change_cit->getChange()->getFragmentSize(),
+                        incoming_change->serialized_payload.data + (count - (fragmentStartingNum - 1)) * incoming_change->getFragmentSize(), original_change_cit->getChange()->serialized_payload.length - (count * original_change_cit->getChange()->getFragmentSize()));
             }
 
             original_change_cit->getChange()->getDataFragments()->at(count) = ChangeFragmentStatus_t::PRESENT;
@@ -121,7 +121,7 @@ CacheChange_t* FragmentedChangePitStop::find(const SequenceNumber_t& sequence_nu
     {
         for(; cit != range.second; ++cit)
         {
-            if(cit->getChange()->writerGUID == writer_guid)
+            if(cit->getChange()->writer_guid == writer_guid)
             {
                 returnedValue = cit->getChange();
                 break;
@@ -145,7 +145,7 @@ bool FragmentedChangePitStop::try_to_remove(const SequenceNumber_t& sequence_num
     {
         for(; cit != range.second; ++cit)
         {
-            if(cit->getChange()->writerGUID == writer_guid)
+            if(cit->getChange()->writer_guid == writer_guid)
             {
                 // Destroy CacheChange_t.
                 parent_->releaseCache(cit->getChange());
@@ -166,8 +166,8 @@ bool FragmentedChangePitStop::try_to_remove_until(const SequenceNumber_t& sequen
     auto cit = changes_.begin();
     while(cit != changes_.end())
     {
-        if(cit->getChange()->sequenceNumber < sequence_number &&
-                cit->getChange()->writerGUID == writer_guid)
+        if(cit->getChange()->sequence_number < sequence_number &&
+                cit->getChange()->writer_guid == writer_guid)
         {
             // Destroy CacheChange_t.
             parent_->releaseCache(cit->getChange());

@@ -118,7 +118,7 @@ namespace eprosima
                  * @param prox Pointer to the WriterProxy.
                  * @return True if correctly removed.
                  */
-                RTPS_DllAPI virtual bool change_removed_by_history(CacheChange_t* change, WriterProxy* prox = nullptr) = 0;
+                RTPS_DllAPI virtual bool change_removed_by_history(CacheChange_t* cachechange, WriterProxy* prox = nullptr) = 0;
 
                 /**
                  * Get the associated listener, secondary attached Listener in case it is of coumpound type
@@ -214,6 +214,19 @@ namespace eprosima
                 private:
 
                 RTPSReader& operator=(const RTPSReader&) NON_COPYABLE_CXX11;
+
+                public:
+
+                /**
+                 * Get mutex
+                 * @return Associated Mutex
+                 */
+                RTPS_DllAPI inline std::recursive_mutex* getMutex() const { return mp_mutex; }
+
+                protected:
+
+                //!Endpoint Mutex
+                std::recursive_mutex* mp_mutex;
             };
 
         } /* namespace rtps */

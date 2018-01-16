@@ -34,7 +34,7 @@
 
 
 #include <fastrtps/rtps/history/ReaderHistory.h>
-#include <fastrtps/rtps/history/WriterHistory.h>
+#include "../../../history/WriterHistoryImpl.h"
 
 
 #include <fastrtps/rtps/builtin/data/WriterProxyData.h>
@@ -132,7 +132,8 @@ bool EDPSimple::createSEDPEndpoints()
         if(mp_RTPSParticipant->getRTPSParticipantAttributes().throughputController.bytesPerPeriod != UINT32_MAX &&
                 mp_RTPSParticipant->getRTPSParticipantAttributes().throughputController.periodMillisecs != 0)
             watt.mode = ASYNCHRONOUS_WRITER;
-        created &=this->mp_RTPSParticipant->createWriter(&waux,watt,mp_PubWriter.second,nullptr,c_EntityId_SEDPPubWriter,true);
+        created &=this->mp_RTPSParticipant->createWriter(&waux, watt, *mp_PubWriter.second, nullptr,
+                c_EntityId_SEDPPubWriter, true);
         if(created)
         {
             mp_PubWriter.first = dynamic_cast<StatefulWriter*>(waux);
@@ -222,7 +223,8 @@ bool EDPSimple::createSEDPEndpoints()
         if(mp_RTPSParticipant->getRTPSParticipantAttributes().throughputController.bytesPerPeriod != UINT32_MAX &&
                 mp_RTPSParticipant->getRTPSParticipantAttributes().throughputController.periodMillisecs != 0)
             watt.mode = ASYNCHRONOUS_WRITER;
-        created &=this->mp_RTPSParticipant->createWriter(&waux,watt,mp_SubWriter.second,nullptr,c_EntityId_SEDPSubWriter,true);
+        created &=this->mp_RTPSParticipant->createWriter(&waux, watt, *mp_SubWriter.second, nullptr,
+                c_EntityId_SEDPSubWriter, true);
         if(created)
         {
             mp_SubWriter.first = dynamic_cast<StatefulWriter*>(waux);
@@ -246,43 +248,48 @@ bool EDPSimple::processLocalReaderProxyData(ReaderProxyData* rdata)
     if(mp_SubWriter.first !=nullptr)
     {
         // TODO(Ricardo) Write a getCdrSerializedPayload for ReaderProxyData.
-        CacheChange_t* change = mp_SubWriter.first->new_change([]() -> uint32_t {return DISCOVERY_SUBSCRIPTION_DATA_MAX_SIZE;}, ALIVE,rdata->key());
+        CacheChange_ptr change = mp_SubWriter.first->new_change([]() ->
+                uint32_t {return DISCOVERY_SUBSCRIPTION_DATA_MAX_SIZE;}, ALIVE,rdata->key());
 
-        if(change !=nullptr)
+        if(change)
         {
             rdata->toParameterList();
 
             CDRMessage_t aux_msg(0);
             aux_msg.wraps = true;
-            aux_msg.buffer = change->serializedPayload.data;
-            aux_msg.max_size = change->serializedPayload.max_size;
+            aux_msg.buffer = change->serialized_payload.data;
+            aux_msg.max_size = change->serialized_payload.max_size;
 
 #if EPROSIMA_BIG_ENDIAN
-            change->serializedPayload.encapsulation = (uint16_t)PL_CDR_BE;
+            change->serialized_payload.encapsulation = (uint16_t)PL_CDR_BE;
             aux_msg.msg_endian = BIGEND;
 #else
-            change->serializedPayload.encapsulation = (uint16_t)PL_CDR_LE;
+            change->serialized_payload.encapsulation = (uint16_t)PL_CDR_LE;
             aux_msg.msg_endian =  LITTLEEND;
 #endif
 
             ParameterList_t parameter_list = rdata->toParameterList();
             ParameterList::writeParameterListToCDRMsg(&aux_msg, &parameter_list, true);
-            change->serializedPayload.length = (uint16_t)aux_msg.length;
+            change->serialized_payload.length = (uint16_t)aux_msg.length;
 
             {
-                std::unique_lock<std::recursive_mutex> lock(*mp_SubWriter.second->getMutex());
-                for(auto ch = mp_SubWriter.second->changesBegin();ch!=mp_SubWriter.second->changesEnd();++ch)
+                WriterHistory::impl& history = get_implementation(*mp_SubWriter.second);
+                auto lock = history.lock_for_transaction();
+                for(auto ch = history.begin_nts(); ch != history.end_nts(); ++ch)
                 {
-                    if((*ch)->instanceHandle == change->instanceHandle)
+                    if(ch->second->instance_handle == change->instance_handle)
                     {
-                        mp_SubWriter.second->remove_change(*ch);
+                        history.remove_change_nts(ch->second->sequence_number);
                         break;
                     }
                 }
             }
 
             if(this->mp_subListen->getAttachedListener() != nullptr)
-                this->mp_subListen->getAttachedListener()->onNewCacheChangeAdded(mp_SubReader.first, change);
+            {
+                this->mp_subListen->getAttachedListener()->onNewCacheChangeAdded(mp_SubReader.first,
+                        &*change);
+            }
 
             mp_SubWriter.second->add_change(change);
 
@@ -297,42 +304,48 @@ bool EDPSimple::processLocalWriterProxyData(WriterProxyData* wdata)
     logInfo(RTPS_EDP, wdata->guid().entityId);
     if(mp_PubWriter.first !=nullptr)
     {
-        CacheChange_t* change = mp_PubWriter.first->new_change([]() -> uint32_t {return DISCOVERY_PUBLICATION_DATA_MAX_SIZE;}, ALIVE, wdata->key());
-        if(change != nullptr)
+        CacheChange_ptr change = mp_PubWriter.first->new_change([]() ->
+                uint32_t {return DISCOVERY_PUBLICATION_DATA_MAX_SIZE;}, ALIVE, wdata->key());
+
+        if(change)
         {
             wdata->toParameterList();
 
             CDRMessage_t aux_msg(0);
             aux_msg.wraps = true;
-            aux_msg.buffer = change->serializedPayload.data;
-            aux_msg.max_size = change->serializedPayload.max_size;
+            aux_msg.buffer = change->serialized_payload.data;
+            aux_msg.max_size = change->serialized_payload.max_size;
 
 #if EPROSIMA_BIG_ENDIAN
-            change->serializedPayload.encapsulation = (uint16_t)PL_CDR_BE;
+            change->serialized_payload.encapsulation = (uint16_t)PL_CDR_BE;
             aux_msg.msg_endian = BIGEND;
 #else
-            change->serializedPayload.encapsulation = (uint16_t)PL_CDR_LE;
+            change->serialized_payload.encapsulation = (uint16_t)PL_CDR_LE;
             aux_msg.msg_endian =  LITTLEEND;
 #endif
 
             ParameterList_t parameter_list = wdata->toParameterList();
             ParameterList::writeParameterListToCDRMsg(&aux_msg, &parameter_list, true);
-            change->serializedPayload.length = (uint16_t)aux_msg.length;
+            change->serialized_payload.length = (uint16_t)aux_msg.length;
 
             {
-                std::unique_lock<std::recursive_mutex> lock(*mp_PubWriter.second->getMutex());
-                for(auto ch = mp_PubWriter.second->changesBegin();ch!=mp_PubWriter.second->changesEnd();++ch)
+                WriterHistory::impl& history = get_implementation(*mp_PubWriter.second);
+                auto lock = history.lock_for_transaction();
+                for(auto ch = history.begin_nts(); ch != history.end_nts(); ++ch)
                 {
-                    if((*ch)->instanceHandle == change->instanceHandle)
+                    if(ch->second->instance_handle == change->instance_handle)
                     {
-                        mp_PubWriter.second->remove_change(*ch);
+                        history.remove_change_nts(ch->second->sequence_number);
                         break;
                     }
                 }
             }
 
             if(this->mp_pubListen->getAttachedListener() != nullptr)
-                this->mp_pubListen->getAttachedListener()->onNewCacheChangeAdded(mp_PubReader.first, change);
+            {
+                this->mp_pubListen->getAttachedListener()->onNewCacheChangeAdded(mp_PubReader.first,
+                        &*change);
+            }
 
             mp_PubWriter.second->add_change(change);
 
@@ -350,16 +363,19 @@ bool EDPSimple::removeLocalWriter(RTPSWriter* W)
     {
         InstanceHandle_t iH;
         iH = W->getGuid();
-        CacheChange_t* change = mp_PubWriter.first->new_change([]() -> uint32_t {return DISCOVERY_PUBLICATION_DATA_MAX_SIZE;}, NOT_ALIVE_DISPOSED_UNREGISTERED,iH);
-        if(change != nullptr)
+        CacheChange_ptr change = mp_PubWriter.first->new_change([]() ->
+                uint32_t {return DISCOVERY_PUBLICATION_DATA_MAX_SIZE;}, NOT_ALIVE_DISPOSED_UNREGISTERED,iH);
+
+        if(change)
         {
             {
-                std::lock_guard<std::recursive_mutex> guard(*mp_PubWriter.second->getMutex());
-                for(auto ch = mp_PubWriter.second->changesBegin();ch!=mp_PubWriter.second->changesEnd();++ch)
+                WriterHistory::impl& history = get_implementation(*mp_PubWriter.second);
+                auto lock = history.lock_for_transaction();
+                for(auto ch = history.begin_nts(); ch != history.end_nts(); ++ch)
                 {
-                    if((*ch)->instanceHandle == change->instanceHandle)
+                    if(ch->second->instance_handle == change->instance_handle)
                     {
-                        mp_PubWriter.second->remove_change(*ch);
+                        history.remove_change_nts(ch->second->sequence_number);
                         break;
                     }
                 }
@@ -367,7 +383,10 @@ bool EDPSimple::removeLocalWriter(RTPSWriter* W)
             }
 
             if(this->mp_pubListen->getAttachedListener() != nullptr)
-                this->mp_pubListen->getAttachedListener()->onNewCacheChangeAdded(mp_PubReader.first, change);
+            {
+                this->mp_pubListen->getAttachedListener()->onNewCacheChangeAdded(mp_PubReader.first,
+                        &*change);
+            }
 
             mp_PubWriter.second->add_change(change);
         }
@@ -378,27 +397,32 @@ bool EDPSimple::removeLocalWriter(RTPSWriter* W)
 bool EDPSimple::removeLocalReader(RTPSReader* R)
 {
     logInfo(RTPS_EDP,R->getGuid().entityId);
-    if(mp_SubWriter.first!=nullptr)
+    if(mp_SubWriter.first != nullptr)
     {
         InstanceHandle_t iH;
         iH = (R->getGuid());
-        CacheChange_t* change = mp_SubWriter.first->new_change([]() -> uint32_t {return DISCOVERY_SUBSCRIPTION_DATA_MAX_SIZE;}, NOT_ALIVE_DISPOSED_UNREGISTERED,iH);
-        if(change != nullptr)
+        CacheChange_ptr change = mp_SubWriter.first->new_change([]() ->
+                uint32_t {return DISCOVERY_SUBSCRIPTION_DATA_MAX_SIZE;}, NOT_ALIVE_DISPOSED_UNREGISTERED,iH);
+
+        if(change)
         {
             {
-                std::lock_guard<std::recursive_mutex> guard(*mp_SubWriter.second->getMutex());
-                for(auto ch = mp_SubWriter.second->changesBegin();ch!=mp_SubWriter.second->changesEnd();++ch)
+                WriterHistory::impl& history = get_implementation(*mp_SubWriter.second);
+                auto lock = history.lock_for_transaction();
+                // TODO inset logic in WriterHistory.
+                for(auto ch = history.begin_nts(); ch != history.end_nts(); ++ch)
                 {
-                    if((*ch)->instanceHandle == change->instanceHandle)
+                    if(ch->second->instance_handle == change->instance_handle)
                     {
-                        mp_SubWriter.second->remove_change(*ch);
+                        history.remove_change_nts(ch->second->sequence_number);
                         break;
                     }
                 }
             }
 
             if(this->mp_subListen->getAttachedListener() != nullptr)
-                this->mp_subListen->getAttachedListener()->onNewCacheChangeAdded(mp_SubReader.first, change);
+                this->mp_subListen->getAttachedListener()->onNewCacheChangeAdded(mp_SubReader.first,
+                        &*change);
 
             mp_SubWriter.second->add_change(change);
         }
@@ -465,7 +489,7 @@ void EDPSimple::assignRemoteEndpoints(const ParticipantProxyData& pdata)
     auxendp &= DISC_BUILTIN_ENDPOINT_SUBSCRIPTION_DETECTOR;
     //FIXME: FIX TO NOT FAIL WITH BAD BUILTIN ENDPOINT SET
     //auxendp = 1;
-    if(auxendp!=0 && mp_SubWriter.first!=nullptr) //Exist Pub Announcer
+    if(auxendp!=0 && mp_SubWriter.first != nullptr) //Exist Pub Announcer
     {
         logInfo(RTPS_EDP,"Adding SEDP Sub Reader to my Sub Writer");
         RemoteReaderAttributes ratt;

@@ -391,7 +391,8 @@ RTPSParticipantImpl::~RTPSParticipantImpl()
 
 
 bool RTPSParticipantImpl::createWriter(RTPSWriter** WriterOut,
-        WriterAttributes& param,WriterHistory* hist,WriterListener* listen, const EntityId_t& entityId,bool isBuiltin)
+        WriterAttributes& param, WriterHistory& hist, WriterListener* listen,
+        const EntityId_t& entityId,bool isBuiltin)
 {
     std::string type = (param.endpoint.reliabilityKind == RELIABLE) ? "RELIABLE" :"BEST_EFFORT";
     logInfo(RTPS_PARTICIPANT," of type " << type);
@@ -470,9 +471,9 @@ bool RTPSParticipantImpl::createWriter(RTPSWriter** WriterOut,
     RTPSWriter* SWriter = nullptr;
     GUID_t guid(m_guid.guidPrefix,entId);
     if(param.endpoint.reliabilityKind == BEST_EFFORT)
-        SWriter = (RTPSWriter*)new StatelessWriter(this,guid,param,hist,listen);
+        SWriter = (RTPSWriter*)new StatelessWriter(this, guid, param, hist, listen);
     else if(param.endpoint.reliabilityKind == RELIABLE)
-        SWriter = (RTPSWriter*)new StatefulWriter(this,guid,param,hist,listen);
+        SWriter = (RTPSWriter*)new StatefulWriter(this, guid, param, hist, listen);
 
     if(SWriter==nullptr)
         return false;

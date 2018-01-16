@@ -16,8 +16,8 @@
  * @file RTPSParticipantImpl.h
  */
 
-#ifndef RTPSParticipantIMPL_H_
-#define RTPSParticipantIMPL_H_
+#ifndef __RTPS_PARTICIPANT_RTPSPARTICIPANTIMPL_H__
+#define __RTPS_PARTICIPANT_RTPSPARTICIPANTIMPL_H__
 #ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
 #include <stdio.h>
 #include <stdlib.h>
@@ -124,7 +124,7 @@ class RTPSParticipantImpl
          * @param plisten
          */
         RTPSParticipantImpl(const RTPSParticipantAttributes &param,
-                const GuidPrefix_t& guidP,RTPSParticipant* part,RTPSParticipantListener* plisten= nullptr);
+                const GuidPrefix_t& guidP, RTPSParticipant* part,RTPSParticipantListener* plisten= nullptr);
         virtual ~RTPSParticipantImpl();
 
         /**
@@ -352,7 +352,8 @@ class RTPSParticipantImpl
          * @param isBuiltin Bool value indicating if the Writer is builtin (Discovery or Liveliness protocol) or is created for the end user.
          * @return True if the Writer was correctly created.
          */
-        bool createWriter(RTPSWriter** Writer, WriterAttributes& param,WriterHistory* hist,WriterListener* listen,
+        //TODO(Ricardo) Change WriterHistory to impl. first change api statelesswriter and statefulwriter
+        bool createWriter(RTPSWriter** Writer, WriterAttributes& param, WriterHistory& hist, WriterListener* listen,
                 const EntityId_t& entityId = c_EntityId_Unknown,bool isBuiltin = false);
 
         /**
@@ -463,4 +464,4 @@ class RTPSParticipantImpl
 } /* namespace rtps */
 } /* namespace eprosima */
 #endif
-#endif /* RTPSParticipant_H_ */
+#endif /* __RTPS_PARTICIPANT_RTPSPARTICIPANTIMPL_H__ */

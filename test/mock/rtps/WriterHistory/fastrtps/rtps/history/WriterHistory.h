@@ -20,6 +20,10 @@
 #define _RTPS_HISTORY_WRITERHISTORY_H_
 
 #include <fastrtps/rtps/attributes/HistoryAttributes.h>
+#include <fastrtps/rtps/history/CacheChangePool.h>
+
+#include <condition_variable>
+#include <gmock/gmock.h>
 
 namespace eprosima {
 namespace fastrtps {
@@ -32,33 +36,20 @@ class WriterHistory
 
         WriterHistory(const HistoryAttributes& /*att*/) : samples_number_(0) {}
 
-        MOCK_METHOD1(release_Cache, bool (CacheChange_t* change));
+        MOCK_METHOD1(add_change_mock, bool(CacheChange_ptr&));
 
-        MOCK_METHOD1(add_change_mock, bool(CacheChange_t*));
-
-        bool add_change(CacheChange_t* change)
+        bool add_change(CacheChange_ptr& change)
         {
             bool ret = add_change_mock(change);
             samples_number_mutex_.lock();
             ++samples_number_;
-            change->sequenceNumber = ++last_sequence_number_;
+            change->sequence_number = ++last_sequence_number_;
             samples_number_mutex_.unlock();
             samples_number_cond_.notify_all();
             return ret;
         }
 
-        MOCK_METHOD1(remove_change, bool (const SequenceNumber_t&));
-
-        MOCK_METHOD1(remove_change_and_reuse, CacheChange_t* (const SequenceNumber_t&));
-
-        MOCK_METHOD1(remove_change_mock, bool (CacheChange_t*));
-
-        bool remove_change(CacheChange_t* change)
-        {
-            bool ret = remove_change_mock(change);
-            delete change;
-            return ret;
-        }
+        MOCK_METHOD1(remove_change, CacheChange_ptr(const SequenceNumber_t&));
 
         void wait_for_more_samples_than(unsigned int minimum)
         {

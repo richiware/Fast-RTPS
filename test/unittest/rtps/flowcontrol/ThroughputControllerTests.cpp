@@ -37,13 +37,13 @@ class ThroughputControllerTests: public ::testing::Test
       for (unsigned int i = 0; i < numberOfTestChanges; i++)
       {
          testChanges.emplace_back(new CacheChange_t(testPayloadSize));
-         testChanges.back()->sequenceNumber = {0, i+1};
-         testChanges.back()->serializedPayload.length = testPayloadSize;
+         testChanges.back()->sequence_number = {0, i+1};
+         testChanges.back()->serialized_payload.length = testPayloadSize;
          testChangesForUse.add_change(testChanges.back().get(), &mock, FragmentNumberSet_t());
 
          otherChanges.emplace_back(new CacheChange_t(testPayloadSize));
-         otherChanges.back()->sequenceNumber = {0, i+1};
-         otherChanges.back()->serializedPayload.length = testPayloadSize;
+         otherChanges.back()->sequence_number = {0, i+1};
+         otherChanges.back()->serialized_payload.length = testPayloadSize;
          otherChangesForUse.add_change(otherChanges.back().get(), &mock, FragmentNumberSet_t());
       }
    }
@@ -96,8 +96,8 @@ TEST_F(ThroughputControllerTests, if_changes_are_fragmented_throughput_controlle
     while(!testChangesForUse.empty())
     {
         RTPSWriterCollector<ReaderLocator*>::Item item = testChangesForUse.pop();
-        ASSERT_EQ(item.sequenceNumber, seqNum);
-        ASSERT_EQ(item.fragmentNumber, fragNum);
+        ASSERT_EQ(item.sequence_number, seqNum);
+        ASSERT_EQ(item.fragment_number, fragNum);
 
         if(++fragNum > 10)
         {

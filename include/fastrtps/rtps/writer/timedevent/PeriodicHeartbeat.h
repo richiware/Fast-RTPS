@@ -17,12 +17,10 @@
  *
  */
 
-#ifndef PERIODICHEARTBEAT_H_
-#define PERIODICHEARTBEAT_H_
+#ifndef __RTPS_WRITER_TIMEDEVENT_PERIODICHEARTBEAT_H__
+#define __RTPS_WRITER_TIMEDEVENT_PERIODICHEARTBEAT_H__
 #ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
 #include "../../resources/TimedEvent.h"
-#include "../../common/CDRMessage_t.h"
-#include "../../messages/RTPSMessageGroup.h"
 
 namespace eprosima {
 namespace fastrtps{
@@ -43,7 +41,7 @@ class PeriodicHeartbeat: public TimedEvent
          * @param p_RP
          * @param interval
          */
-        PeriodicHeartbeat(StatefulWriter* p_RP,double interval);
+        PeriodicHeartbeat(StatefulWriter& writer, double interval);
         virtual ~PeriodicHeartbeat();
 
         /**
@@ -55,13 +53,11 @@ class PeriodicHeartbeat: public TimedEvent
         void event(EventCode code, const char* msg= nullptr);
 
         //!
-        RTPSMessageGroup_t m_cdrmessages;
-        //!
-        StatefulWriter* mp_SFW;
+        StatefulWriter& writer_;
 };
 
 }
 }
 } /* namespace eprosima */
 #endif
-#endif /* PERIODICHEARTBEAT_H_ */
+#endif /* __RTPS_WRITER_TIMEDEVENT_PERIODICHEARTBEAT_H__*/

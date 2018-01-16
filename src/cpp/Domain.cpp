@@ -20,7 +20,6 @@
 #include <fastrtps/Domain.h>
 #include <fastrtps/rtps/RTPSDomain.h>
 
-#include <fastrtps/participant/Participant.h>
 #include "participant/ParticipantImpl.h"
 
 #include <fastrtps/publisher/Publisher.h>
@@ -38,7 +37,7 @@ using namespace eprosima::fastrtps::xmlparser;
 namespace eprosima {
 namespace fastrtps {
 
-std::vector<Domain::t_p_Participant> Domain::m_participants;
+std::vector<Participant*> Domain::m_participants;
 bool Domain::default_xml_profiles_loaded = false;
 
 
@@ -55,10 +54,12 @@ Domain::~Domain()
 
 void Domain::stopAll()
 {
-    while(m_participants.size()>0)
+    while(m_participants.size() > 0)
     {
-        Domain::removeParticipant(m_participants.begin()->first);
+        Domain::removeParticipant(*m_participants.begin());
     }
+
+    //TODO Review sleep
     eClock::my_sleep(100);
     Log::KillThread();
 }
@@ -67,12 +68,12 @@ bool Domain::removeParticipant(Participant* part)
 {
     if(part!=nullptr)
     {
-        for(auto it = m_participants.begin();it!= m_participants.end();++it)
+        for(auto it = m_participants.begin(); it != m_participants.end(); ++it)
         {
-            if(it->second->getGuid() == part->getGuid())
+            if((*it)->getGuid() == part->getGuid())
             {
                 //FOUND
-                delete(it->second);
+                delete(*it);
                 m_participants.erase(it);
                 return true;
             }
@@ -87,10 +88,10 @@ bool Domain::removePublisher(Publisher* pub)
     {
         for(auto it = m_participants.begin();it!= m_participants.end();++it)
         {
-            if(it->second->getGuid().guidPrefix == pub->getGuid().guidPrefix)
+            if((*it)->getGuid().guidPrefix == pub->getGuid().guidPrefix)
             {
                 //FOUND
-                return it->second->removePublisher(pub);
+                return get_implementation(**it).removePublisher(pub);
             }
         }
     }
@@ -103,10 +104,10 @@ bool Domain::removeSubscriber(Subscriber* sub)
     {
         for(auto it = m_participants.begin();it!= m_participants.end();++it)
         {
-            if(it->second->getGuid().guidPrefix == sub->getGuid().guidPrefix)
+            if((*it)->getGuid().guidPrefix == sub->getGuid().guidPrefix)
             {
                 //FOUND
-                return it->second->removeSubscriber(sub);
+                return get_implementation(**it).removeSubscriber(sub);
             }
         }
     }
@@ -130,26 +131,23 @@ Participant* Domain::createParticipant(const std::string &participant_profile, P
     return createParticipant(participant_att, listen);
 }
 
-Participant* Domain::createParticipant(ParticipantAttributes& att,ParticipantListener* listen)
+Participant* Domain::createParticipant(ParticipantAttributes& att,ParticipantListener* listener)
 {
-    Participant* pubsubpar = new Participant();
-    ParticipantImpl* pspartimpl = new ParticipantImpl(att,pubsubpar,listen);
-    RTPSParticipant* part = RTPSDomain::createParticipant(att.rtps,&pspartimpl->m_rtps_listener);
+    Participant* participant = new Participant(att, listener);
+    RTPSParticipant* part = RTPSDomain::createParticipant(att.rtps,
+            get_implementation(*participant).rtps_listener());
 
     if(part == nullptr)
     {
         logError(PARTICIPANT,"Problem creating RTPSParticipant");
-        delete pspartimpl;
+        delete participant;
         return nullptr;
     }
 
-    pspartimpl->mp_rtpsParticipant = part;
-    t_p_Participant pubsubpair;
-    pubsubpair.first = pubsubpar;
-    pubsubpair.second = pspartimpl;
+    get_implementation(*participant).rtps_participant(part);
 
-    m_participants.push_back(pubsubpair);
-    return pubsubpar;
+    m_participants.push_back(participant);
+    return participant;
 }
 
 void Domain::getDefaultParticipantAttributes(ParticipantAttributes& participant_attributes)
@@ -178,9 +176,9 @@ Publisher* Domain::createPublisher(Participant *part, PublisherAttributes &att, 
 {
     for (auto it = m_participants.begin(); it != m_participants.end(); ++it)
     {
-        if(it->second->getGuid() == part->getGuid())
+        if((*it)->getGuid() == part->getGuid())
         {
-            return part->mp_impl->createPublisher(att,listen);
+            return get_implementation(*part).createPublisher(att,listen);
         }
     }
     //TODO MOSTRAR MENSAJE DE ERROR WARNING y COMPROBAR QUE EL PUNTERO QUE ME PASA NO ES NULL
@@ -224,9 +222,9 @@ Subscriber* Domain::createSubscriber(Participant *part, SubscriberAttributes &at
 {
     for (auto it = m_participants.begin(); it != m_participants.end(); ++it)
     {
-        if(it->second->getGuid() == part->getGuid())
+        if((*it)->getGuid() == part->getGuid())
         {
-            return part->mp_impl->createSubscriber(att,listen);
+            return get_implementation(*part).createSubscriber(att,listen);
         }
     }
     return nullptr;
@@ -236,9 +234,9 @@ bool Domain::getRegisteredType(Participant* part, const char* typeName, TopicDat
 {
     for (auto it = m_participants.begin(); it != m_participants.end();++it)
     {
-        if(it->second->getGuid() == part->getGuid())
+        if((*it)->getGuid() == part->getGuid())
         {
-            return part->mp_impl->getRegisteredType(typeName, type);
+            return get_implementation(*part).getRegisteredType(typeName, type);
         }
     }
     return false;
@@ -250,9 +248,9 @@ bool Domain::registerType(Participant* part, TopicDataType* type)
     //haya problemas si el usuario lo destruye antes de tiempo.
     for (auto it = m_participants.begin(); it != m_participants.end();++it)
     {
-        if(it->second->getGuid() == part->getGuid())
+        if((*it)->getGuid() == part->getGuid())
         {
-            return part->mp_impl->registerType(type);
+            return get_implementation(*part).registerType(type);
         }
     }
     return false;
@@ -264,9 +262,9 @@ bool Domain::unregisterType(Participant* part, const char* typeName)
     //haya problemas si el usuario lo destruye antes de tiempo.
     for (auto it = m_participants.begin(); it != m_participants.end();++it)
     {
-        if(it->second->getGuid() == part->getGuid())
+        if((*it)->getGuid() == part->getGuid())
         {
-            return part->mp_impl->unregisterType(typeName);
+            return get_implementation(*part).unregisterType(typeName);
         }
     }
     return true;

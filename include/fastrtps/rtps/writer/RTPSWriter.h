@@ -16,12 +16,14 @@
  * @file RTPSWriter.h
  */
 
-#ifndef RTPSWRITER_H_
-#define RTPSWRITER_H_
+#ifndef __RTPS_WRITER_RTPSWRITER_H__
+#define __RTPS_WRITER_RTPSWRITER_H__
 
 #include "../Endpoint.h"
 #include "../messages/RTPSMessageGroup.h"
 #include "../attributes/WriterAttributes.h"
+#include "../history/WriterHistory.h"
+
 #include <vector>
 #include <memory>
 #include <functional>
@@ -32,10 +34,8 @@ namespace fastrtps{
 namespace rtps {
 
 class WriterListener;
-class WriterHistory;
 class FlowController;
 struct CacheChange_t;
-
 
 /**
  * Class RTPSWriter, manages the sending of data to the readers. Is always associated with a HistoryCache.
@@ -43,11 +43,14 @@ struct CacheChange_t;
  */
 class RTPSWriter : public Endpoint
 {
-    friend class WriterHistory;
     friend class RTPSParticipantImpl;
     friend class RTPSMessageGroup;
+
     protected:
-    RTPSWriter(RTPSParticipantImpl*,GUID_t& guid,WriterAttributes& att,WriterHistory* hist,WriterListener* listen=nullptr);
+
+    RTPSWriter(RTPSParticipantImpl*, GUID_t& guid, WriterAttributes& att, WriterHistory& hist,
+            WriterListener* listen = nullptr);
+
     virtual ~RTPSWriter();
 
     public:
@@ -59,14 +62,16 @@ class RTPSWriter : public Endpoint
      * @return Pointer to the CacheChange or nullptr if incorrect.
      */
     template<typename T>
-    CacheChange_t* new_change(T &data, ChangeKind_t changeKind, InstanceHandle_t handle = c_InstanceHandle_Unknown)
-    {
-        return new_change([data]() -> uint32_t {return (uint32_t)T::getCdrSerializedSize(data);}, changeKind, handle);
-    }
+        CacheChange_ptr new_change(T &data, ChangeKind_t changeKind, InstanceHandle_t handle = c_InstanceHandle_Unknown)
+        {
+            return new_change([data]() -> uint32_t {return (uint32_t)T::getCdrSerializedSize(data);}, changeKind, handle);
+        }
 
 
-    RTPS_DllAPI CacheChange_t* new_change(const std::function<uint32_t()>& dataCdrSerializedSize,
+    RTPS_DllAPI CacheChange_ptr new_change(const std::function<uint32_t()>& dataCdrSerializedSize,
             ChangeKind_t changeKind, InstanceHandle_t handle = c_InstanceHandle_Unknown);
+
+    RTPS_DllAPI void reuse_change(CacheChange_ptr& change);
 
     /**
      * Add a matched reader.
@@ -74,24 +79,20 @@ class RTPSWriter : public Endpoint
      * @return True if added.
      */
     RTPS_DllAPI virtual bool matched_reader_add(const RemoteReaderAttributes& ratt) = 0;
+
     /**
      * Remove a matched reader.
      * @param ratt Pointer to the object to remove.
      * @return True if removed.
      */
     RTPS_DllAPI virtual bool matched_reader_remove(const RemoteReaderAttributes& ratt) = 0;
+
     /**
      * Tells us if a specific Reader is matched against this writer
      * @param ratt Pointer to the ReaderProxyData object
      * @return True if it was matched.
      */
     RTPS_DllAPI virtual bool matched_reader_is_matched(const RemoteReaderAttributes& ratt) = 0;
-    /**
-     * Check if a specific change has been acknowledged by all Readers.
-     * Is only useful in reliable Writer. In BE Writers always returns true;
-     * @return True if acknowledged by all.
-     */
-    RTPS_DllAPI virtual bool is_acked_by_all(CacheChange_t* /*a_change*/){ return true; }
 
     RTPS_DllAPI virtual bool wait_for_all_acked(const Duration_t& /*max_wait*/){ return true; }
 
@@ -107,22 +108,10 @@ class RTPSWriter : public Endpoint
     RTPS_DllAPI virtual void send_any_unsent_changes() = 0;
 
     /**
-     * Get Min Seq Num in History.
-     * @return Minimum sequence number in history
-     */
-    RTPS_DllAPI SequenceNumber_t get_seq_num_min();
-
-    /**
-     * Get Max Seq Num in History.
-     * @return Maximum sequence number in history
-     */
-    RTPS_DllAPI SequenceNumber_t get_seq_num_max();
-
-    /**
      * Get maximum size of the serialized type
      * @return Maximum size of the serialized type
      */
-    RTPS_DllAPI uint32_t getTypeMaxSerialized();
+    RTPS_DllAPI uint32_t getTypeMaxSerialized() const;
 
     uint32_t getMaxDataSize();
 
@@ -132,7 +121,7 @@ class RTPSWriter : public Endpoint
      * Get listener
      * @return Listener
      */
-    RTPS_DllAPI inline WriterListener* getListener(){ return mp_listener; };
+    RTPS_DllAPI inline WriterListener* getListener(){ return listener_; };
 
     /**
      * Get the asserted liveliness
@@ -152,14 +141,6 @@ class RTPSWriter : public Endpoint
      */
     RTPS_DllAPI inline bool isAsync(){ return is_async_; };
 
-    /**
-     * Remove an specified max number of changes
-     * @return at least one change has been removed
-     */
-    RTPS_DllAPI bool remove_older_changes(unsigned int max = 0);
-
-    virtual bool try_remove_change(std::chrono::microseconds& microseconds, std::unique_lock<std::recursive_mutex>& lock) = 0;
-
     /*
      * Adds a flow controller that will apply to this writer exclusively.
      */
@@ -171,23 +152,33 @@ class RTPSWriter : public Endpoint
      */
     inline RTPSParticipantImpl* getRTPSParticipant() const {return mp_RTPSParticipant;}
 
+    RTPS_DllAPI SequenceNumber_t next_sequence_number_nts() const;
+
     protected:
 
     //!Is the data sent directly or announced by HB and THEN send to the ones who ask for it?.
-    bool m_pushMode;
+    bool push_mode_;
+
     //!Group created to send messages more efficiently
     RTPSMessageGroup_t m_cdrmessages;
+
     //!INdicates if the liveliness has been asserted
     bool m_livelinessAsserted;
+
     //!WriterHistory
-    WriterHistory* mp_history;
+    WriterHistory::impl& history_;
+
     //!Listener
-    WriterListener* mp_listener;
+    WriterListener* listener_;
+
     //Asynchronout publication activated
     bool is_async_;
 
     LocatorList_t mAllShrinkedLocatorList;
+
     std::vector<GUID_t> mAllRemoteReaders;
+
+    mutable std::mutex mutex_;
 
     void update_cached_info_nts(std::vector<GUID_t>&& allRemoteReaders,
             std::vector<LocatorList_t>& allLocatorLists);
@@ -197,20 +188,26 @@ class RTPSWriter : public Endpoint
      */
     void init_header();
 
+    private:
+
     /**
      * Add a change to the unsent list.
      * @param change Pointer to the change to add.
      */
-    virtual void unsent_change_added_to_history(CacheChange_t* change)=0;
+    virtual bool unsent_change_added_to_history(const CacheChange_t&) = 0;
 
     /**
      * Indicate the writer that a change has been removed by the history due to some HistoryQos requirement.
      * @param a_change Pointer to the change that is going to be removed.
      * @return True if removed correctly.
      */
-    virtual bool change_removed_by_history(CacheChange_t* a_change)=0;
+    virtual bool change_removed_by_history(const SequenceNumber_t& sequence_number,
+            const InstanceHandle_t& handle) = 0;
 
-    private:
+    //! Last CacheChange Sequence Number added to the History.
+    SequenceNumber_t last_cachechange_seqnum_;
+
+    CacheChangePool cachechange_pool_;
 
     RTPSWriter& operator=(const RTPSWriter&) NON_COPYABLE_CXX11;
 };
@@ -218,4 +215,4 @@ class RTPSWriter : public Endpoint
 } /* namespace rtps */
 } /* namespace eprosima */
 
-#endif /* RTPSWRITER_H_ */
+#endif /* __RTPS_WRITER_RTPSWRITER_H__ */

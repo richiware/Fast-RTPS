@@ -33,7 +33,7 @@ namespace rtps {
 
 bool sort_changes_group (CacheChange_t* c1,CacheChange_t* c2)
 {
-    return(c1->sequenceNumber < c2->sequenceNumber);
+    return(c1->sequence_number < c2->sequence_number);
 }
 
 bool sort_SeqNum(const SequenceNumber_t& s1,const SequenceNumber_t& s2)
@@ -369,9 +369,9 @@ bool RTPSMessageGroup::add_data(const CacheChange_t& change, const std::vector<G
 
     // TODO (Ricardo). Check to create special wrapper.
     CacheChange_t change_to_add;
-    change_to_add.copy_not_memcpy(&change);
-    change_to_add.serializedPayload.data = change.serializedPayload.data;
-    change_to_add.serializedPayload.length = change.serializedPayload.length;
+    change_to_add.copy_not_memcpy(change);
+    change_to_add.serialized_payload.data = change.serialized_payload.data;
+    change_to_add.serialized_payload.length = change.serialized_payload.length;
 
 #if HAVE_SECURITY
     if(endpoint_->is_payload_protected())
@@ -379,15 +379,15 @@ bool RTPSMessageGroup::add_data(const CacheChange_t& change, const std::vector<G
         CDRMessage::initCDRMsg(encrypt_msg_);
 
         // If payload protection, encode payload
-        if(!participant_->security_manager().encode_serialized_payload(change.serializedPayload,
+        if(!participant_->security_manager().encode_serialized_payload(change.serialized_payload,
                     *encrypt_msg_, endpoint_->getGuid()))
         {
-            logError(RTPS_WRITER, "Error encoding change " << change.sequenceNumber);
+            logError(RTPS_WRITER, "Error encoding change " << change.sequence_number);
             return false;
         }
 
-        change_to_add.serializedPayload.data = encrypt_msg_->buffer;
-        change_to_add.serializedPayload.length = encrypt_msg_->length;
+        change_to_add.serialized_payload.data = encrypt_msg_->buffer;
+        change_to_add.serialized_payload.length = encrypt_msg_->length;
     }
 #endif
 
@@ -395,10 +395,10 @@ bool RTPSMessageGroup::add_data(const CacheChange_t& change, const std::vector<G
                 readerId, expectsInlineQos, inlineQos))
     {
         logError(RTPS_WRITER, "Cannot add DATA submsg to the CDRMessage. Buffer too small");
-        change_to_add.serializedPayload.data = NULL;
+        change_to_add.serialized_payload.data = NULL;
         return false;
     }
-    change_to_add.serializedPayload.data = NULL;
+    change_to_add.serialized_payload.data = NULL;
 
 #if HAVE_SECURITY
     if(endpoint_->is_submessage_protected())
@@ -443,13 +443,13 @@ bool RTPSMessageGroup::add_data_frag(const CacheChange_t& change, const uint32_t
     uint32_t fragment_start = change.getFragmentSize() * (fragment_number - 1);
     // Calculate fragment size. If last fragment, size may be smaller
     uint32_t fragment_size = fragment_number < change.getFragmentCount() ? change.getFragmentSize() :
-        change.serializedPayload.length - fragment_start;
+        change.serialized_payload.length - fragment_start;
 
     // TODO (Ricardo). Check to create special wrapper.
     CacheChange_t change_to_add;
-    change_to_add.copy_not_memcpy(&change);
-    change_to_add.serializedPayload.data = change.serializedPayload.data + fragment_start;
-    change_to_add.serializedPayload.length = fragment_size;
+    change_to_add.copy_not_memcpy(change);
+    change_to_add.serialized_payload.data = change.serialized_payload.data + fragment_start;
+    change_to_add.serialized_payload.length = fragment_size;
 
 #if HAVE_SECURITY
     if(endpoint_->is_payload_protected())
@@ -457,27 +457,27 @@ bool RTPSMessageGroup::add_data_frag(const CacheChange_t& change, const uint32_t
         CDRMessage::initCDRMsg(encrypt_msg_);
 
         // If payload protection, encode payload
-        if(!participant_->security_manager().encode_serialized_payload(change_to_add.serializedPayload,
+        if(!participant_->security_manager().encode_serialized_payload(change_to_add.serialized_payload,
                     *encrypt_msg_, endpoint_->getGuid()))
         {
-            logError(RTPS_WRITER, "Error encoding change " << change.sequenceNumber);
+            logError(RTPS_WRITER, "Error encoding change " << change.sequence_number);
             return false;
         }
 
-        change_to_add.serializedPayload.data = encrypt_msg_->buffer;
-        change_to_add.serializedPayload.length = encrypt_msg_->length;
+        change_to_add.serialized_payload.data = encrypt_msg_->buffer;
+        change_to_add.serialized_payload.length = encrypt_msg_->length;
     }
 #endif
 
     if(!RTPSMessageCreator::addSubmessageDataFrag(submessage_msg_, &change_to_add, fragment_number,
-                change.serializedPayload.length, endpoint_->getAttributes()->topicKind, readerId,
+                change.serialized_payload.length, endpoint_->getAttributes()->topicKind, readerId,
                 expectsInlineQos, inlineQos))
     {
         logError(RTPS_WRITER, "Cannot add DATA_FRAG submsg to the CDRMessage. Buffer too small");
-        change_to_add.serializedPayload.data = NULL;
+        change_to_add.serialized_payload.data = NULL;
         return false;
     }
-    change_to_add.serializedPayload.data = NULL;
+    change_to_add.serialized_payload.data = NULL;
 
 #if HAVE_SECURITY
     if(endpoint_->is_submessage_protected())

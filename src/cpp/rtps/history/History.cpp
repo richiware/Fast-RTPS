@@ -47,8 +47,8 @@ History::History(const HistoryAttributes & att):
     {
         m_changes.reserve((uint32_t)abs(att.initialReservedCaches));
         mp_invalidCache = new CacheChange_t();
-        mp_invalidCache->writerGUID = c_Guid_Unknown;
-        mp_invalidCache->sequenceNumber = c_SequenceNumber_Unknown;
+        mp_invalidCache->writer_guid = c_Guid_Unknown;
+        mp_invalidCache->sequence_number = c_SequenceNumber_Unknown;
         mp_minSeqCacheChange = mp_invalidCache;
         mp_maxSeqCacheChange = mp_invalidCache;
         //logInfo(RTPS_HISTORY,"History created");
@@ -88,7 +88,7 @@ bool History::remove_all_changes()
 
 bool History::get_min_change(CacheChange_t** min_change)
 {
-    if(mp_minSeqCacheChange->sequenceNumber != mp_invalidCache->sequenceNumber)
+    if(mp_minSeqCacheChange->sequence_number != mp_invalidCache->sequence_number)
     {
         *min_change = mp_minSeqCacheChange;
         return true;
@@ -98,7 +98,7 @@ bool History::get_min_change(CacheChange_t** min_change)
 }
 bool History::get_max_change(CacheChange_t** max_change)
 {
-    if(mp_maxSeqCacheChange->sequenceNumber != mp_invalidCache->sequenceNumber)
+    if(mp_maxSeqCacheChange->sequence_number != mp_invalidCache->sequence_number)
     {
         *max_change = mp_maxSeqCacheChange;
         return true;
@@ -119,12 +119,12 @@ bool History::get_change(const SequenceNumber_t& seq, const GUID_t& guid,CacheCh
     for(std::vector<CacheChange_t*>::iterator it = m_changes.begin();
             it!=m_changes.end();++it)
     {
-        if((*it)->sequenceNumber == seq && (*it)->writerGUID == guid)
+        if((*it)->sequence_number == seq && (*it)->writer_guid == guid)
         {
             *change = *it;
             return true;
         }
-        else if((*it)->sequenceNumber > seq)
+        else if((*it)->sequence_number > seq)
             break;
     }
     return false;
@@ -147,7 +147,7 @@ void History::print_changes_seqNum2()
     for(std::vector<CacheChange_t*>::iterator it = m_changes.begin();
             it!=m_changes.end();++it)
     {
-        ss << (*it)->sequenceNumber << "-";
+        ss << (*it)->sequence_number << "-";
     }
     ss << std::endl;
     std::cout << ss.str();

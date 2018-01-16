@@ -35,6 +35,7 @@ set(${PROJECT_NAME}_source_files
     rtps/writer/StatelessWriter.cpp
     rtps/writer/ReaderLocator.cpp
     rtps/writer/timedevent/InitialHeartbeat.cpp
+    rtps/writer/timedevent/CleanupEvent.cpp
     rtps/writer/timedevent/PeriodicHeartbeat.cpp
     rtps/writer/timedevent/NackResponseDelay.cpp
     rtps/writer/timedevent/NackSupressionDuration.cpp
@@ -70,7 +71,6 @@ set(${PROJECT_NAME}_source_files
     participant/ParticipantImpl.cpp
     publisher/Publisher.cpp
     publisher/PublisherImpl.cpp
-    publisher/PublisherHistory.cpp
     subscriber/Subscriber.cpp
     subscriber/SubscriberImpl.cpp
     subscriber/SubscriberHistory.cpp

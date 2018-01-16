@@ -101,7 +101,7 @@ bool WLP::createEndpoints()
             mp_participant->getRTPSParticipantAttributes().throughputController.periodMillisecs != 0)
         watt.mode = ASYNCHRONOUS_WRITER;
     RTPSWriter* wout;
-    if(mp_participant->createWriter(&wout,watt,mp_builtinWriterHistory,nullptr,c_EntityId_WriterLiveliness,true))
+    if(mp_participant->createWriter(&wout, watt, *mp_builtinWriterHistory, nullptr, c_EntityId_WriterLiveliness, true))
     {
         mp_builtinWriter = dynamic_cast<StatefulWriter*>(wout);
         logInfo(RTPS_LIVELINESS,"Builtin Liveliness Writer created");

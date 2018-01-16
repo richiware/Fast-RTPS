@@ -37,10 +37,10 @@ NackSupressionDuration::~NackSupressionDuration()
     destroy();
 }
 
-NackSupressionDuration::NackSupressionDuration(ReaderProxy* p_RP,double millisec):
-TimedEvent(p_RP->mp_SFW->getRTPSParticipant()->getEventResource().getIOService(),
-p_RP->mp_SFW->getRTPSParticipant()->getEventResource().getThread(), millisec),
-mp_RP(p_RP)
+NackSupressionDuration::NackSupressionDuration(ReaderProxy& remote_reader,double millisec) :
+    TimedEvent(remote_reader.mp_SFW->getRTPSParticipant()->getEventResource().getIOService(),
+            remote_reader.mp_SFW->getRTPSParticipant()->getEventResource().getThread(), millisec),
+    remote_reader_(remote_reader)
 {
 
 }
@@ -53,14 +53,12 @@ void NackSupressionDuration::event(EventCode code, const char* msg)
 
     if(code == EVENT_SUCCESS)
     {
-        std::lock_guard<std::recursive_mutex> guard(*mp_RP->mp_mutex);
+        logInfo(RTPS_WRITER,"Changing underway to unacked for Reader: " << remote_reader_.m_att.guid);
 
-        logInfo(RTPS_WRITER,"Changing underway to unacked for Reader: "<<mp_RP->m_att.guid);
-
-        if(mp_RP->m_att.endpoint.reliabilityKind == RELIABLE)
+        if(remote_reader_.m_att.endpoint.reliabilityKind == RELIABLE)
         {
-            mp_RP->convert_status_on_all_changes(UNDERWAY,UNACKNOWLEDGED);
-            mp_RP->mp_SFW->mp_periodicHB->restart_timer();
+            remote_reader_.convert_status_on_all_changes(UNDERWAY,UNACKNOWLEDGED);
+            remote_reader_.mp_SFW->mp_periodicHB->restart_timer();
         }
     }
     else if(code == EVENT_ABORT)

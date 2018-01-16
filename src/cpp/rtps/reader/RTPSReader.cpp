@@ -39,8 +39,8 @@ RTPSReader::RTPSReader(RTPSParticipantImpl*pimpl,GUID_t& guid,
     m_acceptMessagesToUnknownReaders(true),
     m_acceptMessagesFromUnkownWriters(true),
     m_expectsInlineQos(att.expectsInlineQos),
-    fragmentedChangePitStop_(nullptr)
-
+    fragmentedChangePitStop_(nullptr),
+    mp_mutex(new std::recursive_mutex())
     {
         mp_history->mp_reader = this;
         mp_history->mp_mutex = mp_mutex;
@@ -52,6 +52,7 @@ RTPSReader::~RTPSReader()
 {
     logInfo(RTPS_READER,"Removing reader "<<this->getGuid().entityId;);
     delete fragmentedChangePitStop_;
+    delete(mp_mutex);
     mp_history->mp_reader = nullptr;
     mp_history->mp_mutex = nullptr;
 }

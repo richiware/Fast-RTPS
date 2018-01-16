@@ -17,21 +17,16 @@
  *
  */
 
-#ifndef INITIALHEARTBEAT_H_
-#define INITIALHEARTBEAT_H_
+#ifndef __RTPS_WRITER_TIMEDEVENT_INITIALHEARTBEAT_H__
+#define __RTPS_WRITER_TIMEDEVENT_INITIALHEARTBEAT_H__
 #ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
 #include <fastrtps/rtps/resources/TimedEvent.h>
-#include <fastrtps/rtps/common/CDRMessage_t.h>
-#include <fastrtps/rtps/common/Guid.h>
-#include <fastrtps/rtps/common/Locator.h>
-#include <fastrtps/rtps/messages/RTPSMessageGroup.h>
 
 namespace eprosima {
 namespace fastrtps{
 namespace rtps{
 
 class ReaderProxy;
-
 
 /**
  * InitialHeartbeat class, controls the initial send operation of HB.
@@ -45,7 +40,7 @@ class InitialHeartbeat: public TimedEvent
          * @param p_RP
          * @param interval
          */
-        InitialHeartbeat(ReaderProxy* rp, double interval);
+        InitialHeartbeat(const ReaderProxy& remote_reader, double interval);
         virtual ~InitialHeartbeat();
 
         /**
@@ -56,14 +51,11 @@ class InitialHeartbeat: public TimedEvent
          */
         void event(EventCode code, const char* msg= nullptr);
 
-        //!
-        RTPSMessageGroup_t m_cdrmessages;
-        //!
-        ReaderProxy* rp_;
+        const ReaderProxy& remote_reader_;
 };
 
 }
 }
 } /* namespace eprosima */
 #endif
-#endif /* INITIALHEARTBEAT_H_ */
+#endif /* __RTPS_WRITER_TIMEDEVENT_INITIALHEARTBEAT_H__ */

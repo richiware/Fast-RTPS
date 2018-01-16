@@ -490,7 +490,8 @@ bool SecurityManager::on_process_handshake(const GUID_t& remote_participant_guid
     }
     if(remote_participant_info->change_sequence_number_ != SequenceNumber_t::unknown())
     {
-        participant_stateless_message_writer_history_->remove_change(remote_participant_info->change_sequence_number_);
+        participant_stateless_message_writer_history_->remove_change(
+                remote_participant_info->change_sequence_number_);
         remote_participant_info->change_sequence_number_ = SequenceNumber_t::unknown();
     }
     int64_t expected_sequence_number = 0;
@@ -510,45 +511,45 @@ bool SecurityManager::on_process_handshake(const GUID_t& remote_participant_guid
         ParticipantGenericMessage message = generate_authentication_message(std::move(message_identity),
                 remote_participant_guid, *handshake_message);
 
-        CacheChange_t* change = participant_stateless_message_writer_->new_change([&message]() -> uint32_t
+        CacheChange_ptr change = participant_stateless_message_writer_->new_change([&message]() -> uint32_t
                 {
                     return static_cast<uint32_t>(ParticipantGenericMessageHelper::serialized_size(message)
                             + 4 /*encapsulation*/);
                 }
                 , ALIVE, c_InstanceHandle_Unknown);
 
-        if(change != nullptr)
+        if(change)
         {
             // Serialize message
             CDRMessage_t aux_msg(0);
             aux_msg.wraps = true;
-            aux_msg.buffer = change->serializedPayload.data;
-            aux_msg.length = change->serializedPayload.length;
-            aux_msg.max_size = change->serializedPayload.max_size;
+            aux_msg.buffer = change->serialized_payload.data;
+            aux_msg.length = change->serialized_payload.length;
+            aux_msg.max_size = change->serialized_payload.max_size;
 
             // Serialize encapsulation
             CDRMessage::addOctet(&aux_msg, 0);
 #if __BIG_ENDIAN__
             aux_msg.msg_endian = BIGEND;
-            change->serializedPayload.encapsulation = PL_CDR_BE;
+            change->serialized_payload.encapsulation = PL_CDR_BE;
             CDRMessage::addOctet(&aux_msg, PL_CDR_BE);
 #else
             aux_msg.msg_endian = LITTLEEND;
-            change->serializedPayload.encapsulation = PL_CDR_LE;
+            change->serialized_payload.encapsulation = PL_CDR_LE;
             CDRMessage::addOctet(&aux_msg, PL_CDR_LE);
 #endif
             CDRMessage::addUInt16(&aux_msg, 0);
 
             if(CDRMessage::addParticipantGenericMessage(&aux_msg, message))
             {
-                change->serializedPayload.length = aux_msg.length;
+                change->serialized_payload.length = aux_msg.length;
 
                 // Send
                 if(participant_stateless_message_writer_history_->add_change(change))
                 {
                     handshake_message_send = true;
                     expected_sequence_number = message.message_identity().sequence_number();
-                    remote_participant_info->change_sequence_number_ = change->sequenceNumber;
+                    remote_participant_info->change_sequence_number_ = change->sequence_number;
                 }
                 else
                 {
@@ -680,7 +681,8 @@ bool SecurityManager::create_participant_stateless_message_writer()
         watt.mode = ASYNCHRONOUS_WRITER;
 
     RTPSWriter* wout = nullptr;
-    if(participant_->createWriter(&wout, watt, participant_stateless_message_writer_history_, nullptr, participant_stateless_message_writer_entity_id, true))
+    if(participant_->createWriter(&wout, watt, *participant_stateless_message_writer_history_, nullptr,
+                participant_stateless_message_writer_entity_id, true))
     {
         participant_->set_endpoint_rtps_protection_supports(wout, false);
         participant_stateless_message_writer_ = dynamic_cast<StatelessWriter*>(wout);
@@ -796,7 +798,8 @@ bool SecurityManager::create_participant_volatile_message_secure_writer()
         watt.mode = ASYNCHRONOUS_WRITER;
 
     RTPSWriter* wout = nullptr;
-    if(participant_->createWriter(&wout, watt, participant_volatile_message_secure_writer_history_, nullptr, participant_volatile_message_secure_writer_entity_id, true))
+    if(participant_->createWriter(&wout, watt, *participant_volatile_message_secure_writer_history_, nullptr,
+                participant_volatile_message_secure_writer_entity_id, true))
     {
         participant_->set_endpoint_rtps_protection_supports(wout, false);
         participant_volatile_message_secure_writer_ = dynamic_cast<StatefulWriter*>(wout);
@@ -942,9 +945,9 @@ void SecurityManager::process_participant_stateless_message(const CacheChange_t*
     ParticipantGenericMessage message;
     CDRMessage_t aux_msg(0);
     aux_msg.wraps = true;
-    aux_msg.buffer = change->serializedPayload.data;
-    aux_msg.length = change->serializedPayload.length;
-    aux_msg.max_size = change->serializedPayload.max_size;
+    aux_msg.buffer = change->serialized_payload.data;
+    aux_msg.length = change->serialized_payload.length;
+    aux_msg.max_size = change->serialized_payload.max_size;
 
     // Read encapsulation
     aux_msg.pos += 1;
@@ -1031,15 +1034,19 @@ void SecurityManager::process_participant_stateless_message(const CacheChange_t*
                     if(remote_participant_info->change_sequence_number_ != SequenceNumber_t::unknown())
                     {
                         // Remove previous change and send a new one.
-                        CacheChange_t* p_change = participant_stateless_message_writer_history_->remove_change_and_reuse(
-                                remote_participant_info->change_sequence_number_);
+                        CacheChange_ptr p_change =
+                            participant_stateless_message_writer_history_->
+                            remove_change(remote_participant_info->change_sequence_number_);
                         remote_participant_info->change_sequence_number_ = SequenceNumber_t::unknown();
 
-                        if(p_change != nullptr)
+                        if(p_change)
                         {
+                            participant_stateless_message_writer_->reuse_change(p_change);
+                            //TODO Mechanism to alert you insert an old sequence number.
                             if(participant_stateless_message_writer_history_->add_change(p_change))
                             {
-                                remote_participant_info->change_sequence_number_ = p_change->sequenceNumber;
+                                remote_participant_info->change_sequence_number_ =
+                                    p_change->sequence_number;
                             }
                             //TODO (Ricardo) What to do if not added?
                         }
@@ -1095,15 +1102,18 @@ void SecurityManager::process_participant_stateless_message(const CacheChange_t*
                 if(remote_participant_info->change_sequence_number_ != SequenceNumber_t::unknown())
                 {
                     // Remove previous change and send a new one.
-                    CacheChange_t* p_change = participant_stateless_message_writer_history_->remove_change_and_reuse(
-                            remote_participant_info->change_sequence_number_);
+                    CacheChange_ptr p_change =
+                        participant_stateless_message_writer_history_->remove_change(
+                                remote_participant_info->change_sequence_number_);
                     remote_participant_info->change_sequence_number_ = SequenceNumber_t::unknown();
 
-                    if(p_change != nullptr)
+                    if(p_change)
                     {
+                        participant_stateless_message_writer_->reuse_change(p_change);
                         if(participant_stateless_message_writer_history_->add_change(p_change))
                         {
-                            remote_participant_info->change_sequence_number_ = p_change->sequenceNumber;
+                            remote_participant_info->change_sequence_number_ =
+                                p_change->sequence_number;
                         }
                         //TODO (Ricardo) What to do if not added?
                     }
@@ -1138,9 +1148,9 @@ void SecurityManager::process_participant_volatile_message_secure(const CacheCha
     ParticipantGenericMessage message;
     CDRMessage_t aux_msg(0);
     aux_msg.wraps = true;
-    aux_msg.buffer = change->serializedPayload.data;
-    aux_msg.length = change->serializedPayload.length;
-    aux_msg.max_size = change->serializedPayload.max_size;
+    aux_msg.buffer = change->serialized_payload.data;
+    aux_msg.length = change->serialized_payload.length;
+    aux_msg.max_size = change->serialized_payload.max_size;
 
     // Read encapsulation
     aux_msg.pos += 1;
@@ -1553,49 +1563,48 @@ ParticipantCryptoHandle* SecurityManager::register_and_match_crypto_endpoint(con
             ParticipantGenericMessage message = generate_participant_crypto_token_message(remote_participant_guid,
                     local_participant_crypto_tokens);
 
-            CacheChange_t* change = participant_volatile_message_secure_writer_->new_change([&message]() -> uint32_t
+            CacheChange_ptr change =
+                participant_volatile_message_secure_writer_->new_change([&message]() -> uint32_t
                     {
                         return static_cast<uint32_t>(ParticipantGenericMessageHelper::serialized_size(message)
                                 + 4 /*encapsulation*/);
                     }
                     , ALIVE, c_InstanceHandle_Unknown);
 
-            if(change != nullptr)
+            if(change)
             {
                 // Serialize message
                 CDRMessage_t aux_msg(0);
                 aux_msg.wraps = true;
-                aux_msg.buffer = change->serializedPayload.data;
-                aux_msg.length = change->serializedPayload.length;
-                aux_msg.max_size = change->serializedPayload.max_size;
+                aux_msg.buffer = change->serialized_payload.data;
+                aux_msg.length = change->serialized_payload.length;
+                aux_msg.max_size = change->serialized_payload.max_size;
 
                 // Serialize encapsulation
                 CDRMessage::addOctet(&aux_msg, 0);
 #if __BIG_ENDIAN__
                 aux_msg.msg_endian = BIGEND;
-                change->serializedPayload.encapsulation = PL_CDR_BE;
+                change->serialized_payload.encapsulation = PL_CDR_BE;
                 CDRMessage::addOctet(&aux_msg, PL_CDR_BE);
 #else
                 aux_msg.msg_endian = LITTLEEND;
-                change->serializedPayload.encapsulation = PL_CDR_LE;
+                change->serialized_payload.encapsulation = PL_CDR_LE;
                 CDRMessage::addOctet(&aux_msg, PL_CDR_LE);
 #endif
                 CDRMessage::addUInt16(&aux_msg, 0);
 
                 if(CDRMessage::addParticipantGenericMessage(&aux_msg, message))
                 {
-                    change->serializedPayload.length = aux_msg.length;
+                    change->serialized_payload.length = aux_msg.length;
 
                     // Send
                     if(!participant_volatile_message_secure_writer_history_->add_change(change))
                     {
-                        participant_volatile_message_secure_writer_history_->release_Cache(change);
                         logError(SECURITY, "WriterHistory cannot add the CacheChange_t");
                     }
                 }
                 else
                 {
-                    participant_volatile_message_secure_writer_history_->release_Cache(change);
                     logError(SECURITY, "Cannot serialize ParticipantGenericMessage");
                 }
             }
@@ -1894,38 +1903,39 @@ bool SecurityManager::discovered_reader(const GUID_t& writer_guid, const GUID_t&
                         ParticipantGenericMessage message = generate_writer_crypto_token_message(remote_participant_key,
                                 remote_reader_data.guid(), writer_guid, local_writer_crypto_tokens);
 
-                        CacheChange_t* change = participant_volatile_message_secure_writer_->new_change([&message]() -> uint32_t
+                        CacheChange_ptr change =
+                            participant_volatile_message_secure_writer_->new_change([&message]() -> uint32_t
                                 {
                                 return static_cast<uint32_t>(ParticipantGenericMessageHelper::serialized_size(message)
                                         + 4 /*encapsulation*/);
                                 }
                                 , ALIVE, c_InstanceHandle_Unknown);
 
-                        if(change != nullptr)
+                        if(change)
                         {
                             // Serialize message
                             CDRMessage_t aux_msg(0);
                             aux_msg.wraps = true;
-                            aux_msg.buffer = change->serializedPayload.data;
-                            aux_msg.length = change->serializedPayload.length;
-                            aux_msg.max_size = change->serializedPayload.max_size;
+                            aux_msg.buffer = change->serialized_payload.data;
+                            aux_msg.length = change->serialized_payload.length;
+                            aux_msg.max_size = change->serialized_payload.max_size;
 
                             // Serialize encapsulation
                             CDRMessage::addOctet(&aux_msg, 0);
 #if __BIG_ENDIAN__
                             aux_msg.msg_endian = BIGEND;
-                            change->serializedPayload.encapsulation = PL_CDR_BE;
+                            change->serialized_payload.encapsulation = PL_CDR_BE;
                             CDRMessage::addOctet(&aux_msg, PL_CDR_BE);
 #else
                             aux_msg.msg_endian = LITTLEEND;
-                            change->serializedPayload.encapsulation = PL_CDR_LE;
+                            change->serialized_payload.encapsulation = PL_CDR_LE;
                             CDRMessage::addOctet(&aux_msg, PL_CDR_LE);
 #endif
                             CDRMessage::addUInt16(&aux_msg, 0);
 
                             if(CDRMessage::addParticipantGenericMessage(&aux_msg, message))
                             {
-                                change->serializedPayload.length = aux_msg.length;
+                                change->serialized_payload.length = aux_msg.length;
 
                                 // Send
                                 if(participant_volatile_message_secure_writer_history_->add_change(change))
@@ -1937,13 +1947,11 @@ bool SecurityManager::discovered_reader(const GUID_t& writer_guid, const GUID_t&
                                 }
                                 else
                                 {
-                                    participant_volatile_message_secure_writer_history_->release_Cache(change);
                                     logError(SECURITY, "WriterHistory cannot add the CacheChange_t");
                                 }
                             }
                             else
                             {
-                                participant_volatile_message_secure_writer_history_->release_Cache(change);
                                 logError(SECURITY, "Cannot serialize ParticipantGenericMessage");
                             }
                         }
@@ -2148,38 +2156,39 @@ bool SecurityManager::discovered_writer(const GUID_t& reader_guid, const GUID_t&
                         ParticipantGenericMessage message = generate_reader_crypto_token_message(remote_participant_key,
                                 remote_writer_data.guid(), reader_guid, local_reader_crypto_tokens);
 
-                        CacheChange_t* change = participant_volatile_message_secure_writer_->new_change([&message]() -> uint32_t
+                        CacheChange_ptr change =
+                            participant_volatile_message_secure_writer_->new_change([&message]() -> uint32_t
                                 {
                                 return static_cast<uint32_t>(ParticipantGenericMessageHelper::serialized_size(message)
                                         + 4 /*encapsulation*/);
                                 }
                                 , ALIVE, c_InstanceHandle_Unknown);
 
-                        if(change != nullptr)
+                        if(change)
                         {
                             // Serialize message
                             CDRMessage_t aux_msg(0);
                             aux_msg.wraps = true;
-                            aux_msg.buffer = change->serializedPayload.data;
-                            aux_msg.length = change->serializedPayload.length;
-                            aux_msg.max_size = change->serializedPayload.max_size;
+                            aux_msg.buffer = change->serialized_payload.data;
+                            aux_msg.length = change->serialized_payload.length;
+                            aux_msg.max_size = change->serialized_payload.max_size;
 
                             // Serialize encapsulation
                             CDRMessage::addOctet(&aux_msg, 0);
 #if __BIG_ENDIAN__
                             aux_msg.msg_endian = BIGEND;
-                            change->serializedPayload.encapsulation = PL_CDR_BE;
+                            change->serialized_payload.encapsulation = PL_CDR_BE;
                             CDRMessage::addOctet(&aux_msg, PL_CDR_BE);
 #else
                             aux_msg.msg_endian = LITTLEEND;
-                            change->serializedPayload.encapsulation = PL_CDR_LE;
+                            change->serialized_payload.encapsulation = PL_CDR_LE;
                             CDRMessage::addOctet(&aux_msg, PL_CDR_LE);
 #endif
                             CDRMessage::addUInt16(&aux_msg, 0);
 
                             if(CDRMessage::addParticipantGenericMessage(&aux_msg, message))
                             {
-                                change->serializedPayload.length = aux_msg.length;
+                                change->serialized_payload.length = aux_msg.length;
 
                                 // Send
                                 if(participant_volatile_message_secure_writer_history_->add_change(change))
@@ -2191,13 +2200,11 @@ bool SecurityManager::discovered_writer(const GUID_t& reader_guid, const GUID_t&
                                 }
                                 else
                                 {
-                                    participant_volatile_message_secure_writer_history_->release_Cache(change);
                                     logError(SECURITY, "WriterHistory cannot add the CacheChange_t");
                                 }
                             }
                             else
                             {
-                                participant_volatile_message_secure_writer_history_->release_Cache(change);
                                 logError(SECURITY, "Cannot serialize ParticipantGenericMessage");
                             }
                         }

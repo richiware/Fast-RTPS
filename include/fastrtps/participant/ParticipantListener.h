@@ -25,6 +25,8 @@
 namespace eprosima {
 namespace fastrtps {
 
+class Participant;
+
 /**
  * Class ParticipantListener, overrides behaviour towards certain events.
  * @ingroup FASTRTPS_MODULE

@@ -43,11 +43,12 @@ class TopicDataType;
  */
 class Domain
 {
-    typedef std::pair<Participant*,ParticipantImpl*> t_p_Participant;
-
     Domain();
+
     virtual ~Domain();
-public:
+
+    public:
+
     /**
      * Create a Participant from a profile name.
      * @param participant_profile Participant profile name.
@@ -172,7 +173,7 @@ public:
 
 private:
 
-    static std::vector<t_p_Participant> m_participants;
+    static std::vector<Participant*> m_participants;
     static bool default_xml_profiles_loaded;
 
 };

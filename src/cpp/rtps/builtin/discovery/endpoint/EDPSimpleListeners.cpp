@@ -40,7 +40,8 @@ namespace eprosima {
 namespace fastrtps{
 namespace rtps {
 
-void EDPSimplePUBListener::onNewCacheChangeAdded(RTPSReader* reader, const CacheChange_t* const change_in)
+void EDPSimplePUBListener::onNewCacheChangeAdded(RTPSReader* reader,
+        const CacheChange_t* const change_in)
 {
     CacheChange_t* change = (CacheChange_t*)change_in;
     //std::lock_guard<std::recursive_mutex> guard(*this->mp_SEDP->mp_PubReader.first->getMutex());
@@ -62,14 +63,14 @@ void EDPSimplePUBListener::onNewCacheChangeAdded(RTPSReader* reader, const Cache
         WriterProxyData writerProxyData;
         CDRMessage_t tempMsg(0);
         tempMsg.wraps = true;
-        tempMsg.msg_endian = change_in->serializedPayload.encapsulation == PL_CDR_BE ? BIGEND : LITTLEEND;
-        tempMsg.length = change_in->serializedPayload.length;
-        tempMsg.max_size = change_in->serializedPayload.max_size;
-        tempMsg.buffer = change_in->serializedPayload.data;
+        tempMsg.msg_endian = change_in->serialized_payload.encapsulation == PL_CDR_BE ? BIGEND : LITTLEEND;
+        tempMsg.length = change_in->serialized_payload.length;
+        tempMsg.max_size = change_in->serialized_payload.max_size;
+        tempMsg.buffer = change_in->serialized_payload.data;
 
         if(writerProxyData.readFromCDRMessage(&tempMsg))
         {
-            change->instanceHandle = writerProxyData.key();
+            change->instance_handle = writerProxyData.key();
             if(writerProxyData.guid().guidPrefix == mp_SEDP->mp_RTPSParticipant->getGuid().guidPrefix)
             {
                 logInfo(RTPS_EDP,"Message from own RTPSParticipant, ignoring");
@@ -100,7 +101,7 @@ void EDPSimplePUBListener::onNewCacheChangeAdded(RTPSReader* reader, const Cache
         //REMOVE WRITER FROM OUR READERS:
         logInfo(RTPS_EDP,"Disposed Remote Writer, removing...");
 
-        GUID_t auxGUID = iHandle2GUID(change->instanceHandle);
+        GUID_t auxGUID = iHandle2GUID(change->instance_handle);
         this->mp_SEDP->removeWriterProxy(auxGUID);
     }
 
@@ -112,9 +113,9 @@ void EDPSimplePUBListener::onNewCacheChangeAdded(RTPSReader* reader, const Cache
 
 static inline bool compute_key(CDRMessage_t* aux_msg,CacheChange_t* change)
 {
-    if(change->instanceHandle == c_InstanceHandle_Unknown)
+    if(change->instance_handle == c_InstanceHandle_Unknown)
     {
-        SerializedPayload_t* pl = &change->serializedPayload;
+        SerializedPayload_t* pl = &change->serialized_payload;
         aux_msg->buffer = pl->data;
         aux_msg->length = pl->length;
         aux_msg->max_size = pl->max_size;
@@ -133,13 +134,13 @@ static inline bool compute_key(CDRMessage_t* aux_msg,CacheChange_t* change)
             }
             if(pid == PID_KEY_HASH)
             {
-                valid &= CDRMessage::readData(aux_msg,change->instanceHandle.value,16);
+                valid &= CDRMessage::readData(aux_msg,change->instance_handle.value,16);
                 aux_msg->buffer = nullptr;
                 return true;
             }
             if(pid == PID_ENDPOINT_GUID)
             {
-                valid &= CDRMessage::readData(aux_msg,change->instanceHandle.value,16);
+                valid &= CDRMessage::readData(aux_msg,change->instance_handle.value,16);
                 aux_msg->buffer = nullptr;
                 return true;
             }
@@ -164,7 +165,8 @@ bool EDPSimpleSUBListener::computeKey(CacheChange_t* change)
     return compute_key(&aux_msg,change);
 }
 
-void EDPSimpleSUBListener::onNewCacheChangeAdded(RTPSReader* reader, const CacheChange_t* const change_in)
+void EDPSimpleSUBListener::onNewCacheChangeAdded(RTPSReader* reader,
+        const CacheChange_t* const change_in)
 {
     CacheChange_t* change = (CacheChange_t*)change_in;
     //std::lock_guard<std::recursive_mutex> guard(*this->mp_SEDP->mp_SubReader.first->getMutex());
@@ -186,14 +188,14 @@ void EDPSimpleSUBListener::onNewCacheChangeAdded(RTPSReader* reader, const Cache
         ReaderProxyData readerProxyData;
         CDRMessage_t tempMsg(0);
         tempMsg.wraps = true;
-        tempMsg.msg_endian = change_in->serializedPayload.encapsulation == PL_CDR_BE ? BIGEND : LITTLEEND;
-        tempMsg.length = change_in->serializedPayload.length;
-        tempMsg.max_size = change_in->serializedPayload.max_size;
-        tempMsg.buffer = change_in->serializedPayload.data;
+        tempMsg.msg_endian = change_in->serialized_payload.encapsulation == PL_CDR_BE ? BIGEND : LITTLEEND;
+        tempMsg.length = change_in->serialized_payload.length;
+        tempMsg.max_size = change_in->serialized_payload.max_size;
+        tempMsg.buffer = change_in->serialized_payload.data;
 
         if(readerProxyData.readFromCDRMessage(&tempMsg))
         {
-            change->instanceHandle = readerProxyData.key();
+            change->instance_handle = readerProxyData.key();
             if(readerProxyData.guid().guidPrefix == mp_SEDP->mp_RTPSParticipant->getGuid().guidPrefix)
             {
                 logInfo(RTPS_EDP,"From own RTPSParticipant, ignoring");
@@ -224,7 +226,7 @@ void EDPSimpleSUBListener::onNewCacheChangeAdded(RTPSReader* reader, const Cache
         //REMOVE WRITER FROM OUR READERS:
         logInfo(RTPS_EDP,"Disposed Remote Reader, removing...");
 
-        GUID_t auxGUID = iHandle2GUID(change->instanceHandle);
+        GUID_t auxGUID = iHandle2GUID(change->instance_handle);
         this->mp_SEDP->removeReaderProxy(auxGUID);
     }
 

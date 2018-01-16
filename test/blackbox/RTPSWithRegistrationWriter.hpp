@@ -112,7 +112,8 @@ class RTPSWithRegistrationWriter
         history_ = new WriterHistory(hattr_);
 
         //Create writer
-        writer_ = eprosima::fastrtps::rtps::RTPSDomain::createRTPSWriter(participant_, writer_attr_, history_, &listener_);
+        writer_ = eprosima::fastrtps::rtps::RTPSDomain::createRTPSWriter(participant_, writer_attr_, *history_,
+                &listener_);
         ASSERT_NE(writer_, nullptr);
 
         ASSERT_EQ(participant_->registerWriter(writer_, topic_attr_, writer_qos_), true);
@@ -128,14 +129,15 @@ class RTPSWithRegistrationWriter
 
         while(it != msgs.end())
         {
-	    CacheChange_t * ch = writer_->new_change(*it,ALIVE);
+            CacheChange_ptr ch = writer_->new_change(*it,ALIVE);
 
-	    eprosima::fastcdr::FastBuffer buffer((char*)ch->serializedPayload.data, ch->serializedPayload.max_size);
+            eprosima::fastcdr::FastBuffer buffer((char*)ch->serialized_payload.data,
+                    ch->serialized_payload.max_size);
             eprosima::fastcdr::Cdr cdr(buffer);
 
             cdr << *it;
 
-            ch->serializedPayload.length = static_cast<uint32_t>(cdr.getSerializedDataLength());
+            ch->serialized_payload.length = static_cast<uint32_t>(cdr.getSerializedDataLength());
 
             history_->add_change(ch);
             it = msgs.erase(it);

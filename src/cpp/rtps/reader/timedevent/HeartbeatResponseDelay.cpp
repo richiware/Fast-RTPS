@@ -140,9 +140,9 @@ void HeartbeatResponseDelay::event(EventCode code, const char* msg)
                 }
 
                 ++mp_WP->mp_SFR->m_nackfragCount;
-                logInfo(RTPS_READER,"Sending NACKFRAG for sample" << cit->sequenceNumber << ": "<< frag_sns;);
+                logInfo(RTPS_READER,"Sending NACKFRAG for sample" << cit->sequence_number << ": "<< frag_sns;);
 
-                group.add_nackfrag(mp_WP->m_att.guid, cit->sequenceNumber, frag_sns, mp_WP->mp_SFR->m_nackfragCount, locators);
+                group.add_nackfrag(mp_WP->m_att.guid, cit->sequence_number, frag_sns, mp_WP->mp_SFR->m_nackfragCount, locators);
             }
         }
     }

@@ -16,16 +16,14 @@
  * @file Endpoint.h
  */
 
-
-
 #ifndef ENDPOINT_H_
 #define ENDPOINT_H_
-#include <mutex>
 #include "common/Types.h"
 #include "common/Locator.h"
 #include "common/Guid.h"
-
 #include "attributes/EndpointAttributes.h"
+
+#include <mutex>
 
 namespace eprosima {
 namespace fastrtps{
@@ -57,12 +55,6 @@ class Endpoint
     RTPS_DllAPI inline const GUID_t& getGuid() const { return m_guid; };
 
     /**
-     * Get mutex
-     * @return Associated Mutex
-     */
-    RTPS_DllAPI inline std::recursive_mutex* getMutex() const { return mp_mutex; }
-
-    /**
      * Get associated attributes
      * @return Endpoint attributes
      */
@@ -83,8 +75,6 @@ class Endpoint
     const GUID_t m_guid;
     //!Endpoint Attributes
     EndpointAttributes m_att;
-    //!Endpoint Mutex
-    std::recursive_mutex* mp_mutex;
 
     private:
 

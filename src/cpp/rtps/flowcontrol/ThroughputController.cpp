@@ -49,7 +49,7 @@ void ThroughputController::operator()(RTPSWriterCollector<ReaderLocator*>& chang
 
     while(it != changesToSend.items().end())
     {
-        if(!process_change_nts_(it->cacheChange, it->sequenceNumber, it->fragmentNumber))
+        if(!process_change_nts_(it->cachechange, it->sequence_number, it->fragment_number))
             break;
 
         ++it;
@@ -66,7 +66,7 @@ void ThroughputController::operator()(RTPSWriterCollector<ReaderProxy*>& changes
 
     while(it != changesToSend.items().end())
     {
-        if(!process_change_nts_(it->cacheChange, it->sequenceNumber, it->fragmentNumber))
+        if(!process_change_nts_(it->cachechange, it->sequence_number, it->fragment_number))
             break;
 
         ++it;
@@ -75,16 +75,16 @@ void ThroughputController::operator()(RTPSWriterCollector<ReaderProxy*>& changes
     changesToSend.items().erase(it, changesToSend.items().end());
 }
 
-bool ThroughputController::process_change_nts_(CacheChange_t* change, const SequenceNumber_t& /*seqNum*/,
+bool ThroughputController::process_change_nts_(const CacheChange_t* const change, const SequenceNumber_t& /*seqNum*/,
         const FragmentNumber_t fragNum)
 {
     assert(change != nullptr);
 
-    uint32_t dataLength = change->serializedPayload.length;
+    uint32_t dataLength = change->serialized_payload.length;
 
     if (fragNum != 0)
         dataLength = (fragNum + 1) != change->getFragmentCount() ?
-            change->getFragmentSize() : change->serializedPayload.length - (fragNum * change->getFragmentSize());
+            change->getFragmentSize() : change->serialized_payload.length - (fragNum * change->getFragmentSize());
 
     if((mAccumulatedPayloadSize + dataLength) <= mBytesPerPeriod)
     {

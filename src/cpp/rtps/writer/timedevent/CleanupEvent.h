@@ -1,4 +1,4 @@
-// Copyright 2016 Proyectos y Sistemas de Mantenimiento SL (eProsima).
+// Copyright 2018 Proyectos y Sistemas de Mantenimiento SL (eProsima).
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -13,37 +13,32 @@
 // limitations under the License.
 
 /**
- * @file NackResponseDelay.h
+ * @file CleanupEvent.h
  *
  */
 
-#ifndef __RTPS_WRITER_TIMEDEVENT_NACKRESPONSEDELAY_H__
-#define __RTPS_WRITER_TIMEDEVENT_NACKRESPONSEDELAY_H__
+#ifndef __RTPS_WRITER_TIMEEVENT_CLEANUPEVENT_H__
+#define __RTPS_WRITER_TIMEEVENT_CLEANUPEVENT_H__
 #ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
-#include "../../resources/TimedEvent.h"
-
+#include <fastrtps/rtps/resources/TimedEvent.h>
 
 namespace eprosima {
 namespace fastrtps{
-namespace rtps {
+namespace rtps{
 
 class StatefulWriter;
-class ReaderProxy;
 
 /**
- * NackResponseDelay class use to delay the response to an NACK message.
+ * InitialHeartbeat class, controls the initial send operation of HB.
  * @ingroup WRITER_MODULE
  */
-class NackResponseDelay:public TimedEvent
+class CleanupEvent : public TimedEvent
 {
     public:
-        /**
-         *
-         * @param p_RP
-         * @param intervalmillisec
-         */
-        NackResponseDelay(ReaderProxy& remote_reader, double intervalmillisec);
-        virtual ~NackResponseDelay();
+
+        CleanupEvent(StatefulWriter& writer, double interval);
+
+        virtual ~CleanupEvent();
 
         /**
          * Method invoked when the event occurs
@@ -53,11 +48,12 @@ class NackResponseDelay:public TimedEvent
          */
         void event(EventCode code, const char* msg= nullptr);
 
-        //!Associated reader proxy
-        ReaderProxy& remote_reader_;
+        StatefulWriter& writer_;
 };
+
 }
 }
 } /* namespace eprosima */
 #endif
-#endif /* __RTPS_WRITER_TIMEDEVENT_NACKRESPONSEDELAY_H__ */
+#endif /* __RTPS_WRITER_TIMEEVENT_CLEANUPEVENT_H__ */
+

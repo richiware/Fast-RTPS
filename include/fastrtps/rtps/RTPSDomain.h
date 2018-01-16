@@ -88,7 +88,8 @@ class RTPSDomain
      * @param listen Pointer to the WriterListener.
      * @return Pointer to the created RTPSWriter.
      */
-    RTPS_DllAPI static RTPSWriter* createRTPSWriter(RTPSParticipant* p, WriterAttributes& watt, WriterHistory* hist, WriterListener* listen = nullptr);
+    RTPS_DllAPI static RTPSWriter* createRTPSWriter(RTPSParticipant* p, WriterAttributes& watt, WriterHistory& hist,
+            WriterListener* listen = nullptr);
     /**
      * Remove a RTPSWriter.
      * @param writer Pointer to the writer you want to remove.

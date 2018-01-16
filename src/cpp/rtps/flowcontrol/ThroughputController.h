@@ -44,7 +44,7 @@ public:
 
 private:
 
-   bool process_change_nts_(CacheChange_t* change, const SequenceNumber_t& seqNum,
+   bool process_change_nts_(const CacheChange_t* const change, const SequenceNumber_t& seqNum,
         const FragmentNumber_t fragNum);
 
    uint32_t mBytesPerPeriod;

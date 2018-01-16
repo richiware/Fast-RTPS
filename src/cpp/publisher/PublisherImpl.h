@@ -18,18 +18,20 @@
 
 
 
-#ifndef PUBLISHERIMPL_H_
-#define PUBLISHERIMPL_H_
+#ifndef __PUBLISHER_PUBLISHERIMPL_H__
+#define __PUBLISHER_PUBLISHERIMPL_H__
 #ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
 
+#include <fastrtps/publisher/Publisher.h>
+#include <fastrtps/participant/Participant.h>
 #include <fastrtps/rtps/common/Locator.h>
 #include <fastrtps/rtps/common/Guid.h>
-
 #include <fastrtps/attributes/PublisherAttributes.h>
-
-#include <fastrtps/publisher/PublisherHistory.h>
-
 #include <fastrtps/rtps/writer/WriterListener.h>
+#include "../rtps/history/WriterHistoryImpl.h"
+
+#include <map>
+#include <mutex>
 
 namespace eprosima {
 namespace fastrtps{
@@ -39,31 +41,28 @@ class RTPSWriter;
 class RTPSParticipant;
 }
 
-using namespace rtps;
-
 class TopicDataType;
 class PublisherListener;
-class ParticipantImpl;
-class Publisher;
 
 
 /**
  * Class PublisherImpl, contains the actual implementation of the behaviour of the Publisher.
  * @ingroup FASTRTPS_MODULE
  */
-class PublisherImpl
+class Publisher::impl
 {
-    friend class ParticipantImpl;
+    using map = std::map<InstanceHandle_t, std::set<SequenceNumber_t>>;
+
     public:
 
     /**
      * Create a publisher, assigning its pointer to the associated writer.
      * Don't use directly, create Publisher using DomainRTPSParticipant static function.
      */
-    PublisherImpl(ParticipantImpl* p,TopicDataType* ptype,
-            PublisherAttributes& att,PublisherListener* p_listen = nullptr);
+    impl(Participant::impl& p, Publisher& publisher, TopicDataType* ptype,
+            PublisherAttributes& att, PublisherListener* p_listen = nullptr);
 
-    virtual ~PublisherImpl();
+    virtual ~impl();
 
     /**
      * 
@@ -71,7 +70,7 @@ class PublisherImpl
      * @param  Data
      * @return
      */
-    bool create_new_change(ChangeKind_t kind, void* Data);
+    bool create_new_change(ChangeKind_t change_kind, void* data);
 
     /**
      * 
@@ -80,7 +79,7 @@ class PublisherImpl
      * @param wparams
      * @return
      */
-    bool create_new_change_with_params(ChangeKind_t kind, void* Data, WriteParams &wparams);
+    bool create_new_change_with_params(ChangeKind_t change_kind, void* data, WriteParams &wparams);
 
     /**
      * Removes the cache change with the minimum sequence number
@@ -117,49 +116,61 @@ class PublisherImpl
      * Get the Attributes of the Subscriber.
      * @return Attributes of the Subscriber.
      */
-    inline const PublisherAttributes& getAttributes(){ return m_att; };
+    inline const PublisherAttributes& getAttributes(){ return att_; };
 
     /**
      * Get topic data type
      * @return Topic data type
      */
-    TopicDataType* getType() {return mp_type;};
+    TopicDataType* getType() {return type_;};
 
     bool try_remove_change(std::unique_lock<std::recursive_mutex>& lock);
 
     bool wait_for_all_acked(const Time_t& max_wait);
 
     private:
-    ParticipantImpl* mp_participant;
+
+    Participant::impl& participant_;
+
+    //TODO Make private again
+    public:
     //! Pointer to the associated Data Writer.
-    RTPSWriter* mp_writer;
+    RTPSWriter* writer_;
+
     //! Pointer to the TopicDataType object.
-    TopicDataType* mp_type;
+    TopicDataType* type_;
+
     //!Attributes of the Publisher
-    PublisherAttributes m_att;
-    //!Publisher History
-    PublisherHistory m_history;
+    PublisherAttributes att_;
+
+    WriterHistory history_;
+
     //!PublisherListener
-    PublisherListener* mp_listener;
+    PublisherListener* listener_;
+
     //!Listener to capture the events of the Writer
     class PublisherWriterListener: public WriterListener
     {
         public:
-            PublisherWriterListener(PublisherImpl* p):mp_publisherImpl(p){};
+            PublisherWriterListener(Publisher& publisher): publisher_(publisher){};
+
             virtual ~PublisherWriterListener(){};
+
             void onWriterMatched(RTPSWriter* writer,MatchingInfo& info);
-            PublisherImpl* mp_publisherImpl;
-    }m_writerListener;
 
-    Publisher* mp_userPublisher;
-
-    RTPSParticipant* mp_rtpsParticipant;
+            Publisher& publisher_;
+    } writer_listener_;
 
     uint32_t high_mark_for_frag_;
+
+    map changes_by_instance_;
+
+    std::mutex mutex_;
 };
 
+inline Publisher::impl& get_implementation(Publisher& publisher) { return *publisher.impl_; }
 
 } /* namespace  */
 } /* namespace eprosima */
 #endif
-#endif /* PUBLISHER_H_ */
+#endif /* __PUBLISHER_PUBLISHERIMPL_H__*/

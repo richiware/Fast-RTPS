@@ -61,22 +61,25 @@ namespace eprosima
              */
             struct RTPS_DllAPI CacheChange_t
             {
+                friend struct CacheChangeCmp;
+
                 //!Kind of change, default value ALIVE.
                 ChangeKind_t kind;
                 //!GUID_t of the writer that generated this change.
-                GUID_t writerGUID;
+                GUID_t writer_guid;
                 //!Handle of the data associated wiht this change.
-                InstanceHandle_t instanceHandle;
+                InstanceHandle_t instance_handle;
                 //!SequenceNumber of the change
-                SequenceNumber_t sequenceNumber;
+                SequenceNumber_t sequence_number;
                 //!Serialized Payload associated with the change.
-                SerializedPayload_t serializedPayload;
+                SerializedPayload_t serialized_payload;
                 //!Indicates if the cache has been read (only used in READERS)
-                bool isRead;
+                bool is_read;
                 //!Source TimeStamp (only used in Readers)
-                Time_t sourceTimestamp;
+                Time_t source_timestamp;
 
                 WriteParams write_params;
+
                 bool is_untyped_;
 
                 /*!
@@ -85,15 +88,12 @@ namespace eprosima
                  */
                 CacheChange_t():
                     kind(ALIVE),
-                    isRead(false),
+                    is_read(false),
                     is_untyped_(true),
                     dataFragments_(new std::vector<uint32_t>()),
                     fragment_size_(0)
                 {
                 }
-
-                CacheChange_t(const CacheChange_t&) = delete;
-                const CacheChange_t& operator=(const CacheChange_t&) = delete;
 
                 /**
                  * Constructor with payload size
@@ -102,8 +102,8 @@ namespace eprosima
                 // TODO Check pass uint32_t to serializedPayload that needs int16_t.
                 CacheChange_t(uint32_t payload_size, bool is_untyped = false):
                     kind(ALIVE),
-                    serializedPayload(payload_size),
-                    isRead(false),
+                    serialized_payload(payload_size),
+                    is_read(false),
                     is_untyped_(is_untyped),
                     dataFragments_(new std::vector<uint32_t>()),
                     fragment_size_(0)
@@ -115,41 +115,41 @@ namespace eprosima
                  * @param[in] ch_ptr Pointer to the change.
                  * @return True if correct.
                  */
-                bool copy(const CacheChange_t* ch_ptr)
+                bool copy(const CacheChange_t& cachechange)
                 {
-                    kind = ch_ptr->kind;
-                    writerGUID = ch_ptr->writerGUID;
-                    instanceHandle = ch_ptr->instanceHandle;
-                    sequenceNumber = ch_ptr->sequenceNumber;
-                    sourceTimestamp = ch_ptr->sourceTimestamp;
-                    write_params = ch_ptr->write_params;
+                    kind = cachechange.kind;
+                    writer_guid = cachechange.writer_guid;
+                    instance_handle = cachechange.instance_handle;
+                    sequence_number = cachechange.sequence_number;
+                    source_timestamp = cachechange.source_timestamp;
+                    write_params = cachechange.write_params;
 
-                    bool ret = serializedPayload.copy(&ch_ptr->serializedPayload, (ch_ptr->is_untyped_ ? false : true));
+                    bool ret = serialized_payload.copy(&cachechange.serialized_payload, (cachechange.is_untyped_ ? false : true));
 
-                    setFragmentSize(ch_ptr->fragment_size_);
-                    dataFragments_->assign(ch_ptr->dataFragments_->begin(), ch_ptr->dataFragments_->end());
+                    setFragmentSize(cachechange.fragment_size_);
+                    dataFragments_->assign(cachechange.dataFragments_->begin(), cachechange.dataFragments_->end());
 
-                    isRead = ch_ptr->isRead;
+                    is_read = cachechange.is_read;
 
                     return ret;
                 }
 
-                void copy_not_memcpy(const CacheChange_t* ch_ptr)
+                void copy_not_memcpy(const CacheChange_t& cachechange)
                 {
-                    kind = ch_ptr->kind;
-                    writerGUID = ch_ptr->writerGUID;
-                    instanceHandle = ch_ptr->instanceHandle;
-                    sequenceNumber = ch_ptr->sequenceNumber;
-                    sourceTimestamp = ch_ptr->sourceTimestamp;
-                    write_params = ch_ptr->write_params;
+                    kind = cachechange.kind;
+                    writer_guid = cachechange.writer_guid;
+                    instance_handle = cachechange.instance_handle;
+                    sequence_number = cachechange.sequence_number;
+                    source_timestamp = cachechange.source_timestamp;
+                    write_params = cachechange.write_params;
 
                     // Copy certain values from serializedPayload
-                    serializedPayload.encapsulation = ch_ptr->serializedPayload.encapsulation;
+                    serialized_payload.encapsulation = cachechange.serialized_payload.encapsulation;
 
-                    setFragmentSize(ch_ptr->fragment_size_);
-                    dataFragments_->assign(ch_ptr->dataFragments_->begin(), ch_ptr->dataFragments_->end());
+                    setFragmentSize(cachechange.fragment_size_);
+                    dataFragments_->assign(cachechange.dataFragments_->begin(), cachechange.dataFragments_->end());
 
-                    isRead = ch_ptr->isRead;
+                    is_read = cachechange.is_read;
                 }
 
                 ~CacheChange_t()
@@ -163,7 +163,7 @@ namespace eprosima
                     return (uint32_t)dataFragments_->size();
                 }
 
-                std::vector<uint32_t>* getDataFragments() { return dataFragments_; }
+                std::vector<uint32_t>* getDataFragments() const { return dataFragments_; }
 
                 uint16_t getFragmentSize() const { return fragment_size_; }
 
@@ -178,13 +178,16 @@ namespace eprosima
                     {
                         //TODO Mirar si cuando se compatibilice con RTI funciona el calculo, porque ellos
                         //en el sampleSize incluyen el padding.
-                        uint32_t size = (serializedPayload.length + fragment_size - 1) / fragment_size;
+                        uint32_t size = (serialized_payload.length + fragment_size - 1) / fragment_size;
                         dataFragments_->assign(size, ChangeFragmentStatus_t::NOT_PRESENT);
                     }
                 }
 
 
                 private:
+
+                CacheChange_t(const CacheChange_t&) = delete;
+                const CacheChange_t& operator=(const CacheChange_t&) = delete;
 
                 // Data fragments
                 std::vector<uint32_t>* dataFragments_;
@@ -229,29 +232,28 @@ namespace eprosima
 
                 public:
 
-                ChangeForReader_t() : status_(UNSENT), is_relevant_(true),
-                change_(nullptr)
-                {
-                }
+                ChangeForReader_t() = delete;
 
                 ChangeForReader_t(const ChangeForReader_t& ch) : status_(ch.status_),
-                is_relevant_(ch.is_relevant_), seq_num_(ch.seq_num_), change_(ch.change_),
-                unsent_fragments_(ch.unsent_fragments_)
+                is_relevant_(ch.is_relevant_), seq_num_(ch.seq_num_), unsent_fragments_(ch.unsent_fragments_),
+                num_fragments_(ch.num_fragments_)
                 {
                 }
 
-                //TODO(Ricardo) Temporal
-                //ChangeForReader_t(const CacheChange_t* change) : status_(UNSENT),
-                ChangeForReader_t(CacheChange_t* change) : status_(UNSENT),
-                is_relevant_(true), seq_num_(change->sequenceNumber), change_(change)
+                ChangeForReader_t(const CacheChange_t& change) : status_(UNSENT),
+                is_relevant_(true), seq_num_(change.sequence_number), num_fragments_(change.getFragmentCount())
                 {
-                   if (change->getFragmentSize() != 0)
-                    for (uint32_t i = 1; i != change->getFragmentCount() + 1; i++)
-                       unsent_fragments_.insert(i); // Indexed on 1
+                   if (change.getFragmentSize() != 0)
+                   {
+                       for(uint32_t i = 1; i != change.getFragmentCount() + 1; ++i)
+                       {
+                           unsent_fragments_.insert(i); // Indexed on 1
+                       }
+                   }
                 }
 
                 ChangeForReader_t(const SequenceNumber_t& seq_num) : status_(UNSENT),
-                is_relevant_(true), seq_num_(seq_num), change_(nullptr)
+                is_relevant_(false), seq_num_(seq_num), num_fragments_(0)
                 {
                 }
 
@@ -262,78 +264,54 @@ namespace eprosima
                     status_ = ch.status_;
                     is_relevant_ = ch.is_relevant_;
                     seq_num_ = ch.seq_num_;
-                    change_ = ch.change_;
                     unsent_fragments_ = ch.unsent_fragments_;
                     return *this;
                 }
 
-                /**
-                 * Get the cache change
-                 * @return Cache change
-                 */
-                // TODO(Ricardo) Temporal
-                //const CacheChange_t* getChange() const
-                CacheChange_t* getChange() const
-                {
-                    return change_;
-                }
-
-                void setStatus(const ChangeForReaderStatus_t status)
+                void set_status(const ChangeForReaderStatus_t status)
                 {
                     status_ = status;
                 }
 
-                ChangeForReaderStatus_t getStatus() const
+                ChangeForReaderStatus_t get_status() const
                 {
                     return status_;
                 }
 
-                void setRelevance(const bool relevance)
+                void set_relevance(const bool relevance)
                 {
                     is_relevant_ = relevance;
                 }
 
-                bool isRelevant() const
+                bool is_relevant() const
                 {
                     return is_relevant_;
                 }
 
-                const SequenceNumber_t getSequenceNumber() const
+                const SequenceNumber_t get_sequence_number() const
                 {
                     return seq_num_;
                 }
 
-                //! Set change as not valid
-                void notValid()
-                {
-                    is_relevant_ = false;
-                    change_ = nullptr;
-                }
-
-                //! Set change as valid
-                bool isValid() const
-                {
-                    return change_ != nullptr;
-                }
-
-                FragmentNumberSet_t getUnsentFragments() const
+                FragmentNumberSet_t get_unsent_fragments() const
                 {
                     return unsent_fragments_;
                 }
 
-                void markAllFragmentsAsUnsent()
+                void mark_all_fragments_as_unsent()
                 {
-                   if (change_->getFragmentSize() != 0)
-                    for (uint32_t i = 1; i != change_->getFragmentCount() + 1; i++)
-                       unsent_fragments_.insert(i); // Indexed on 1
+                    for (uint32_t i = 1; i != num_fragments_ + 1; ++i)
+                    {
+                        unsent_fragments_.insert(i); // Indexed on 1
+                    }
                 }
 
-                void markFragmentsAsSent(const FragmentNumber_t& sentFragment)
+                void mark_fragment_as_sent(const FragmentNumber_t& sentFragment)
                 {
                     unsent_fragments_.erase(sentFragment);
                 }
 
-                void markFragmentsAsUnsent(const FragmentNumberSet_t& unsentFragments)
+                void mark_fragment_as_unsent(const FragmentNumberSet_t& unsentFragments)
                 {
                     for(auto element : unsentFragments.set)
                         unsent_fragments_.insert(element);
@@ -350,11 +328,9 @@ namespace eprosima
                 //!Sequence number
                 SequenceNumber_t seq_num_;
 
-                // TODO(Ricardo) Temporal
-                //const CacheChange_t* change_;
-                CacheChange_t* change_;
-
                 std::set<FragmentNumber_t> unsent_fragments_;
+
+                uint32_t num_fragments_;
             };
 
             struct ChangeForReaderCmp

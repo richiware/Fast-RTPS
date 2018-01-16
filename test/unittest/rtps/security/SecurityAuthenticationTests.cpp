@@ -176,8 +176,9 @@ class SecurityAuthenticationTest : public ::testing::Test
                 WillOnce(DoAll(SetArgPointee<0>(&handshake_handle_), 
                             SetArgPointee<1>(&handshake_message), Return(ValidationResult_t::VALIDATION_PENDING_HANDSHAKE_MESSAGE)));
             EXPECT_CALL(*stateless_writer_, new_change(_,_,_)).Times(1).
-                WillOnce(Return(change));
-            EXPECT_CALL(*stateless_writer_->history_, add_change_mock(change)).Times(1).
+                WillOnce(Return(ByMove(CacheChange_ptr(nullptr, change))));
+            // TODO Check cachechange
+            EXPECT_CALL(*stateless_writer_->history_, add_change_mock(_)).Times(1).
                 WillOnce(Return(true));
             EXPECT_CALL(*participant_.pdpsimple(), get_participant_proxy_data_serialized(BIGEND)).Times(1);
 
@@ -210,24 +211,24 @@ class SecurityAuthenticationTest : public ::testing::Test
                     + 4 /*encapsulation*/); //TODO(Ricardo) Think casting
             CDRMessage_t aux_msg(0);
             aux_msg.wraps = true;
-            aux_msg.buffer = change->serializedPayload.data;
-            aux_msg.max_size = change->serializedPayload.max_size;
+            aux_msg.buffer = change->serialized_payload.data;
+            aux_msg.max_size = change->serialized_payload.max_size;
 
             // Serialize encapsulation
             CDRMessage::addOctet(&aux_msg, 0);
 #if __BIG_ENDIAN__
             aux_msg.msg_endian = BIGEND;
-            change->serializedPayload.encapsulation = PL_CDR_BE;
+            change->serialized_payload.encapsulation = PL_CDR_BE;
             CDRMessage::addOctet(&aux_msg, PL_CDR_BE);
 #else
             aux_msg.msg_endian = LITTLEEND;
-            change->serializedPayload.encapsulation = PL_CDR_LE;
+            change->serialized_payload.encapsulation = PL_CDR_LE;
             CDRMessage::addOctet(&aux_msg, PL_CDR_LE);
 #endif
             CDRMessage::addUInt16(&aux_msg, 0);
 
             ASSERT_TRUE(CDRMessage::addParticipantGenericMessage(&aux_msg, message));
-            change->serializedPayload.length = aux_msg.length;
+            change->serialized_payload.length = aux_msg.length;
 
             HandshakeMessageToken handshake_message;
             CacheChange_t* change2 = new CacheChange_t(200);
@@ -237,8 +238,8 @@ class SecurityAuthenticationTest : public ::testing::Test
                 WillOnce(DoAll(SetArgPointee<0>(&handshake_handle_), 
                             SetArgPointee<1>(&handshake_message), Return(ValidationResult_t::VALIDATION_PENDING_HANDSHAKE_MESSAGE)));
             EXPECT_CALL(*stateless_writer_, new_change(_,_,_)).Times(1).
-                WillOnce(Return(change2));
-            EXPECT_CALL(*stateless_writer_->history_, add_change_mock(change2)).Times(1).
+                WillOnce(Return(ByMove(CacheChange_ptr(nullptr, change2))));
+            EXPECT_CALL(*stateless_writer_->history_, add_change_mock(_)).Times(1).
                 WillOnce(Return(true));
             EXPECT_CALL(*stateless_reader_->history_, remove_change_mock(change)).Times(1).
                 WillOnce(Return(true));
@@ -254,10 +255,12 @@ class SecurityAuthenticationTest : public ::testing::Test
 
         void final_message_process_ok(CacheChange_t** final_message_change = nullptr)
         {
-            request_process_ok();
+            CacheChange_t* request_message_change = nullptr;
+            request_process_ok(&request_message_change);
 
             EXPECT_CALL(*stateless_writer_->history_, remove_change(SequenceNumber_t{0,1})).Times(1).
-                WillOnce(Return(true));
+                WillOnce(Return(ByMove(CacheChange_ptr(nullptr, request_message_change))));
+            delete request_message_change;
 
             GUID_t remote_participant_key(participant_data_.m_guid);
 
@@ -273,24 +276,24 @@ class SecurityAuthenticationTest : public ::testing::Test
                     + 4 /*encapsulation*/);
             CDRMessage_t aux_msg(0);
             aux_msg.wraps = true;
-            aux_msg.buffer = change->serializedPayload.data;
-            aux_msg.max_size = change->serializedPayload.max_size;
+            aux_msg.buffer = change->serialized_payload.data;
+            aux_msg.max_size = change->serialized_payload.max_size;
             // 
             // Serialize encapsulation
             CDRMessage::addOctet(&aux_msg, 0);
 #if __BIG_ENDIAN__
             aux_msg.msg_endian = BIGEND;
-            change->serializedPayload.encapsulation = PL_CDR_BE;
+            change->serialized_payload.encapsulation = PL_CDR_BE;
             CDRMessage::addOctet(&aux_msg, PL_CDR_BE);
 #else
             aux_msg.msg_endian = LITTLEEND;
-            change->serializedPayload.encapsulation = PL_CDR_LE;
+            change->serialized_payload.encapsulation = PL_CDR_LE;
             CDRMessage::addOctet(&aux_msg, PL_CDR_LE);
 #endif
             CDRMessage::addUInt16(&aux_msg, 0);
 
             ASSERT_TRUE(CDRMessage::addParticipantGenericMessage(&aux_msg, message));
-            change->serializedPayload.length = aux_msg.length;
+            change->serialized_payload.length = aux_msg.length;
 
             HandshakeMessageToken handshake_message;
             CacheChange_t* change2 = new CacheChange_t(200);
@@ -300,8 +303,8 @@ class SecurityAuthenticationTest : public ::testing::Test
             EXPECT_CALL(*auth_plugin_, process_handshake_rvr(_,_, Ref(handshake_handle_),_)).Times(1).
                 WillOnce(DoAll(SetArgPointee<0>(&handshake_message), Return(ValidationResult_t::VALIDATION_OK_WITH_FINAL_MESSAGE)));
             EXPECT_CALL(*stateless_writer_, new_change(_,_,_)).Times(1).
-                WillOnce(Return(change2));
-            EXPECT_CALL(*stateless_writer_->history_, add_change_mock(change2)).Times(1).
+                WillOnce(Return(ByMove(CacheChange_ptr(nullptr, change2))));
+            EXPECT_CALL(*stateless_writer_->history_, add_change_mock(_)).Times(1).
                 WillOnce(Return(true));
             EXPECT_CALL(*stateless_reader_->history_, remove_change_mock(change)).Times(1).
                 WillOnce(Return(true));
@@ -667,7 +670,7 @@ TEST_F(SecurityAuthenticationTest, discovered_participant_validation_remote_iden
         WillOnce(DoAll(SetArgPointee<0>(&handshake_handle), 
                     SetArgPointee<1>(&handshake_message), Return(ValidationResult_t::VALIDATION_PENDING_HANDSHAKE_MESSAGE)));
     EXPECT_CALL(*stateless_writer_, new_change(_,_,_)).Times(1).
-        WillOnce(Return(nullptr));
+        WillOnce(Return(ByMove(CacheChange_ptr())));
     EXPECT_CALL(*auth_plugin_, return_identity_handle(&local_identity_handle_,_)).Times(1).
         WillRepeatedly(Return(true));
     EXPECT_CALL(*auth_plugin_, return_identity_handle(&remote_identity_handle,_)).Times(1).
@@ -697,8 +700,8 @@ TEST_F(SecurityAuthenticationTest, discovered_participant_validation_remote_iden
         WillOnce(DoAll(SetArgPointee<0>(&handshake_handle), 
                     SetArgPointee<1>(&handshake_message), Return(ValidationResult_t::VALIDATION_PENDING_HANDSHAKE_MESSAGE)));
     EXPECT_CALL(*stateless_writer_, new_change(_,_,_)).Times(1).
-        WillOnce(Return(change));
-    EXPECT_CALL(*stateless_writer_->history_, add_change_mock(change)).Times(1).
+        WillOnce(Return(ByMove(CacheChange_ptr(nullptr, change))));
+    EXPECT_CALL(*stateless_writer_->history_, add_change_mock(_)).Times(1).
         WillOnce(Return(false));
     EXPECT_CALL(*auth_plugin_, return_identity_handle(&local_identity_handle_,_)).Times(1).
         WillRepeatedly(Return(true));
@@ -739,9 +742,9 @@ TEST_F(SecurityAuthenticationTest, discovered_participant_validation_remote_iden
     CacheChange_t* request_message_change = nullptr;
     request_process_ok(&request_message_change);
 
-    EXPECT_CALL(*stateless_writer_->history_, remove_change_and_reuse(request_message_change->sequenceNumber)).Times(1).
-        WillOnce(Return(request_message_change));
-    EXPECT_CALL(*stateless_writer_->history_, add_change_mock(request_message_change)).Times(1).
+    EXPECT_CALL(*stateless_writer_->history_, remove_change(request_message_change->sequence_number)).
+        Times(1).WillOnce(Return(ByMove(CacheChange_ptr(nullptr, request_message_change))));
+    EXPECT_CALL(*stateless_writer_->history_, add_change_mock(_)).Times(1).
         WillOnce(Return(true));
     stateless_writer_->history_->wait_for_more_samples_than(1);
 
@@ -768,8 +771,8 @@ TEST_F(SecurityAuthenticationTest, discovered_participant_validation_remote_iden
         WillOnce(DoAll(SetArgPointee<0>(&handshake_handle), 
                     SetArgPointee<1>(&handshake_message), Return(ValidationResult_t::VALIDATION_OK_WITH_FINAL_MESSAGE)));
     EXPECT_CALL(*stateless_writer_, new_change(_,_,_)).Times(1).
-        WillOnce(Return(change));
-    EXPECT_CALL(*stateless_writer_->history_, add_change_mock(change)).Times(1).
+                WillOnce(Return(ByMove(CacheChange_ptr(nullptr, change))));
+    EXPECT_CALL(*stateless_writer_->history_, add_change_mock(_)).Times(1).
         WillOnce(Return(true));
     EXPECT_CALL(*auth_plugin_, return_identity_handle(&local_identity_handle_,_)).Times(1).
         WillRepeatedly(Return(true));
@@ -818,8 +821,8 @@ TEST_F(SecurityAuthenticationTest, discovered_participant_ok)
         WillOnce(DoAll(SetArgPointee<0>(&handshake_handle), 
                     SetArgPointee<1>(&handshake_message), Return(ValidationResult_t::VALIDATION_PENDING_HANDSHAKE_MESSAGE)));
     EXPECT_CALL(*stateless_writer_, new_change(_,_,_)).Times(1).
-        WillOnce(Return(change));
-    EXPECT_CALL(*stateless_writer_->history_, add_change_mock(change)).Times(1).
+                WillOnce(Return(ByMove(CacheChange_ptr(nullptr, change))));
+    EXPECT_CALL(*stateless_writer_->history_, add_change_mock(_)).Times(1).
         WillOnce(Return(true));
     EXPECT_CALL(*auth_plugin_, return_identity_handle(&local_identity_handle_,_)).Times(1).
         WillRepeatedly(Return(true));
@@ -864,8 +867,8 @@ TEST_F(SecurityAuthenticationTest, discovered_participant_validate_remote_fail_a
         WillOnce(DoAll(SetArgPointee<0>(&handshake_handle), 
                     SetArgPointee<1>(&handshake_message), Return(ValidationResult_t::VALIDATION_PENDING_HANDSHAKE_MESSAGE)));
     EXPECT_CALL(*stateless_writer_, new_change(_,_,_)).Times(1).
-        WillOnce(Return(change));
-    EXPECT_CALL(*stateless_writer_->history_, add_change_mock(change)).Times(1).
+        WillOnce(Return(ByMove(CacheChange_ptr(nullptr, change))));
+    EXPECT_CALL(*stateless_writer_->history_, add_change_mock(_)).Times(1).
         WillOnce(Return(true));
     EXPECT_CALL(*auth_plugin_, return_identity_handle(&local_identity_handle_,_)).Times(1).
         WillRepeatedly(Return(true));
@@ -911,8 +914,8 @@ TEST_F(SecurityAuthenticationTest, discovered_participant_begin_handshake_reques
         WillOnce(DoAll(SetArgPointee<0>(&handshake_handle), 
                     SetArgPointee<1>(&handshake_message), Return(ValidationResult_t::VALIDATION_PENDING_HANDSHAKE_MESSAGE)));
     EXPECT_CALL(*stateless_writer_, new_change(_,_,_)).Times(1).
-        WillOnce(Return(change));
-    EXPECT_CALL(*stateless_writer_->history_, add_change_mock(change)).Times(1).
+        WillOnce(Return(ByMove(CacheChange_ptr(nullptr, change))));
+    EXPECT_CALL(*stateless_writer_->history_, add_change_mock(_)).Times(1).
         WillOnce(Return(true));
     EXPECT_CALL(*auth_plugin_, return_identity_handle(&local_identity_handle_,_)).Times(1).
         WillRepeatedly(Return(true));
@@ -937,24 +940,24 @@ TEST_F(SecurityAuthenticationTest, discovered_participant_process_message_not_re
             + 4 /*encapsulation*/);
     CDRMessage_t aux_msg(0);
     aux_msg.wraps = true;
-    aux_msg.buffer = change->serializedPayload.data;
-    aux_msg.max_size = change->serializedPayload.max_size;
+    aux_msg.buffer = change->serialized_payload.data;
+    aux_msg.max_size = change->serialized_payload.max_size;
 
     // Serialize encapsulation
     CDRMessage::addOctet(&aux_msg, 0);
 #if __BIG_ENDIAN__
     aux_msg.msg_endian = BIGEND;
-    change->serializedPayload.encapsulation = PL_CDR_BE;
+    change->serialized_payload.encapsulation = PL_CDR_BE;
     CDRMessage::addOctet(&aux_msg, PL_CDR_BE);
 #else
     aux_msg.msg_endian = LITTLEEND;
-    change->serializedPayload.encapsulation = PL_CDR_LE;
+    change->serialized_payload.encapsulation = PL_CDR_LE;
     CDRMessage::addOctet(&aux_msg, PL_CDR_LE);
 #endif
     CDRMessage::addUInt16(&aux_msg, 0);
 
     ASSERT_TRUE(CDRMessage::addParticipantGenericMessage(&aux_msg, message));
-    change->serializedPayload.length = aux_msg.length;
+    change->serialized_payload.length = aux_msg.length;
 
     EXPECT_CALL(*auth_plugin_, return_identity_handle(&local_identity_handle_,_)).Times(1).
         WillRepeatedly(Return(true));
@@ -982,24 +985,24 @@ TEST_F(SecurityAuthenticationTest, discovered_participant_process_message_bad_me
             + 4 /*encapsulation*/);
     CDRMessage_t aux_msg(0);
     aux_msg.wraps = true;
-    aux_msg.buffer = change->serializedPayload.data;
-    aux_msg.max_size = change->serializedPayload.max_size;
+    aux_msg.buffer = change->serialized_payload.data;
+    aux_msg.max_size = change->serialized_payload.max_size;
 
     // Serialize encapsulation
     CDRMessage::addOctet(&aux_msg, 0);
 #if __BIG_ENDIAN__
     aux_msg.msg_endian = BIGEND;
-    change->serializedPayload.encapsulation = PL_CDR_BE;
+    change->serialized_payload.encapsulation = PL_CDR_BE;
     CDRMessage::addOctet(&aux_msg, PL_CDR_BE);
 #else
     aux_msg.msg_endian = LITTLEEND;
-    change->serializedPayload.encapsulation = PL_CDR_LE;
+    change->serialized_payload.encapsulation = PL_CDR_LE;
     CDRMessage::addOctet(&aux_msg, PL_CDR_LE);
 #endif
     CDRMessage::addUInt16(&aux_msg, 0);
 
     ASSERT_TRUE(CDRMessage::addParticipantGenericMessage(&aux_msg, message));
-    change->serializedPayload.length = aux_msg.length;
+    change->serialized_payload.length = aux_msg.length;
 
     EXPECT_CALL(*auth_plugin_, return_identity_handle(&local_identity_handle_,_)).Times(1).
         WillRepeatedly(Return(true));
@@ -1041,24 +1044,24 @@ TEST_F(SecurityAuthenticationTest, discovered_participant_process_message_not_ex
             + 4 /*encapsulation*/);
     CDRMessage_t aux_msg(0);
     aux_msg.wraps = true;
-    aux_msg.buffer = change->serializedPayload.data;
-    aux_msg.max_size = change->serializedPayload.max_size;
+    aux_msg.buffer = change->serialized_payload.data;
+    aux_msg.max_size = change->serialized_payload.max_size;
 
     // Serialize encapsulation
     CDRMessage::addOctet(&aux_msg, 0);
 #if __BIG_ENDIAN__
     aux_msg.msg_endian = BIGEND;
-    change->serializedPayload.encapsulation = PL_CDR_BE;
+    change->serialized_payload.encapsulation = PL_CDR_BE;
     CDRMessage::addOctet(&aux_msg, PL_CDR_BE);
 #else
     aux_msg.msg_endian = LITTLEEND;
-    change->serializedPayload.encapsulation = PL_CDR_LE;
+    change->serialized_payload.encapsulation = PL_CDR_LE;
     CDRMessage::addOctet(&aux_msg, PL_CDR_LE);
 #endif
     CDRMessage::addUInt16(&aux_msg, 0);
 
     ASSERT_TRUE(CDRMessage::addParticipantGenericMessage(&aux_msg, message));
-    change->serializedPayload.length = aux_msg.length;
+    change->serialized_payload.length = aux_msg.length;
 
     EXPECT_CALL(*auth_plugin_, return_identity_handle(&local_identity_handle_,_)).Times(1).
         WillRepeatedly(Return(true));
@@ -1093,24 +1096,24 @@ TEST_F(SecurityAuthenticationTest, discovered_participant_process_message_fail_b
             + 4 /*encapsulation*/);
     CDRMessage_t aux_msg(0);
     aux_msg.wraps = true;
-    aux_msg.buffer = change->serializedPayload.data;
-    aux_msg.max_size = change->serializedPayload.max_size;
+    aux_msg.buffer = change->serialized_payload.data;
+    aux_msg.max_size = change->serialized_payload.max_size;
 
     // Serialize encapsulation
     CDRMessage::addOctet(&aux_msg, 0);
 #if __BIG_ENDIAN__
     aux_msg.msg_endian = BIGEND;
-    change->serializedPayload.encapsulation = PL_CDR_BE;
+    change->serialized_payload.encapsulation = PL_CDR_BE;
     CDRMessage::addOctet(&aux_msg, PL_CDR_BE);
 #else
     aux_msg.msg_endian = LITTLEEND;
-    change->serializedPayload.encapsulation = PL_CDR_LE;
+    change->serialized_payload.encapsulation = PL_CDR_LE;
     CDRMessage::addOctet(&aux_msg, PL_CDR_LE);
 #endif
     CDRMessage::addUInt16(&aux_msg, 0);
 
     ASSERT_TRUE(CDRMessage::addParticipantGenericMessage(&aux_msg, message));
-    change->serializedPayload.length = aux_msg.length;
+    change->serialized_payload.length = aux_msg.length;
 
     EXPECT_CALL(*auth_plugin_, begin_handshake_reply_rvr(_,_,_, Ref(remote_identity_handle),
                 Ref(local_identity_handle_),_,_)).Times(1).
@@ -1153,24 +1156,24 @@ TEST_F(SecurityAuthenticationTest, discovered_participant_process_message_ok_beg
             + 4 /*encapsulation*/);
     CDRMessage_t aux_msg(0);
     aux_msg.wraps = true;
-    aux_msg.buffer = change->serializedPayload.data;
-    aux_msg.max_size = change->serializedPayload.max_size;
+    aux_msg.buffer = change->serialized_payload.data;
+    aux_msg.max_size = change->serialized_payload.max_size;
 
     // Serialize encapsulation
     CDRMessage::addOctet(&aux_msg, 0);
 #if __BIG_ENDIAN__
     aux_msg.msg_endian = BIGEND;
-    change->serializedPayload.encapsulation = PL_CDR_BE;
+    change->serialized_payload.encapsulation = PL_CDR_BE;
     CDRMessage::addOctet(&aux_msg, PL_CDR_BE);
 #else
     aux_msg.msg_endian = LITTLEEND;
-    change->serializedPayload.encapsulation = PL_CDR_LE;
+    change->serialized_payload.encapsulation = PL_CDR_LE;
     CDRMessage::addOctet(&aux_msg, PL_CDR_LE);
 #endif
     CDRMessage::addUInt16(&aux_msg, 0);
 
     ASSERT_TRUE(CDRMessage::addParticipantGenericMessage(&aux_msg, message));
-    change->serializedPayload.length = aux_msg.length;
+    change->serialized_payload.length = aux_msg.length;
 
     MockHandshakeHandle handshake_handle;
     MockSharedSecretHandle shared_secret_handle;
@@ -1234,24 +1237,24 @@ TEST_F(SecurityAuthenticationTest, discovered_participant_process_message_new_ch
             + 4 /*encapsulation*/);
     CDRMessage_t aux_msg(0);
     aux_msg.wraps = true;
-    aux_msg.buffer = change->serializedPayload.data;
-    aux_msg.max_size = change->serializedPayload.max_size;
+    aux_msg.buffer = change->serialized_payload.data;
+    aux_msg.max_size = change->serialized_payload.max_size;
 
     // Serialize encapsulation
     CDRMessage::addOctet(&aux_msg, 0);
 #if __BIG_ENDIAN__
     aux_msg.msg_endian = BIGEND;
-    change->serializedPayload.encapsulation = PL_CDR_BE;
+    change->serialized_payload.encapsulation = PL_CDR_BE;
     CDRMessage::addOctet(&aux_msg, PL_CDR_BE);
 #else
     aux_msg.msg_endian = LITTLEEND;
-    change->serializedPayload.encapsulation = PL_CDR_LE;
+    change->serialized_payload.encapsulation = PL_CDR_LE;
     CDRMessage::addOctet(&aux_msg, PL_CDR_LE);
 #endif
     CDRMessage::addUInt16(&aux_msg, 0);
 
     ASSERT_TRUE(CDRMessage::addParticipantGenericMessage(&aux_msg, message));
-    change->serializedPayload.length = aux_msg.length;
+    change->serialized_payload.length = aux_msg.length;
 
     MockHandshakeHandle handshake_handle;
     HandshakeMessageToken handshake_message;
@@ -1265,7 +1268,7 @@ TEST_F(SecurityAuthenticationTest, discovered_participant_process_message_new_ch
     EXPECT_CALL(*auth_plugin_, return_identity_handle(&remote_identity_handle,_)).Times(1).
         WillRepeatedly(Return(true));
     EXPECT_CALL(*stateless_writer_, new_change(_,_,_)).Times(1).
-        WillOnce(Return(nullptr));
+        WillOnce(Return(ByMove(CacheChange_ptr())));
     EXPECT_CALL(*auth_plugin_, return_handshake_handle(&handshake_handle,_)).Times(1).
         WillOnce(Return(true));
     EXPECT_CALL(*stateless_reader_->history_, remove_change_mock(change)).Times(1).
@@ -1298,24 +1301,24 @@ TEST_F(SecurityAuthenticationTest, discovered_participant_process_message_add_ch
             + 4 /*encapsulation*/);
     CDRMessage_t aux_msg(0);
     aux_msg.wraps = true;
-    aux_msg.buffer = change->serializedPayload.data;
-    aux_msg.max_size = change->serializedPayload.max_size;
+    aux_msg.buffer = change->serialized_payload.data;
+    aux_msg.max_size = change->serialized_payload.max_size;
 
     // Serialize encapsulation
     CDRMessage::addOctet(&aux_msg, 0);
 #if __BIG_ENDIAN__
     aux_msg.msg_endian = BIGEND;
-    change->serializedPayload.encapsulation = PL_CDR_BE;
+    change->serialized_payload.encapsulation = PL_CDR_BE;
     CDRMessage::addOctet(&aux_msg, PL_CDR_BE);
 #else
     aux_msg.msg_endian = LITTLEEND;
-    change->serializedPayload.encapsulation = PL_CDR_LE;
+    change->serialized_payload.encapsulation = PL_CDR_LE;
     CDRMessage::addOctet(&aux_msg, PL_CDR_LE);
 #endif
     CDRMessage::addUInt16(&aux_msg, 0);
 
     ASSERT_TRUE(CDRMessage::addParticipantGenericMessage(&aux_msg, message));
-    change->serializedPayload.length = aux_msg.length;
+    change->serialized_payload.length = aux_msg.length;
 
     MockHandshakeHandle handshake_handle;
     HandshakeMessageToken handshake_message;
@@ -1330,8 +1333,8 @@ TEST_F(SecurityAuthenticationTest, discovered_participant_process_message_add_ch
     EXPECT_CALL(*auth_plugin_, return_identity_handle(&remote_identity_handle,_)).Times(1).
         WillRepeatedly(Return(true));
     EXPECT_CALL(*stateless_writer_, new_change(_,_,_)).Times(1).
-        WillOnce(Return(change2));
-    EXPECT_CALL(*stateless_writer_->history_, add_change_mock(change2)).Times(1).
+        WillOnce(Return(ByMove(CacheChange_ptr(nullptr, change2))));
+    EXPECT_CALL(*stateless_writer_->history_, add_change_mock(_)).Times(1).
         WillOnce(Return(false));
     EXPECT_CALL(*auth_plugin_, return_handshake_handle(&handshake_handle,_)).Times(1).
         WillOnce(Return(true));
@@ -1368,9 +1371,10 @@ TEST_F(SecurityAuthenticationTest, discovered_participant_process_message_pendin
     CacheChange_t* reply_message_change = nullptr;
     reply_process_ok(&reply_message_change);
 
-    EXPECT_CALL(*stateless_writer_->history_, remove_change_and_reuse(reply_message_change->sequenceNumber)).Times(1).
-        WillOnce(Return(reply_message_change));
-    EXPECT_CALL(*stateless_writer_->history_, add_change_mock(reply_message_change)).Times(1).
+    EXPECT_CALL(*stateless_writer_->history_, remove_change(
+                reply_message_change->sequence_number)).Times(1).
+        WillOnce(Return(ByMove(CacheChange_ptr(nullptr, reply_message_change))));
+    EXPECT_CALL(*stateless_writer_->history_, add_change_mock(_)).Times(1).
         WillOnce(Return(true));
     stateless_writer_->history_->wait_for_more_samples_than(1);
 
@@ -1400,24 +1404,24 @@ TEST_F(SecurityAuthenticationTest, discovered_participant_process_message_pendin
             + 4 /*encapsulation*/);
     CDRMessage_t aux_msg(0);
     aux_msg.wraps = true;
-    aux_msg.buffer = change->serializedPayload.data;
-    aux_msg.max_size = change->serializedPayload.max_size;
+    aux_msg.buffer = change->serialized_payload.data;
+    aux_msg.max_size = change->serialized_payload.max_size;
 
     // Serialize encapsulation
     CDRMessage::addOctet(&aux_msg, 0);
 #if __BIG_ENDIAN__
     aux_msg.msg_endian = BIGEND;
-    change->serializedPayload.encapsulation = PL_CDR_BE;
+    change->serialized_payload.encapsulation = PL_CDR_BE;
     CDRMessage::addOctet(&aux_msg, PL_CDR_BE);
 #else
     aux_msg.msg_endian = LITTLEEND;
-    change->serializedPayload.encapsulation = PL_CDR_LE;
+    change->serialized_payload.encapsulation = PL_CDR_LE;
     CDRMessage::addOctet(&aux_msg, PL_CDR_LE);
 #endif
     CDRMessage::addUInt16(&aux_msg, 0);
 
     ASSERT_TRUE(CDRMessage::addParticipantGenericMessage(&aux_msg, message));
-    change->serializedPayload.length = aux_msg.length;
+    change->serialized_payload.length = aux_msg.length;
 
     MockHandshakeHandle handshake_handle;
     HandshakeMessageToken handshake_message;
@@ -1434,8 +1438,8 @@ TEST_F(SecurityAuthenticationTest, discovered_participant_process_message_pendin
     EXPECT_CALL(*auth_plugin_, return_identity_handle(&remote_identity_handle,_)).Times(1).
         WillRepeatedly(Return(true));
     EXPECT_CALL(*stateless_writer_, new_change(_,_,_)).Times(1).
-        WillOnce(Return(change2));
-    EXPECT_CALL(*stateless_writer_->history_, add_change_mock(change2)).Times(1).
+        WillOnce(Return(ByMove(CacheChange_ptr(nullptr, change2))));
+    EXPECT_CALL(*stateless_writer_->history_, add_change_mock(_)).Times(1).
         WillOnce(Return(true));
     EXPECT_CALL(*auth_plugin_, return_handshake_handle(&handshake_handle,_)).Times(1).
         WillOnce(Return(true));
@@ -1484,24 +1488,24 @@ TEST_F(SecurityAuthenticationTest, discovered_participant_process_message_fail_p
             + 4 /*encapsulation*/);
     CDRMessage_t aux_msg(0);
     aux_msg.wraps = true;
-    aux_msg.buffer = change->serializedPayload.data;
-    aux_msg.max_size = change->serializedPayload.max_size;
+    aux_msg.buffer = change->serialized_payload.data;
+    aux_msg.max_size = change->serialized_payload.max_size;
 
     // Serialize encapsulation
     CDRMessage::addOctet(&aux_msg, 0);
 #if __BIG_ENDIAN__
     aux_msg.msg_endian = BIGEND;
-    change->serializedPayload.encapsulation = PL_CDR_BE;
+    change->serialized_payload.encapsulation = PL_CDR_BE;
     CDRMessage::addOctet(&aux_msg, PL_CDR_BE);
 #else
     aux_msg.msg_endian = LITTLEEND;
-    change->serializedPayload.encapsulation = PL_CDR_LE;
+    change->serialized_payload.encapsulation = PL_CDR_LE;
     CDRMessage::addOctet(&aux_msg, PL_CDR_LE);
 #endif
     CDRMessage::addUInt16(&aux_msg, 0);
 
     ASSERT_TRUE(CDRMessage::addParticipantGenericMessage(&aux_msg, message));
-    change->serializedPayload.length = aux_msg.length;
+    change->serialized_payload.length = aux_msg.length;
 
     EXPECT_CALL(*auth_plugin_, process_handshake_rvr(_,_, Ref(handshake_handle_),_)).Times(1).
         WillOnce(Return(ValidationResult_t::VALIDATION_FAILED));
@@ -1523,10 +1527,12 @@ TEST_F(SecurityAuthenticationTest, discovered_participant_process_message_fail_p
 
 TEST_F(SecurityAuthenticationTest, discovered_participant_process_message_ok_process_handshake_reply)
 {
-    request_process_ok();
+    CacheChange_t* request_message_change = nullptr;
+    request_process_ok(&request_message_change);
 
     EXPECT_CALL(*stateless_writer_->history_, remove_change(SequenceNumber_t{0,1})).Times(1).
-        WillOnce(Return(true));
+        WillOnce(Return(ByMove(CacheChange_ptr(nullptr, request_message_change))));
+    delete(request_message_change);
 
     GUID_t remote_participant_key(participant_data_.m_guid);
 
@@ -1542,24 +1548,24 @@ TEST_F(SecurityAuthenticationTest, discovered_participant_process_message_ok_pro
             + 4 /*encapsulation*/);
     CDRMessage_t aux_msg(0);
     aux_msg.wraps = true;
-    aux_msg.buffer = change->serializedPayload.data;
-    aux_msg.max_size = change->serializedPayload.max_size;
+    aux_msg.buffer = change->serialized_payload.data;
+    aux_msg.max_size = change->serialized_payload.max_size;
 
     // Serialize encapsulation
     CDRMessage::addOctet(&aux_msg, 0);
 #if __BIG_ENDIAN__
     aux_msg.msg_endian = BIGEND;
-    change->serializedPayload.encapsulation = PL_CDR_BE;
+    change->serialized_payload.encapsulation = PL_CDR_BE;
     CDRMessage::addOctet(&aux_msg, PL_CDR_BE);
 #else
     aux_msg.msg_endian = LITTLEEND;
-    change->serializedPayload.encapsulation = PL_CDR_LE;
+    change->serialized_payload.encapsulation = PL_CDR_LE;
     CDRMessage::addOctet(&aux_msg, PL_CDR_LE);
 #endif
     CDRMessage::addUInt16(&aux_msg, 0);
 
     ASSERT_TRUE(CDRMessage::addParticipantGenericMessage(&aux_msg, message));
-    change->serializedPayload.length = aux_msg.length;
+    change->serialized_payload.length = aux_msg.length;
 
     MockSharedSecretHandle shared_secret_handle;
     MockParticipantCryptoHandle participant_crypto_handle;
@@ -1598,10 +1604,12 @@ TEST_F(SecurityAuthenticationTest, discovered_participant_process_message_ok_pro
 
 TEST_F(SecurityAuthenticationTest, discovered_participant_process_message_process_handshake_reply_new_change_fail)
 {
-    request_process_ok();
+    CacheChange_t* request_message_change = nullptr;
+    request_process_ok(&request_message_change);
 
     EXPECT_CALL(*stateless_writer_->history_, remove_change(SequenceNumber_t{0,1})).Times(1).
-        WillOnce(Return(true));
+        WillOnce(Return(ByMove(CacheChange_ptr(nullptr, request_message_change))));
+    delete(request_message_change);
 
     GUID_t remote_participant_key(participant_data_.m_guid);
 
@@ -1617,24 +1625,24 @@ TEST_F(SecurityAuthenticationTest, discovered_participant_process_message_proces
             + 4 /*encapsulation*/);
     CDRMessage_t aux_msg(0);
     aux_msg.wraps = true;
-    aux_msg.buffer = change->serializedPayload.data;
-    aux_msg.max_size = change->serializedPayload.max_size;
+    aux_msg.buffer = change->serialized_payload.data;
+    aux_msg.max_size = change->serialized_payload.max_size;
 
     // Serialize encapsulation
     CDRMessage::addOctet(&aux_msg, 0);
 #if __BIG_ENDIAN__
     aux_msg.msg_endian = BIGEND;
-    change->serializedPayload.encapsulation = PL_CDR_BE;
+    change->serialized_payload.encapsulation = PL_CDR_BE;
     CDRMessage::addOctet(&aux_msg, PL_CDR_BE);
 #else
     aux_msg.msg_endian = LITTLEEND;
-    change->serializedPayload.encapsulation = PL_CDR_LE;
+    change->serialized_payload.encapsulation = PL_CDR_LE;
     CDRMessage::addOctet(&aux_msg, PL_CDR_LE);
 #endif
     CDRMessage::addUInt16(&aux_msg, 0);
 
     ASSERT_TRUE(CDRMessage::addParticipantGenericMessage(&aux_msg, message));
-    change->serializedPayload.length = aux_msg.length;
+    change->serialized_payload.length = aux_msg.length;
 
     HandshakeMessageToken handshake_message;
 
@@ -1645,7 +1653,7 @@ TEST_F(SecurityAuthenticationTest, discovered_participant_process_message_proces
     EXPECT_CALL(*auth_plugin_, return_identity_handle(&remote_identity_handle_,_)).Times(1).
         WillRepeatedly(Return(true));
     EXPECT_CALL(*stateless_writer_, new_change(_,_,_)).Times(1).
-        WillOnce(Return(nullptr));
+        WillOnce(Return(ByMove(CacheChange_ptr())));
     EXPECT_CALL(*auth_plugin_, return_handshake_handle(&handshake_handle_,_)).Times(1).
         WillOnce(Return(true));
     EXPECT_CALL(*stateless_reader_->history_, remove_change_mock(change)).Times(1).
@@ -1656,10 +1664,12 @@ TEST_F(SecurityAuthenticationTest, discovered_participant_process_message_proces
 
 TEST_F(SecurityAuthenticationTest, discovered_participant_process_message_process_handshake_reply_add_change_fail)
 {
-    request_process_ok();
+    CacheChange_t* request_message_change = nullptr;
+    request_process_ok(&request_message_change);
 
     EXPECT_CALL(*stateless_writer_->history_, remove_change(SequenceNumber_t{0,1})).Times(1).
-        WillOnce(Return(true));
+        WillOnce(Return(ByMove(CacheChange_ptr(nullptr, request_message_change))));
+    delete(request_message_change);
 
     GUID_t remote_participant_key(participant_data_.m_guid);
 
@@ -1675,24 +1685,24 @@ TEST_F(SecurityAuthenticationTest, discovered_participant_process_message_proces
             + 4 /*encapsulation*/);
     CDRMessage_t aux_msg(0);
     aux_msg.wraps = true;
-    aux_msg.buffer = change->serializedPayload.data;
-    aux_msg.max_size = change->serializedPayload.max_size;
+    aux_msg.buffer = change->serialized_payload.data;
+    aux_msg.max_size = change->serialized_payload.max_size;
 
     // Serialize encapsulation
     CDRMessage::addOctet(&aux_msg, 0);
 #if __BIG_ENDIAN__
     aux_msg.msg_endian = BIGEND;
-    change->serializedPayload.encapsulation = PL_CDR_BE;
+    change->serialized_payload.encapsulation = PL_CDR_BE;
     CDRMessage::addOctet(&aux_msg, PL_CDR_BE);
 #else
     aux_msg.msg_endian = LITTLEEND;
-    change->serializedPayload.encapsulation = PL_CDR_LE;
+    change->serialized_payload.encapsulation = PL_CDR_LE;
     CDRMessage::addOctet(&aux_msg, PL_CDR_LE);
 #endif
     CDRMessage::addUInt16(&aux_msg, 0);
 
     ASSERT_TRUE(CDRMessage::addParticipantGenericMessage(&aux_msg, message));
-    change->serializedPayload.length = aux_msg.length;
+    change->serialized_payload.length = aux_msg.length;
 
     HandshakeMessageToken handshake_message;
     CacheChange_t* change2 = new CacheChange_t(200);
@@ -1704,8 +1714,8 @@ TEST_F(SecurityAuthenticationTest, discovered_participant_process_message_proces
     EXPECT_CALL(*auth_plugin_, return_identity_handle(&remote_identity_handle_,_)).Times(1).
         WillRepeatedly(Return(true));
     EXPECT_CALL(*stateless_writer_, new_change(_,_,_)).Times(1).
-        WillOnce(Return(change2));
-    EXPECT_CALL(*stateless_writer_->history_, add_change_mock(change2)).Times(1).
+    WillOnce(Return(ByMove(CacheChange_ptr(nullptr, change2))));
+    EXPECT_CALL(*stateless_writer_->history_, add_change_mock(_)).Times(1).
         WillOnce(Return(false));
     EXPECT_CALL(*auth_plugin_, return_handshake_handle(&handshake_handle_,_)).Times(1).
         WillOnce(Return(true));
@@ -1755,28 +1765,28 @@ TEST_F(SecurityAuthenticationTest, discovered_participant_process_message_proces
             + 4 /*encapsulation*/);
     CDRMessage_t aux_msg(0);
     aux_msg.wraps = true;
-    aux_msg.buffer = change->serializedPayload.data;
-    aux_msg.max_size = change->serializedPayload.max_size;
+    aux_msg.buffer = change->serialized_payload.data;
+    aux_msg.max_size = change->serialized_payload.max_size;
 
     // Serialize encapsulation
     CDRMessage::addOctet(&aux_msg, 0);
 #if __BIG_ENDIAN__
     aux_msg.msg_endian = BIGEND;
-    change->serializedPayload.encapsulation = PL_CDR_BE;
+    change->serialized_payload.encapsulation = PL_CDR_BE;
     CDRMessage::addOctet(&aux_msg, PL_CDR_BE);
 #else
     aux_msg.msg_endian = LITTLEEND;
-    change->serializedPayload.encapsulation = PL_CDR_LE;
+    change->serialized_payload.encapsulation = PL_CDR_LE;
     CDRMessage::addOctet(&aux_msg, PL_CDR_LE);
 #endif
     CDRMessage::addUInt16(&aux_msg, 0);
 
     ASSERT_TRUE(CDRMessage::addParticipantGenericMessage(&aux_msg, message));
-    change->serializedPayload.length = aux_msg.length;
+    change->serialized_payload.length = aux_msg.length;
 
-    EXPECT_CALL(*stateless_writer_->history_, remove_change_and_reuse(final_message_change->sequenceNumber)).Times(1).
-        WillOnce(Return(final_message_change));
-    EXPECT_CALL(*stateless_writer_->history_, add_change_mock(final_message_change)).Times(1).
+    EXPECT_CALL(*stateless_writer_->history_, remove_change(final_message_change->sequence_number)).
+        Times(1).WillOnce(Return(ByMove(CacheChange_ptr(nullptr, final_message_change))));
+    EXPECT_CALL(*stateless_writer_->history_, add_change_mock(_)).Times(1).
         WillOnce(Return(true));
     EXPECT_CALL(*stateless_reader_->history_, remove_change_mock(change)).Times(1).
         WillOnce(Return(true));
@@ -1805,24 +1815,24 @@ TEST_F(SecurityAuthenticationTest, discovered_participant_process_message_bad_re
             + 4 /*encapsulation*/);
     CDRMessage_t aux_msg(0);
     aux_msg.wraps = true;
-    aux_msg.buffer = change->serializedPayload.data;
-    aux_msg.max_size = change->serializedPayload.max_size;
+    aux_msg.buffer = change->serialized_payload.data;
+    aux_msg.max_size = change->serialized_payload.max_size;
 
     // Serialize encapsulation
     CDRMessage::addOctet(&aux_msg, 0);
 #if __BIG_ENDIAN__
     aux_msg.msg_endian = BIGEND;
-    change->serializedPayload.encapsulation = PL_CDR_BE;
+    change->serialized_payload.encapsulation = PL_CDR_BE;
     CDRMessage::addOctet(&aux_msg, PL_CDR_BE);
 #else
     aux_msg.msg_endian = LITTLEEND;
-    change->serializedPayload.encapsulation = PL_CDR_LE;
+    change->serialized_payload.encapsulation = PL_CDR_LE;
     CDRMessage::addOctet(&aux_msg, PL_CDR_LE);
 #endif
     CDRMessage::addUInt16(&aux_msg, 0);
 
     ASSERT_TRUE(CDRMessage::addParticipantGenericMessage(&aux_msg, message));
-    change->serializedPayload.length = aux_msg.length;
+    change->serialized_payload.length = aux_msg.length;
 
     EXPECT_CALL(*auth_plugin_, return_identity_handle(&local_identity_handle_,_)).Times(1).
         WillRepeatedly(Return(true));
@@ -1854,24 +1864,24 @@ TEST_F(SecurityAuthenticationTest, discovered_participant_process_message_bad_re
             + 4 /*encapsulation*/);
     CDRMessage_t aux_msg(0);
     aux_msg.wraps = true;
-    aux_msg.buffer = change->serializedPayload.data;
-    aux_msg.max_size = change->serializedPayload.max_size;
+    aux_msg.buffer = change->serialized_payload.data;
+    aux_msg.max_size = change->serialized_payload.max_size;
 
     // Serialize encapsulation
     CDRMessage::addOctet(&aux_msg, 0);
 #if __BIG_ENDIAN__
     aux_msg.msg_endian = BIGEND;
-    change->serializedPayload.encapsulation = PL_CDR_BE;
+    change->serialized_payload.encapsulation = PL_CDR_BE;
     CDRMessage::addOctet(&aux_msg, PL_CDR_BE);
 #else
     aux_msg.msg_endian = LITTLEEND;
-    change->serializedPayload.encapsulation = PL_CDR_LE;
+    change->serialized_payload.encapsulation = PL_CDR_LE;
     CDRMessage::addOctet(&aux_msg, PL_CDR_LE);
 #endif
     CDRMessage::addUInt16(&aux_msg, 0);
 
     ASSERT_TRUE(CDRMessage::addParticipantGenericMessage(&aux_msg, message));
-    change->serializedPayload.length = aux_msg.length;
+    change->serialized_payload.length = aux_msg.length;
 
     EXPECT_CALL(*auth_plugin_, return_identity_handle(&local_identity_handle_,_)).Times(1).
         WillRepeatedly(Return(true));
@@ -1903,24 +1913,24 @@ TEST_F(SecurityAuthenticationTest, discovered_participant_process_message_fail_p
             + 4 /*encapsulation*/);
     CDRMessage_t aux_msg(0);
     aux_msg.wraps = true;
-    aux_msg.buffer = change->serializedPayload.data;
-    aux_msg.max_size = change->serializedPayload.max_size;
+    aux_msg.buffer = change->serialized_payload.data;
+    aux_msg.max_size = change->serialized_payload.max_size;
 
     // Serialize encapsulation
     CDRMessage::addOctet(&aux_msg, 0);
 #if __BIG_ENDIAN__
     aux_msg.msg_endian = BIGEND;
-    change->serializedPayload.encapsulation = PL_CDR_BE;
+    change->serialized_payload.encapsulation = PL_CDR_BE;
     CDRMessage::addOctet(&aux_msg, PL_CDR_BE);
 #else
     aux_msg.msg_endian = LITTLEEND;
-    change->serializedPayload.encapsulation = PL_CDR_LE;
+    change->serialized_payload.encapsulation = PL_CDR_LE;
     CDRMessage::addOctet(&aux_msg, PL_CDR_LE);
 #endif
     CDRMessage::addUInt16(&aux_msg, 0);
 
     ASSERT_TRUE(CDRMessage::addParticipantGenericMessage(&aux_msg, message));
-    change->serializedPayload.length = aux_msg.length;
+    change->serialized_payload.length = aux_msg.length;
 
     EXPECT_CALL(*auth_plugin_, process_handshake_rvr(_,_, Ref(handshake_handle_),_)).Times(1).
         WillOnce(Return(ValidationResult_t::VALIDATION_FAILED));
@@ -1942,10 +1952,12 @@ TEST_F(SecurityAuthenticationTest, discovered_participant_process_message_fail_p
 
 TEST_F(SecurityAuthenticationTest, discovered_participant_process_message_ok_process_handshake_final)
 {
-    reply_process_ok();
+    CacheChange_t* reply_message_change = nullptr;
+    reply_process_ok(&reply_message_change);
 
     EXPECT_CALL(*stateless_writer_->history_, remove_change(SequenceNumber_t{0,1})).Times(1).
-        WillOnce(Return(true));
+        WillOnce(Return(ByMove(CacheChange_ptr(nullptr, reply_message_change))));
+    delete reply_message_change;
 
     GUID_t remote_participant_key(participant_data_.m_guid);
 
@@ -1961,24 +1973,24 @@ TEST_F(SecurityAuthenticationTest, discovered_participant_process_message_ok_pro
             + 4 /*encapsulation*/);
     CDRMessage_t aux_msg(0);
     aux_msg.wraps = true;
-    aux_msg.buffer = change->serializedPayload.data;
-    aux_msg.max_size = change->serializedPayload.max_size;
+    aux_msg.buffer = change->serialized_payload.data;
+    aux_msg.max_size = change->serialized_payload.max_size;
 
     // Serialize encapsulation
     CDRMessage::addOctet(&aux_msg, 0);
 #if __BIG_ENDIAN__
     aux_msg.msg_endian = BIGEND;
-    change->serializedPayload.encapsulation = PL_CDR_BE;
+    change->serialized_payload.encapsulation = PL_CDR_BE;
     CDRMessage::addOctet(&aux_msg, PL_CDR_BE);
 #else
     aux_msg.msg_endian = LITTLEEND;
-    change->serializedPayload.encapsulation = PL_CDR_LE;
+    change->serialized_payload.encapsulation = PL_CDR_LE;
     CDRMessage::addOctet(&aux_msg, PL_CDR_LE);
 #endif
     CDRMessage::addUInt16(&aux_msg, 0);
 
     ASSERT_TRUE(CDRMessage::addParticipantGenericMessage(&aux_msg, message));
-    change->serializedPayload.length = aux_msg.length;
+    change->serialized_payload.length = aux_msg.length;
 
     MockSharedSecretHandle shared_secret_handle;
     MockParticipantCryptoHandle participant_crypto_handle;

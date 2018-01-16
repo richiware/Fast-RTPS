@@ -34,7 +34,7 @@ FlowController::~FlowController()
    DeRegisterAsListeningController();
 }
 
-void FlowController::NotifyControllersChangeSent(CacheChange_t* change)
+void FlowController::NotifyControllersChangeSent(const CacheChange_t* const change)
 {
    std::unique_lock<std::recursive_mutex> scopedLock(FlowControllerMutex);
    for (auto filter : ListeningControllers)

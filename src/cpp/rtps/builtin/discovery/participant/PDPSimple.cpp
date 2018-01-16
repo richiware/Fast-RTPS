@@ -43,8 +43,9 @@
 #include <fastrtps/rtps/reader/StatefulReader.h>
 #include <fastrtps/rtps/reader/WriterProxy.h>
 
-#include <fastrtps/rtps/history/WriterHistory.h>
+#include "../../../history/WriterHistoryImpl.h"
 #include <fastrtps/rtps/history/ReaderHistory.h>
+#include <fastrtps/rtps/history/CacheChangePool.h>
 
 
 #include <fastrtps/utils/TimeConversion.h>
@@ -217,7 +218,6 @@ void PDPSimple::resetParticipantAnnouncement()
 void PDPSimple::announceParticipantState(bool new_change, bool dispose)
 {
     logInfo(RTPS_PDP,"Announcing RTPSParticipant State (new change: "<< new_change <<")");
-    CacheChange_t* change = nullptr;
 
     if(!dispose)
     {
@@ -230,28 +230,28 @@ void PDPSimple::announceParticipantState(bool new_change, bool dispose)
             ParameterList_t parameter_list = local_participant_data->AllQostoParameterList();
             this->mp_mutex->unlock();
 
-            if(mp_SPDPWriterHistory->getHistorySize() > 0)
-                mp_SPDPWriterHistory->remove_min_change();
+            // TODO Reuse change returned by this function
+            mp_SPDPWriterHistory->remove_min_change();
             // TODO(Ricardo) Change DISCOVERY_PARTICIPANT_DATA_MAX_SIZE with getLocalParticipantProxyData()->size().
-            change = mp_SPDPWriter->new_change([]() -> uint32_t {return DISCOVERY_PARTICIPANT_DATA_MAX_SIZE;}, ALIVE, key);
+            CacheChange_ptr change = mp_SPDPWriter->new_change([]() -> uint32_t {return DISCOVERY_PARTICIPANT_DATA_MAX_SIZE;}, ALIVE, key);
 
-            if(change != nullptr)
+            if(change)
             {
                 CDRMessage_t aux_msg(0);
                 aux_msg.wraps = true;
-                aux_msg.buffer = change->serializedPayload.data;
-                aux_msg.max_size = change->serializedPayload.max_size;
+                aux_msg.buffer = change->serialized_payload.data;
+                aux_msg.max_size = change->serialized_payload.max_size;
 
 #if EPROSIMA_BIG_ENDIAN
                 change->serializedPayload.encapsulation = (uint16_t)PL_CDR_BE;
                 aux_msg.msg_endian = BIGEND;
 #else
-                change->serializedPayload.encapsulation = (uint16_t)PL_CDR_LE;
+                change->serialized_payload.encapsulation = (uint16_t)PL_CDR_LE;
                 aux_msg.msg_endian =  LITTLEEND;
 #endif
 
                 ParameterList::writeParameterListToCDRMsg(&aux_msg, &parameter_list, true);
-                change->serializedPayload.length = (uint16_t)aux_msg.length;
+                change->serialized_payload.length = (uint16_t)aux_msg.length;
 
                 mp_SPDPWriterHistory->add_change(change);
             }
@@ -260,7 +260,7 @@ void PDPSimple::announceParticipantState(bool new_change, bool dispose)
         }
         else
         {
-            mp_SPDPWriter->unsent_changes_reset();
+            mp_SPDPWriter->resent_changes();
         }
     }
     else
@@ -269,27 +269,29 @@ void PDPSimple::announceParticipantState(bool new_change, bool dispose)
         ParameterList_t parameter_list = getLocalParticipantProxyData()->AllQostoParameterList();
         this->mp_mutex->unlock();
 
-        if(mp_SPDPWriterHistory->getHistorySize() > 0)
-            mp_SPDPWriterHistory->remove_min_change();
-        change = mp_SPDPWriter->new_change([]() -> uint32_t {return DISCOVERY_PARTICIPANT_DATA_MAX_SIZE;}, NOT_ALIVE_DISPOSED_UNREGISTERED, getLocalParticipantProxyData()->m_key);
+        // TODO Reuse change returned by this function
+        mp_SPDPWriterHistory->remove_min_change();
+        CacheChange_ptr change = mp_SPDPWriter->new_change([]() ->
+                uint32_t {return DISCOVERY_PARTICIPANT_DATA_MAX_SIZE;},
+                NOT_ALIVE_DISPOSED_UNREGISTERED, getLocalParticipantProxyData()->m_key);
 
-        if(change != nullptr)
+        if(change)
         {
             CDRMessage_t aux_msg(0);
             aux_msg.wraps = true;
-            aux_msg.buffer = change->serializedPayload.data;
-            aux_msg.max_size = change->serializedPayload.max_size;
+            aux_msg.buffer = change->serialized_payload.data;
+            aux_msg.max_size = change->serialized_payload.max_size;
 
 #if EPROSIMA_BIG_ENDIAN
-            change->serializedPayload.encapsulation = (uint16_t)PL_CDR_BE;
+            change->serialized_payload.encapsulation = (uint16_t)PL_CDR_BE;
             aux_msg.msg_endian = BIGEND;
 #else
-            change->serializedPayload.encapsulation = (uint16_t)PL_CDR_LE;
+            change->serialized_payload.encapsulation = (uint16_t)PL_CDR_LE;
             aux_msg.msg_endian =  LITTLEEND;
 #endif
 
             ParameterList::writeParameterListToCDRMsg(&aux_msg, &parameter_list, true);
-            change->serializedPayload.length = (uint16_t)aux_msg.length;
+            change->serialized_payload.length = (uint16_t)aux_msg.length;
 
             mp_SPDPWriterHistory->add_change(change);
         }
@@ -420,7 +422,7 @@ bool PDPSimple::createSPDPEndpoints()
             mp_RTPSParticipant->getRTPSParticipantAttributes().throughputController.periodMillisecs != 0)
         watt.mode = ASYNCHRONOUS_WRITER;
     RTPSWriter* wout;
-    if(mp_RTPSParticipant->createWriter(&wout,watt,mp_SPDPWriterHistory,nullptr,c_EntityId_SPDPWriter,true))
+    if(mp_RTPSParticipant->createWriter(&wout, watt, *mp_SPDPWriterHistory, nullptr, c_EntityId_SPDPWriter, true))
     {
 #if HAVE_SECURITY
         mp_RTPSParticipant->set_endpoint_rtps_protection_supports(wout, false);
@@ -711,7 +713,7 @@ bool PDPSimple::removeRemoteParticipant(GUID_t& partGUID)
         for(std::vector<CacheChange_t*>::iterator it=this->mp_SPDPReaderHistory->changesBegin();
                 it!=this->mp_SPDPReaderHistory->changesEnd();++it)
         {
-            if((*it)->instanceHandle == pdata->m_key)
+            if((*it)->instance_handle == pdata->m_key)
             {
                 this->mp_SPDPReaderHistory->remove_change(*it);
                 break;

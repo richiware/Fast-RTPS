@@ -106,10 +106,11 @@ class PubSubWriter
                 {
                     CDRMessage_t tempMsg(0);
                     tempMsg.wraps = true;
-                    tempMsg.msg_endian = change_in->serializedPayload.encapsulation == PL_CDR_BE ? BIGEND : LITTLEEND;
-                    tempMsg.length = change_in->serializedPayload.length;
-                    tempMsg.max_size = change_in->serializedPayload.max_size;
-                    tempMsg.buffer = change_in->serializedPayload.data;
+                    tempMsg.msg_endian =
+                        change_in->serialized_payload.encapsulation == PL_CDR_BE ? BIGEND : LITTLEEND;
+                    tempMsg.length = change_in->serialized_payload.length;
+                    tempMsg.max_size = change_in->serialized_payload.max_size;
+                    tempMsg.buffer = change_in->serialized_payload.data;
 
                     if(readerInfo.readFromCDRMessage(&tempMsg))
                     {
@@ -121,7 +122,7 @@ class PubSubWriter
                 {
                     // Search info of entity
                     GUID_t readerGuid;
-                    iHandle2GUID(readerGuid, change_in->instanceHandle);
+                    iHandle2GUID(readerGuid, change_in->instance_handle);
 
                     if(writer_.participant_->get_remote_reader_info(readerGuid, readerInfo))
                     {
@@ -159,10 +160,10 @@ class PubSubWriter
                 {
                     CDRMessage_t tempMsg(0);
                     tempMsg.wraps = true;
-                    tempMsg.msg_endian = change_in->serializedPayload.encapsulation == PL_CDR_BE ? BIGEND : LITTLEEND;
-                    tempMsg.length = change_in->serializedPayload.length;
-                    tempMsg.max_size = change_in->serializedPayload.max_size;
-                    tempMsg.buffer = change_in->serializedPayload.data;
+                    tempMsg.msg_endian = change_in->serialized_payload.encapsulation == PL_CDR_BE ? BIGEND : LITTLEEND;
+                    tempMsg.length = change_in->serialized_payload.length;
+                    tempMsg.max_size = change_in->serialized_payload.max_size;
+                    tempMsg.buffer = change_in->serialized_payload.data;
 
                     if(writerInfo.readFromCDRMessage(&tempMsg))
                     {
@@ -178,7 +179,7 @@ class PubSubWriter
                 {
                     // Search info of entity
                     GUID_t writerGuid;
-                    iHandle2GUID(writerGuid, change_in->instanceHandle);
+                    iHandle2GUID(writerGuid, change_in->instance_handle);
 
                     if(writer_.participant_->get_remote_writer_info(writerGuid, writerInfo))
                     {

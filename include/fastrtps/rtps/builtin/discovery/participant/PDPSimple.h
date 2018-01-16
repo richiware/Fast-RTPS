@@ -24,6 +24,7 @@
 #include <mutex>
 #include "../../../common/Guid.h"
 #include "../../../attributes/RTPSParticipantAttributes.h"
+#include "../../../history/WriterHistory.h"
 
 #include "../../../../qos/QosPolicies.h"
 
@@ -35,7 +36,6 @@ namespace rtps {
 
 class StatelessWriter;
 class StatelessReader;
-class WriterHistory;
 class ReaderHistory;
 class RTPSParticipantImpl;
 class BuiltinProtocols;

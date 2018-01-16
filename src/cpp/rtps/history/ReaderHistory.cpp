@@ -36,7 +36,7 @@ namespace rtps {
 
 inline bool sort_ReaderHistoryCache(CacheChange_t*c1, CacheChange_t*c2)
 {
-    return c1->sequenceNumber < c2->sequenceNumber;
+    return c1->sequence_number < c2->sequence_number;
 }
 
 
@@ -68,15 +68,15 @@ bool ReaderHistory::add_change(CacheChange_t* a_change)
     }
 
     std::lock_guard<std::recursive_mutex> guard(*mp_mutex);
-    if(m_att.memoryPolicy == PREALLOCATED_MEMORY_MODE && a_change->serializedPayload.length > m_att.payloadMaxSize)
+    if(m_att.memoryPolicy == PREALLOCATED_MEMORY_MODE && a_change->serialized_payload.length > m_att.payloadMaxSize)
     {
         logError(RTPS_HISTORY,
-            "Change payload size of '" << a_change->serializedPayload.length <<
+            "Change payload size of '" << a_change->serialized_payload.length <<
             "' bytes is larger than the history payload size of '" << m_att.payloadMaxSize <<
             "' bytes and cannot be resized.");
         return false;
     }
-    if(a_change->writerGUID == c_Guid_Unknown)
+    if(a_change->writer_guid == c_Guid_Unknown)
     {
         logError(RTPS_HISTORY,"The Writer GUID_t must be defined");
     }
@@ -84,7 +84,7 @@ bool ReaderHistory::add_change(CacheChange_t* a_change)
     m_changes.push_back(a_change);
     sortCacheChanges();
     updateMaxMinSeqNum();
-    logInfo(RTPS_HISTORY, "Change " << a_change->sequenceNumber << " added with " << a_change->serializedPayload.length << " bytes");
+    logInfo(RTPS_HISTORY, "Change " << a_change->sequence_number << " added with " << a_change->serialized_payload.length << " bytes");
 
     return true;
 }
@@ -107,19 +107,19 @@ bool ReaderHistory::remove_change(CacheChange_t* a_change)
     for(std::vector<CacheChange_t*>::iterator chit = m_changes.begin();
             chit!=m_changes.end();++chit)
     {
-        if((*chit)->sequenceNumber == a_change->sequenceNumber &&
-                (*chit)->writerGUID == a_change->writerGUID)
+        if((*chit)->sequence_number == a_change->sequence_number &&
+                (*chit)->writer_guid == a_change->writer_guid)
         {
-            logInfo(RTPS_HISTORY,"Removing change "<< a_change->sequenceNumber);
+            logInfo(RTPS_HISTORY,"Removing change "<< a_change->sequence_number);
             mp_reader->change_removed_by_history(a_change);
-            m_changePool.release_Cache(a_change);
+            m_changePool.release_cache(a_change);
             m_changes.erase(chit);
             sortCacheChanges();
             updateMaxMinSeqNum();
             return true;
         }
     }
-    logWarning(RTPS_HISTORY,"SequenceNumber "<<a_change->sequenceNumber << " not found");
+    logWarning(RTPS_HISTORY, "SequenceNumber " << a_change->sequence_number << " not found");
     return false;
 }
 
@@ -139,10 +139,10 @@ bool ReaderHistory::remove_changes_with_guid(const GUID_t& a_guid)
         {
             bool matches = true;
             unsigned int size = a_guid.guidPrefix.size;
-            if( !std::equal( (*chit)->writerGUID.guidPrefix.value , (*chit)->writerGUID.guidPrefix.value + size -1, a_guid.guidPrefix.value ) )
+            if( !std::equal( (*chit)->writer_guid.guidPrefix.value , (*chit)->writer_guid.guidPrefix.value + size -1, a_guid.guidPrefix.value ) )
                 matches = false;
             size = a_guid.entityId.size;
-            if( !std::equal( (*chit)->writerGUID.entityId.value , (*chit)->writerGUID.entityId.value + size -1, a_guid.entityId.value ) )
+            if( !std::equal( (*chit)->writer_guid.entityId.value , (*chit)->writer_guid.entityId.value + size -1, a_guid.entityId.value ) )
                     matches = false;
             if(matches)
                 changes_to_remove.push_back( (*chit) );
@@ -193,7 +193,7 @@ bool ReaderHistory::get_min_change_from(CacheChange_t** min_change, const GUID_t
 
     for(auto it = m_changes.begin(); it != m_changes.end(); ++it)
     {
-        if((*it)->writerGUID == writerGuid)
+        if((*it)->writer_guid == writerGuid)
         {
             *min_change = *it;
             ret = true;

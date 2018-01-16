@@ -37,35 +37,36 @@ class RTPSWriterCollector
 
         struct Item
         {
-            Item(SequenceNumber_t seqNum, FragmentNumber_t fragNum,
-                    CacheChange_t* c) : sequenceNumber(seqNum),
-                                        fragmentNumber(fragNum),
-                                        cacheChange(c)
+            Item(const SequenceNumber_t& seq_num, const FragmentNumber_t& frag_num,
+                    const CacheChange_t* const change) : sequence_number(seq_num),
+                                        fragment_number(frag_num),
+                                        cachechange(change)
 
             {
-                assert(seqNum == c->sequenceNumber);
+                assert(seq_num == change->sequence_number);
             }
+
             //! Sequence number of the CacheChange.
-            SequenceNumber_t sequenceNumber;
+            SequenceNumber_t sequence_number;
             /*!
              *  Fragment number of the represented fragment.
              *  If value is zero, it represents a whole change.
              */
-            FragmentNumber_t fragmentNumber;
+            FragmentNumber_t fragment_number;
 
-            CacheChange_t* cacheChange;
+            const CacheChange_t* const cachechange;
 
-            mutable std::vector<T> remoteReaders;
+            mutable std::vector<T> remote_readers;
         };
 
         struct ItemCmp
         {
             bool operator()(const Item& a, const Item& b) const
             {
-                if(a.sequenceNumber < b.sequenceNumber)
+                if(a.sequence_number < b.sequence_number)
                     return true;
-                else if(a.sequenceNumber == b.sequenceNumber)
-                    if(a.fragmentNumber < b.fragmentNumber)
+                else if(a.sequence_number == b.sequence_number)
+                    if(a.fragment_number < b.fragment_number)
                         return true;
 
                 return false;
@@ -74,55 +75,55 @@ class RTPSWriterCollector
 
         typedef std::set<Item, ItemCmp> ItemSet;
 
-        void add_change(CacheChange_t* change, const T& remoteReader, const FragmentNumberSet_t optionalFragmentsNotSent)
+        void add_change(const CacheChange_t* const change, const T& remote_reader, const FragmentNumberSet_t opt_fragment_not_sent)
         {
             if(change->getFragmentSize() > 0)
             {
-                for(auto sn = optionalFragmentsNotSent.get_begin(); sn != optionalFragmentsNotSent.get_end(); ++sn)
+                for(auto sn = opt_fragment_not_sent.get_begin(); sn != opt_fragment_not_sent.get_end(); ++sn)
                 {
                     assert(*sn <= change->getDataFragments()->size());
-                    auto it = mItems_.emplace(change->sequenceNumber, *sn, change);
-                    it.first->remoteReaders.push_back(remoteReader);
+                    auto it = items_.emplace(change->sequence_number, *sn, change);
+                    it.first->remote_readers.push_back(remote_reader);
                 }
             }
             else
             {
-                auto it = mItems_.emplace(change->sequenceNumber, 0, change);
-                it.first->remoteReaders.push_back(remoteReader);
+                auto it = items_.emplace(change->sequence_number, 0, change);
+                it.first->remote_readers.push_back(remote_reader);
             }
         }
 
         bool empty()
         {
-            return mItems_.empty();
+            return items_.empty();
         }
 
         size_t size()
         {
-            return mItems_.size();
+            return items_.size();
         }
 
         Item pop()
         {
-            auto it = mItems_.begin();
+            auto it = items_.begin();
             Item ret = *it;
-            mItems_.erase(it);
+            items_.erase(it);
             return ret;
         }
 
         void clear()
         {
-            return mItems_.clear();
+            return items_.clear();
         }
 
         ItemSet& items()
         {
-            return mItems_;
+            return items_;
         }
 
     private:
 
-        ItemSet mItems_;
+        ItemSet items_;
 };
 
 } // namespace rtps

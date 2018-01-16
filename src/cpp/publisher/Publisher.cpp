@@ -17,7 +17,6 @@
  *
  */
 
-#include <fastrtps/publisher/Publisher.h>
 #include "PublisherImpl.h"
 
 #include <fastrtps/log/Log.h>
@@ -26,64 +25,65 @@ namespace eprosima {
 namespace fastrtps {
 
 
-Publisher::Publisher(PublisherImpl* pimpl) : mp_impl(pimpl)
+Publisher::Publisher(Participant::impl& participant, TopicDataType* ptype,
+            PublisherAttributes& att, PublisherListener* p_listen) :
+    impl_(new impl(participant, *this, ptype, att, p_listen))
 {
-    // TODO Auto-generated constructor stub
 }
 
-Publisher::~Publisher() {
-    // TODO Auto-generated destructor stub
+Publisher::~Publisher()
+{
 }
 
 bool Publisher::write(void* Data) {
     logInfo(PUBLISHER,"Writing new data");
-    return mp_impl->create_new_change(ALIVE,Data);
+    return get_implementation(*this).create_new_change(ALIVE,Data);
 }
 
 bool Publisher::write(void* Data, WriteParams &wparams) {
     logInfo(PUBLISHER,"Writing new data with WriteParams");
-    return mp_impl->create_new_change_with_params(ALIVE, Data, wparams);
+    return get_implementation(*this).create_new_change_with_params(ALIVE, Data, wparams);
 }
 
 bool Publisher::dispose(void* Data)
 {
     logInfo(PUBLISHER,"Disposing of Data");
-    return mp_impl->create_new_change(NOT_ALIVE_DISPOSED,Data);
+    return get_implementation(*this).create_new_change(NOT_ALIVE_DISPOSED,Data);
 }
 
 
 bool Publisher::unregister(void* Data) {
     //Convert data to serialized Payload
     logInfo(PUBLISHER,"Unregistering of Data");
-    return mp_impl->create_new_change(NOT_ALIVE_UNREGISTERED,Data);
+    return get_implementation(*this).create_new_change(NOT_ALIVE_UNREGISTERED,Data);
 }
 
 bool Publisher::dispose_and_unregister(void* Data) {
     //Convert data to serialized Payload
     logInfo(PUBLISHER,"Disposing and Unregistering Data");
-    return mp_impl->create_new_change(NOT_ALIVE_DISPOSED_UNREGISTERED,Data);
+    return get_implementation(*this).create_new_change(NOT_ALIVE_DISPOSED_UNREGISTERED,Data);
 }
 
 bool Publisher::removeAllChange(size_t* removed )
 {
     logInfo(PUBLISHER,"Removing all data from history");
-    return mp_impl->removeAllChange(removed);
+    return get_implementation(*this).removeAllChange(removed);
 }
 
 bool Publisher::wait_for_all_acked(const Time_t& max_wait)
 {
     logInfo(PUBLISHER,"Waiting for all samples acknowledged");
-    return mp_impl->wait_for_all_acked(max_wait);
+    return get_implementation(*this).wait_for_all_acked(max_wait);
 }
 
 const GUID_t& Publisher::getGuid()
 {
-    return mp_impl->getGuid();
+    return get_implementation(*this).getGuid();
 }
 
 PublisherAttributes Publisher::getAttributes()
 {
-    return mp_impl->getAttributes();
+    return get_implementation(*this).getAttributes();
 }
 
 } /* namespace pubsub */

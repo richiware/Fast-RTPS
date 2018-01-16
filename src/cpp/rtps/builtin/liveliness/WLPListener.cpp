@@ -54,53 +54,53 @@ typedef std::vector<WriterProxy*>::iterator WPIT;
 
 void WLPListener::onNewCacheChangeAdded(RTPSReader* reader,const CacheChange_t* const changeIN)
 {
-	std::lock_guard<std::recursive_mutex> guard2(*mp_WLP->getBuiltinProtocols()->mp_PDP->getMutex());
-	logInfo(RTPS_LIVELINESS,"");
-	GuidPrefix_t guidP;
-	LivelinessQosPolicyKind livelinessKind;
-	CacheChange_t* change = (CacheChange_t*)changeIN;
-	if(!computeKey(change))
-	{
-		logWarning(RTPS_LIVELINESS,"Problem obtaining the Key");
-		return;
-	}
-	//Check the serializedPayload:
-	for(auto ch = this->mp_WLP->mp_builtinReaderHistory->changesBegin();
-			ch!=mp_WLP->mp_builtinReaderHistory->changesEnd();++ch)
-	{
-		if((*ch)->instanceHandle == change->instanceHandle &&
-				(*ch)->sequenceNumber < change->sequenceNumber)
-		{
-			mp_WLP->mp_builtinReaderHistory->remove_change(*ch);
-			break;
-		}
-	}
-	if(change->serializedPayload.length>0)
-	{
-		for(uint8_t i =0;i<12;++i)
-		{
-			guidP.value[i] = change->serializedPayload.data[i];
-		}
-		livelinessKind = (LivelinessQosPolicyKind)(change->serializedPayload.data[15]-0x01);
+    std::lock_guard<std::recursive_mutex> guard2(*mp_WLP->getBuiltinProtocols()->mp_PDP->getMutex());
+    logInfo(RTPS_LIVELINESS,"");
+    GuidPrefix_t guidP;
+    LivelinessQosPolicyKind livelinessKind;
+    CacheChange_t* change = (CacheChange_t*)changeIN;
+    if(!computeKey(change))
+    {
+        logWarning(RTPS_LIVELINESS,"Problem obtaining the Key");
+        return;
+    }
+    //Check the serializedPayload:
+    for(auto ch = this->mp_WLP->mp_builtinReaderHistory->changesBegin();
+            ch!=mp_WLP->mp_builtinReaderHistory->changesEnd();++ch)
+    {
+        if((*ch)->instance_handle == change->instance_handle &&
+                (*ch)->sequence_number < change->sequence_number)
+        {
+            mp_WLP->mp_builtinReaderHistory->remove_change(*ch);
+            break;
+        }
+    }
+    if(change->serialized_payload.length>0)
+    {
+        for(uint8_t i =0;i<12;++i)
+        {
+            guidP.value[i] = change->serialized_payload.data[i];
+        }
+        livelinessKind = (LivelinessQosPolicyKind)(change->serialized_payload.data[15]-0x01);
 
-	}
-	else
-	{
-		if(!separateKey(change->instanceHandle,&guidP,&livelinessKind))
-			return;
-	}
-	logInfo(RTPS_LIVELINESS,"RTPSParticipant "<<guidP<< " assert liveliness of "
-			<<((livelinessKind == 0x00)?"AUTOMATIC":"")
-			<<((livelinessKind==0x01)?"MANUAL_BY_RTPSParticipant":"")<< " writers");
-	if(guidP == reader->getGuid().guidPrefix)
-	{
-		logInfo(RTPS_LIVELINESS,"Message from own RTPSParticipant, ignoring");
-		this->mp_WLP->mp_builtinReaderHistory->remove_change(change);
-		return;
-	}
-	this->mp_WLP->getBuiltinProtocols()->mp_PDP->assertRemoteWritersLiveliness(guidP,livelinessKind);
+    }
+    else
+    {
+        if(!separateKey(change->instance_handle,&guidP,&livelinessKind))
+            return;
+    }
+    logInfo(RTPS_LIVELINESS,"RTPSParticipant "<<guidP<< " assert liveliness of "
+            <<((livelinessKind == 0x00)?"AUTOMATIC":"")
+            <<((livelinessKind==0x01)?"MANUAL_BY_RTPSParticipant":"")<< " writers");
+    if(guidP == reader->getGuid().guidPrefix)
+    {
+        logInfo(RTPS_LIVELINESS,"Message from own RTPSParticipant, ignoring");
+        this->mp_WLP->mp_builtinReaderHistory->remove_change(change);
+        return;
+    }
+    this->mp_WLP->getBuiltinProtocols()->mp_PDP->assertRemoteWritersLiveliness(guidP,livelinessKind);
 
-	return;
+    return;
 }
 
 
@@ -128,36 +128,36 @@ void WLPListener::onNewCacheChangeAdded(RTPSReader* reader,const CacheChange_t* 
 
 bool WLPListener::separateKey(InstanceHandle_t& key,GuidPrefix_t* guidP,LivelinessQosPolicyKind* liveliness)
 {
-	for(uint8_t i=0;i<12;++i)
-	{
-		guidP->value[i] = key.value[i];
-	}
-	*liveliness = (LivelinessQosPolicyKind)key.value[15];
-	return true;
+    for(uint8_t i=0;i<12;++i)
+    {
+        guidP->value[i] = key.value[i];
+    }
+    *liveliness = (LivelinessQosPolicyKind)key.value[15];
+    return true;
 }
 
 bool WLPListener::computeKey(CacheChange_t* change)
 {
-	if(change->instanceHandle == c_InstanceHandle_Unknown)
-	{
-		SerializedPayload_t* pl = &change->serializedPayload;
-		if(pl->length > 16)
-		{
-			CDRMessage::initCDRMsg(&aux_msg);
-			aux_msg.buffer = pl->data;
-			aux_msg.length = pl->length;
-			aux_msg.max_size = pl->max_size;
-			aux_msg.msg_endian = pl->encapsulation == PL_CDR_BE ? BIGEND : LITTLEEND;
-			for(uint8_t i =0;i<16;++i)
-			{
-				change->instanceHandle.value[i] = aux_msg.buffer[i];
-			}
-			aux_msg.buffer = nullptr;
-			return true;
-		}
-		return false;
-	}
-	return true;
+    if(change->instance_handle == c_InstanceHandle_Unknown)
+    {
+        SerializedPayload_t* pl = &change->serialized_payload;
+        if(pl->length > 16)
+        {
+            CDRMessage::initCDRMsg(&aux_msg);
+            aux_msg.buffer = pl->data;
+            aux_msg.length = pl->length;
+            aux_msg.max_size = pl->max_size;
+            aux_msg.msg_endian = pl->encapsulation == PL_CDR_BE ? BIGEND : LITTLEEND;
+            for(uint8_t i =0;i<16;++i)
+            {
+                change->instance_handle.value[i] = aux_msg.buffer[i];
+            }
+            aux_msg.buffer = nullptr;
+            return true;
+        }
+        return false;
+    }
+    return true;
 }
 
 

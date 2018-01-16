@@ -487,10 +487,10 @@ class HistoryQosPolicy : private Parameter_t, public QosPolicy {
 
 /**
  * Class ResourceLimitsQosPolicy, defines the ResourceLimits for the Writer or the Reader.
- * max_samples: Default value 5000.
- * max_instances: Default value 10.
- * max_samples_per_instance: Default value 400.
- * allocated_samples: Default value 100.
+ * max_samples: Default value 0 (infinite).
+ * max_instances: Default value 0 (infinite).
+ * max_samples_per_instance: Default value 0 (infinite).
+ * allocated_samples: Default value 40.
  */
 class ResourceLimitsQosPolicy : private Parameter_t, public QosPolicy {
     public:
@@ -499,7 +499,7 @@ class ResourceLimitsQosPolicy : private Parameter_t, public QosPolicy {
         int32_t max_samples_per_instance;
         int32_t allocated_samples;
         RTPS_DllAPI ResourceLimitsQosPolicy():Parameter_t(PID_RESOURCE_LIMITS,4+4+4),QosPolicy(false),
-        max_samples(5000),max_instances(10),max_samples_per_instance(400),allocated_samples(100){};
+        max_samples(0),max_instances(0),max_samples_per_instance(0),allocated_samples(40){};
         virtual RTPS_DllAPI ~ResourceLimitsQosPolicy(){};
         /**
          * Appends QoS to the specified CDR message.

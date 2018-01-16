@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef _RTPS_EXCEPTIONS_EXCEPTION_H_
-#define _RTPS_EXCEPTIONS_EXCEPTION_H_
+#ifndef __RTPS_EXCEPTIONS_EXCEPTION_H__
+#define __RTPS_EXCEPTIONS_EXCEPTION_H__
 
 #include "../../fastrtps_dll.h"
 #include <exception>
@@ -110,4 +110,4 @@ class Exception : public std::exception
 } // namespace fastrtps
 } // namespace eprosima
 
-#endif // _RTPS_EXCEPTIONS_EXCEPTION_H_
+#endif // __RTPS_EXCEPTIONS_EXCEPTION_H__

@@ -21,16 +21,14 @@
 
 #include <fastrtps/rtps/attributes/WriterAttributes.h>
 #include <fastrtps/rtps/Endpoint.h>
-#include <fastrtps/rtps/common/CacheChange.h>
+#include <fastrtps/rtps/history/CacheChangePool.h>
+#include <fastrtps/rtps/history/WriterHistory.h>
 
-#include <condition_variable>
 #include <gmock/gmock.h>
 
 namespace eprosima {
 namespace fastrtps {
 namespace rtps {
-
-class WriterHistory;
 
 class RTPSWriter : public Endpoint
 {
@@ -40,8 +38,10 @@ class RTPSWriter : public Endpoint
 
         virtual bool matched_reader_remove(RemoteReaderAttributes& ratt) = 0;
 
-        MOCK_METHOD3(new_change, CacheChange_t*(const std::function<uint32_t()>&,
+        MOCK_METHOD3(new_change, CacheChange_ptr(const std::function<uint32_t()>&,
             ChangeKind_t, InstanceHandle_t));
+
+        MOCK_METHOD1(reuse_change, void(CacheChange_ptr&));
 
         WriterHistory* history_;
 };

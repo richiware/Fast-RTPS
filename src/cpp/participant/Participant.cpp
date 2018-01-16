@@ -17,57 +17,54 @@
  *
  */
 
-#include <fastrtps/participant/Participant.h>
-
 #include "ParticipantImpl.h"
 
 namespace eprosima {
 namespace fastrtps {
 
-Participant::Participant():
-		mp_impl(nullptr)
+Participant::Participant(const ParticipantAttributes& attr, ParticipantListener* listener) :
+    impl_(new Participant::impl(*this, attr, listener))
 {
-
 }
 
-Participant::~Participant() {
-	// TODO Auto-generated destructor stub
+Participant::~Participant()
+{
 }
 
 const GUID_t& Participant::getGuid() const
 {
-	return mp_impl->getGuid();
+    return impl_->getGuid();
 }
 
 const ParticipantAttributes& Participant::getAttributes()
 {
-	return mp_impl->getAttributes();
+    return impl_->getAttributes();
 }
 
 bool Participant::newRemoteEndpointDiscovered(const GUID_t& partguid, uint16_t endpointId,
-	EndpointKind_t kind)
+        EndpointKind_t kind)
 {
-	return mp_impl->newRemoteEndpointDiscovered(partguid, endpointId, kind);
+    return impl_->newRemoteEndpointDiscovered(partguid, endpointId, kind);
 }
 
 std::pair<StatefulReader*,StatefulReader*> Participant::getEDPReaders(){
-	std::pair<StatefulReader *,StatefulReader*> buffer;
+    std::pair<StatefulReader *,StatefulReader*> buffer;
 
-	return mp_impl->getEDPReaders();
+    return impl_->getEDPReaders();
 }
 
 std::vector<std::string> Participant::getParticipantNames(){
-  return mp_impl->getParticipantNames();
+    return impl_->getParticipantNames();
 }
 
 bool Participant::get_remote_writer_info(const GUID_t& writerGuid, WriterProxyData& returnedInfo)
 {
-    return mp_impl->get_remote_writer_info(writerGuid, returnedInfo);
+    return impl_->get_remote_writer_info(writerGuid, returnedInfo);
 }
 
 bool Participant::get_remote_reader_info(const GUID_t& readerGuid, ReaderProxyData& returnedInfo)
 {
-    return mp_impl->get_remote_reader_info(readerGuid, returnedInfo);
+    return impl_->get_remote_reader_info(readerGuid, returnedInfo);
 }
 
 } /* namespace pubsub */

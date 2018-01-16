@@ -18,20 +18,17 @@
  */
 
 #include <fastrtps/rtps/writer/RTPSWriter.h>
-#include <fastrtps/rtps/history/WriterHistory.h>
+#include "../history/WriterHistoryImpl.h"
 #include <fastrtps/rtps/messages/RTPSMessageCreator.h>
 #include <fastrtps/log/Log.h>
 #include "../participant/RTPSParticipantImpl.h"
 #include "../flowcontrol/FlowController.h"
 
-#include <mutex>
-
 using namespace eprosima::fastrtps::rtps;
 
-
-RTPSWriter::RTPSWriter(RTPSParticipantImpl* impl, GUID_t& guid, WriterAttributes& att, WriterHistory* hist, WriterListener* listen):
-    Endpoint(impl,guid,att.endpoint),
-    m_pushMode(true),
+RTPSWriter::RTPSWriter(RTPSParticipantImpl* impl, GUID_t& guid, WriterAttributes& att,
+        WriterHistory& history, WriterListener* listen) :
+    Endpoint(impl,guid,att.endpoint), push_mode_(true),
     m_cdrmessages(impl->getMaxMessageSize() > att.throughputController.bytesPerPeriod ?
             att.throughputController.bytesPerPeriod > impl->getRTPSParticipantAttributes().throughputController.bytesPerPeriod ?
             impl->getRTPSParticipantAttributes().throughputController.bytesPerPeriod :
@@ -40,88 +37,67 @@ RTPSWriter::RTPSWriter(RTPSParticipantImpl* impl, GUID_t& guid, WriterAttributes
             impl->getRTPSParticipantAttributes().throughputController.bytesPerPeriod :
             impl->getMaxMessageSize(), impl->getGuid().guidPrefix),
     m_livelinessAsserted(false),
-    mp_history(hist),
-    mp_listener(listen),
-    is_async_(att.mode == SYNCHRONOUS_WRITER ? false : true)
+    history_(get_implementation(history)),
+    listener_(listen),
+    is_async_(att.mode == SYNCHRONOUS_WRITER ? false : true),
+    cachechange_pool_(history_.attributes().initialReservedCaches, history_.attributes().payloadMaxSize,
+            history_.attributes().maximumReservedCaches, history_.attributes().memoryPolicy)
 {
-    mp_history->mp_writer = this;
-    mp_history->mp_mutex = mp_mutex;
+    history_.call_after_adding_change(std::bind(&RTPSWriter::unsent_change_added_to_history, this,
+            std::placeholders::_1));
+    history_.call_after_deleting_change(std::bind(&RTPSWriter::change_removed_by_history, this,
+            std::placeholders::_1, std::placeholders::_2));
     logInfo(RTPS_WRITER,"RTPSWriter created");
 }
 
 RTPSWriter::~RTPSWriter()
 {
     logInfo(RTPS_WRITER,"RTPSWriter destructor");
-
-    // Deletion of the events has to be made in child destructor.
-
-    mp_history->mp_writer = nullptr;
-    mp_history->mp_mutex = nullptr;
+    history_.clear();
 }
 
-CacheChange_t* RTPSWriter::new_change(const std::function<uint32_t()>& dataCdrSerializedSize,
-        ChangeKind_t changeKind, InstanceHandle_t handle)
+SequenceNumber_t RTPSWriter::next_sequence_number_nts() const
+{
+    return last_cachechange_seqnum_ + 1;
+}
+
+CacheChange_ptr RTPSWriter::new_change(const std::function<uint32_t()>& data_cdr_serialize_size,
+        ChangeKind_t change_kind, InstanceHandle_t handle)
 {
     logInfo(RTPS_WRITER,"Creating new change");
-    CacheChange_t* ch = nullptr;
+    CacheChange_t* cachechange = nullptr;
 
-    if(!mp_history->reserve_Cache(&ch, dataCdrSerializedSize))
+    std::lock_guard<std::mutex> guard(mutex_);
+
+    if(!cachechange_pool_.reserve_cache(&cachechange, data_cdr_serialize_size))
     {
         logWarning(RTPS_WRITER,"Problem reserving Cache from the History");
-        return nullptr;
+        return CacheChange_ptr();
     }
+    assert(cachechange != nullptr);
 
-    ch->kind = changeKind;
-    if(m_att.topicKind == WITH_KEY && !handle.isDefined())
+    cachechange->sequence_number = ++last_cachechange_seqnum_;
+    cachechange->kind = change_kind;
+    if(m_att.topicKind == WITH_KEY && !handle.is_unknown())
     {
         logWarning(RTPS_WRITER,"Changes in KEYED Writers need a valid instanceHandle");
     }
-    ch->instanceHandle = handle;
-    ch->writerGUID = m_guid;
-    return ch;
+    cachechange->instance_handle = handle;
+    cachechange->writer_guid = m_guid;
+    cachechange->write_params = WriteParams();
+    return CacheChange_ptr(&cachechange_pool_, cachechange);
 }
 
-SequenceNumber_t RTPSWriter::get_seq_num_min()
+void RTPSWriter::reuse_change(CacheChange_ptr& change)
 {
-    CacheChange_t* change;
-    if(mp_history->get_min_change(&change) && change!= nullptr)
-        return change->sequenceNumber;
-    else
-        return c_SequenceNumber_Unknown;
+    std::lock_guard<std::mutex> guard(mutex_);
+    // TODO System to verify is my change.
+    change->sequence_number = ++last_cachechange_seqnum_;
 }
 
-SequenceNumber_t RTPSWriter::get_seq_num_max()
+uint32_t RTPSWriter::getTypeMaxSerialized() const
 {
-    CacheChange_t* change;
-    if(mp_history->get_max_change(&change) && change!=nullptr)
-        return change->sequenceNumber;
-    else
-        return c_SequenceNumber_Unknown;
-}
-
-uint32_t RTPSWriter::getTypeMaxSerialized()
-{
-    return mp_history->getTypeMaxSerialized();
-}
-
-
-bool RTPSWriter::remove_older_changes(unsigned int max)
-{
-    logInfo(RTPS_WRITER, "Starting process clean_history for writer " << getGuid());
-    std::lock_guard<std::recursive_mutex> guard(*mp_mutex);
-    bool limit = (max != 0);
-
-    bool remove_ret = mp_history->remove_min_change();
-    bool at_least_one = remove_ret;
-    unsigned int count = 1;
-
-    while(remove_ret && (!limit || count < max))
-    {
-        remove_ret = mp_history->remove_min_change();
-        ++count;
-    }
-
-    return at_least_one;
+    return cachechange_pool_.get_initial_payload_size();
 }
 
 CONSTEXPR uint32_t info_dst_message_length = 16;

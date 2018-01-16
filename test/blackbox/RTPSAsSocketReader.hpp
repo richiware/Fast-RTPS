@@ -273,7 +273,8 @@ class RTPSAsSocketReader
             if(receiving_)
             {
                 type data;
-                eprosima::fastcdr::FastBuffer buffer((char*)change->serializedPayload.data, change->serializedPayload.length);
+                eprosima::fastcdr::FastBuffer buffer((char*)change->serialized_payload.data,
+                        change->serialized_payload.length);
                 eprosima::fastcdr::Cdr cdr(buffer);
                 std::string magicword;
                 cdr >> magicword;
@@ -281,8 +282,8 @@ class RTPSAsSocketReader
                 if(magicword.compare(magicword_) == 0)
                 {
                     // Check order of changes.
-                    ASSERT_LT(last_seq_, change->sequenceNumber);
-                    last_seq_ = change->sequenceNumber;
+                    ASSERT_LT(last_seq_, change->sequence_number);
+                    last_seq_ = change->sequence_number;
 
                     cdr >> data;
 
@@ -292,7 +293,9 @@ class RTPSAsSocketReader
                     ++current_received_count_;
 
                     if(current_received_count_ == number_samples_expected_)
+                    {
                         cv_.notify_one();
+                    }
                 }
 
                 eprosima::fastrtps::rtps::ReaderHistory *history = reader->getHistory();

@@ -478,18 +478,18 @@ bool MessageReceiver::proc_Submsg_Data(CDRMessage_t* msg,SubmessageHeader_t* smh
     //FOUND THE READER.
     //We ask the reader for a cachechange to store the information.
     CacheChange_t ch;
-    ch.serializedPayload.max_size = mMaxPayload_;
-    ch.writerGUID.guidPrefix = sourceGuidPrefix;
-    valid &= CDRMessage::readEntityId(msg,&ch.writerGUID.entityId);
+    ch.serialized_payload.max_size = mMaxPayload_;
+    ch.writer_guid.guidPrefix = sourceGuidPrefix;
+    valid &= CDRMessage::readEntityId(msg,&ch.writer_guid.entityId);
 
     //Get sequence number
-    valid &= CDRMessage::readSequenceNumber(msg,&ch.sequenceNumber);
+    valid &= CDRMessage::readSequenceNumber(msg,&ch.sequence_number);
 
     if (!valid){
         return false;
     }
 
-    if(ch.sequenceNumber <= SequenceNumber_t(0, 0) || (ch.sequenceNumber.high == -1 && ch.sequenceNumber.low == 0)) //message invalid //TODO make faster
+    if(ch.sequence_number <= SequenceNumber_t(0, 0) || (ch.sequence_number.high == -1 && ch.sequence_number.low == 0)) //message invalid //TODO make faster
     {
         logWarning(RTPS_MSG_IN,IDSTRING"Invalid message received, bad sequence Number");
         return false;
@@ -531,26 +531,26 @@ bool MessageReceiver::proc_Submsg_Data(CDRMessage_t* msg,SubmessageHeader_t* smh
 
         if(dataFlag)
         {
-            if(ch.serializedPayload.max_size >= payload_size && payload_size > 0)
+            if(ch.serialized_payload.max_size >= payload_size && payload_size > 0)
             {
-                ch.serializedPayload.data = &msg->buffer[msg->pos];
-                ch.serializedPayload.length = payload_size;
+                ch.serialized_payload.data = &msg->buffer[msg->pos];
+                ch.serialized_payload.length = payload_size;
                 msg->pos += payload_size;
                 ch.kind = ALIVE;
             }
             else
             {
                 logWarning(RTPS_MSG_IN,IDSTRING"Serialized Payload value invalid or larger than maximum allowed size"
-                        "(" <<payload_size <<"/"<< ch.serializedPayload.max_size<<")");
+                        "(" <<payload_size <<"/"<< ch.serialized_payload.max_size<<")");
                 return false;
             }
         }
         else if(keyFlag)
         {
             Endianness_t previous_endian = msg->msg_endian;
-            if(ch.serializedPayload.encapsulation == PL_CDR_BE)
+            if(ch.serialized_payload.encapsulation == PL_CDR_BE)
                 msg->msg_endian = BIGEND;
-            else if(ch.serializedPayload.encapsulation == PL_CDR_LE)
+            else if(ch.serialized_payload.encapsulation == PL_CDR_LE)
                 msg->msg_endian = LITTLEEND;
             else
             {
@@ -573,11 +573,11 @@ bool MessageReceiver::proc_Submsg_Data(CDRMessage_t* msg,SubmessageHeader_t* smh
 
     // Set sourcetimestamp
     if(haveTimestamp)
-        ch.sourceTimestamp = this->timestamp;
+        ch.source_timestamp = this->timestamp;
 
 
     //FIXME: DO SOMETHING WITH PARAMETERLIST CREATED.
-    logInfo(RTPS_MSG_IN,IDSTRING"from Writer " << ch.writerGUID << "; possible RTPSReaders: "<<AssociatedReaders.size());
+    logInfo(RTPS_MSG_IN,IDSTRING"from Writer " << ch.writer_guid << "; possible RTPSReaders: "<<AssociatedReaders.size());
     //Look for the correct reader to add the change
     for(std::vector<RTPSReader*>::iterator it = AssociatedReaders.begin();
             it != AssociatedReaders.end(); ++it)
@@ -588,7 +588,7 @@ bool MessageReceiver::proc_Submsg_Data(CDRMessage_t* msg,SubmessageHeader_t* smh
         }
     }
 
-    ch.serializedPayload.data = nullptr;
+    ch.serialized_payload.data = nullptr;
 
     logInfo(RTPS_MSG_IN,IDSTRING"Sub Message DATA processed");
     return true;
@@ -654,14 +654,14 @@ bool MessageReceiver::proc_Submsg_DataFrag(CDRMessage_t* msg, SubmessageHeader_t
     //FOUND THE READER.
     //We ask the reader for a cachechange to store the information.
     CacheChange_t ch;
-    ch.serializedPayload.max_size = mMaxPayload_;
-    ch.writerGUID.guidPrefix = sourceGuidPrefix;
-    valid &= CDRMessage::readEntityId(msg, &ch.writerGUID.entityId);
+    ch.serialized_payload.max_size = mMaxPayload_;
+    ch.writer_guid.guidPrefix = sourceGuidPrefix;
+    valid &= CDRMessage::readEntityId(msg, &ch.writer_guid.entityId);
 
     //Get sequence number
-    valid &= CDRMessage::readSequenceNumber(msg, &ch.sequenceNumber);
+    valid &= CDRMessage::readSequenceNumber(msg, &ch.sequence_number);
 
-    if (ch.sequenceNumber <= SequenceNumber_t())
+    if (ch.sequence_number <= SequenceNumber_t())
     {
         logWarning(RTPS_MSG_IN, IDSTRING"Invalid message received, bad sequence Number");
         return false;
@@ -722,17 +722,17 @@ bool MessageReceiver::proc_Submsg_DataFrag(CDRMessage_t* msg, SubmessageHeader_t
 
     if (!keyFlag)
     {
-        if (ch.serializedPayload.max_size >= payload_size && payload_size > 0)
+        if (ch.serialized_payload.max_size >= payload_size && payload_size > 0)
         {
-            ch.serializedPayload.length = payload_size;
+            ch.serialized_payload.length = payload_size;
 
             // TODO Mejorar el reubicar el vector de fragmentos.
             ch.setFragmentSize(fragmentSize);
             ch.getDataFragments()->clear();
             ch.getDataFragments()->resize(fragmentsInSubmessage, ChangeFragmentStatus_t::PRESENT);
 
-            ch.serializedPayload.data = &msg->buffer[msg->pos];
-            ch.serializedPayload.length = payload_size;
+            ch.serialized_payload.data = &msg->buffer[msg->pos];
+            ch.serialized_payload.length = payload_size;
             msg->pos += payload_size;
 
             ch.kind = ALIVE;
@@ -740,7 +740,7 @@ bool MessageReceiver::proc_Submsg_DataFrag(CDRMessage_t* msg, SubmessageHeader_t
         else
         {
             logWarning(RTPS_MSG_IN, IDSTRING"Serialized Payload value invalid or larger than maximum allowed size "
-                    "(" << payload_size << "/" << ch.serializedPayload.max_size << ")");
+                    "(" << payload_size << "/" << ch.serialized_payload.max_size << ")");
             return false;
         }
     }
@@ -773,10 +773,10 @@ bool MessageReceiver::proc_Submsg_DataFrag(CDRMessage_t* msg, SubmessageHeader_t
 
     // Set sourcetimestamp
     if (haveTimestamp)
-        ch.sourceTimestamp = this->timestamp;
+        ch.source_timestamp = this->timestamp;
 
     //FIXME: DO SOMETHING WITH PARAMETERLIST CREATED.
-    logInfo(RTPS_MSG_IN, IDSTRING"from Writer " << ch.writerGUID << "; possible RTPSReaders: " << AssociatedReaders.size());
+    logInfo(RTPS_MSG_IN, IDSTRING"from Writer " << ch.writer_guid << "; possible RTPSReaders: " << AssociatedReaders.size());
     //Look for the correct reader to add the change
     for (std::vector<RTPSReader*>::iterator it = AssociatedReaders.begin();
             it != AssociatedReaders.end(); ++it)
@@ -787,7 +787,7 @@ bool MessageReceiver::proc_Submsg_DataFrag(CDRMessage_t* msg, SubmessageHeader_t
         }
     }
 
-    ch.serializedPayload.data = nullptr;
+    ch.serialized_payload.data = nullptr;
 
     logInfo(RTPS_MSG_IN, IDSTRING"Sub Message DATA_FRAG processed");
 
@@ -1032,32 +1032,12 @@ bool MessageReceiver::proc_Submsg_NackFrag(CDRMessage_t*msg, SubmessageHeader_t*
     for (std::vector<RTPSWriter*>::iterator it = AssociatedWriters.begin();
             it != AssociatedWriters.end(); ++it)
     {
-        //Look for the readerProxy the acknack is from
-        std::lock_guard<std::recursive_mutex> guardW(*(*it)->getMutex());
         if ((*it)->getGuid() == writerGUID)
         {
             if ((*it)->getAttributes()->reliabilityKind == RELIABLE)
             {
                 StatefulWriter* SF = (StatefulWriter*)(*it);
-
-                for (auto rit = SF->matchedReadersBegin(); rit != SF->matchedReadersEnd(); ++rit)
-                {
-                    std::lock_guard<std::recursive_mutex> guardReaderProxy(*(*rit)->mp_mutex);
-
-                    if ((*rit)->m_att.guid == readerGUID)
-                    {
-                        if ((*rit)->getLastNackfragCount() < Ackcount)
-                        {
-                            (*rit)->setLastNackfragCount(Ackcount);
-                            // TODO Not doing Acknowledged.
-                            if((*rit)->requested_fragment_set(writerSN, fnState))
-                            {
-                                (*rit)->mp_nackResponse->restart_timer();
-                            }
-                        }
-                        break;
-                    }
-                }
+                SF->process_nackfrag(readerGUID, Ackcount, writerSN, fnState);
                 return true;
             }
             else

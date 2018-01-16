@@ -16,8 +16,8 @@
  * @file ReaderProxy.h
  *
  */
-#ifndef READERPROXY_H_
-#define READERPROXY_H_
+#ifndef __RTPS_WRITER_READERPROXY_H__
+#define __RTPS_WRITER_READERPROXY_H__
 #ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
 #include <algorithm>
 #include <mutex>
@@ -63,11 +63,11 @@ namespace eprosima
 
                 void destroy_timers();
 
-                void addChange(const ChangeForReader_t&);
+                void add_change(const ChangeForReader_t&);
+
+                void back_to_live_change(const ChangeForReader_t&);
 
                 size_t countChangesForReader() const;
-
-                bool change_is_acked(const SequenceNumber_t& sequence_number);
 
                 /**
                  * Mark all changes up to the one indicated by the seqNum as Acknowledged.
@@ -103,7 +103,7 @@ namespace eprosima
                  */
                 void set_change_to_status(const SequenceNumber_t& seq_num, ChangeForReaderStatus_t status);
 
-                bool mark_fragment_as_sent_for_change(const CacheChange_t* change, FragmentNumber_t fragment);
+                bool mark_fragment_as_sent_for_change(const SequenceNumber_t& sequence_number, FragmentNumber_t fragment);
 
                 /*
                  * Converts all changes with a given status to a different status.
@@ -112,8 +112,7 @@ namespace eprosima
                  */
                 void convert_status_on_all_changes(ChangeForReaderStatus_t previous, ChangeForReaderStatus_t next);
 
-                //void setNotValid(const CacheChange_t* change);
-                void setNotValid(CacheChange_t* change);
+                void setNotValid(const SequenceNumber_t& sequence_number);
 
                 /*!
                  * @brief Returns there is some UNACKNOWLEDGED change.
@@ -134,14 +133,6 @@ namespace eprosima
                 //!Pointer to the associated StatefulWriter.
                 StatefulWriter* mp_SFW;
 
-                /**
-                 * Return the minimum change in a vector of CacheChange_t.
-                 * @param Changes Pointer to a vector of CacheChange_t.
-                 * @param changeForReader Pointer to the CacheChange_t.
-                 * @return True if correct.
-                 */
-                bool minChange(std::vector<ChangeForReader_t*>* Changes, ChangeForReader_t* changeForReader);
-
                 /*!
                  * @brief Adds requested fragments. These fragments will be sent in next NackResponseDelay.
                  * @param[in] frag_set set containing the requested fragments to be sent.
@@ -154,13 +145,15 @@ namespace eprosima
                  * @brief Returns the last NACKFRAG count.
                  * @return Last NACKFRAG count.
                  */
-                uint32_t getLastNackfragCount() const { return lastNackfragCount_; }
+                uint32_t last_nackfrag_count() const { return last_nackfrag_count_; }
+
+                uint32_t& last_nackfrag_count() { return last_nackfrag_count_; }
 
                 /*!
                  * @brief Sets the last NACKFRAG count.
                  * @param lastNackfragCount New value for last NACKFRAG count.
                  */
-                void setLastNackfragCount(uint32_t lastNackfragCount) { lastNackfragCount_ = lastNackfragCount; }
+                void last_nackfrag_count(uint32_t last_nackfrag_count) { last_nackfrag_count_ = last_nackfrag_count; }
 
                 //! Timed Event to manage the Acknack response delay.
                 NackResponseDelay* mp_nackResponse;
@@ -176,9 +169,9 @@ namespace eprosima
                  * @param change
                  * @return
                  */
-                inline bool rtps_is_relevant(CacheChange_t* change){(void)change; return true;};
+                bool rtps_is_relevant(const CacheChange_t&){ return true; };
 
-                SequenceNumber_t get_low_mark() const { return changesFromRLowMark_; }
+                SequenceNumber_t get_low_mark_nts() const { return changesFromRLowMark_; }
 
                 //!Mutex
                 std::recursive_mutex* mp_mutex;
@@ -188,7 +181,7 @@ namespace eprosima
                 //!Set of the changes and its state.
                 private:
                 //! Last  NACKFRAG count.
-                uint32_t lastNackfragCount_;
+                uint32_t last_nackfrag_count_;
 
                 SequenceNumber_t changesFromRLowMark_;
             };
@@ -196,4 +189,4 @@ namespace eprosima
     } /* namespace rtps */
 } /* namespace eprosima */
 #endif
-#endif /* READERPROXY_H_ */
+#endif /* __RTPS_WRITER_READERPROXY_H__ */

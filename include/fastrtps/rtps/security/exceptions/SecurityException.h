@@ -54,7 +54,7 @@ class SecurityException : public Exception
          * @brief Assigment operation.
          * @param ex SecurityException that will be copied.
          */
-        RTPS_DllAPI SecurityException& operator=(const SecurityException &ex);
+        RTPS_DllAPI SecurityException& operator=(const SecurityException& ex);
 
         /**
          * @brief Assigment operation.

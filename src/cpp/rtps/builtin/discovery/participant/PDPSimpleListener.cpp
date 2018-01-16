@@ -48,7 +48,7 @@ void PDPSimpleListener::onNewCacheChangeAdded(RTPSReader* reader, const CacheCha
 {
     CacheChange_t* change = (CacheChange_t*)(change_in);
     logInfo(RTPS_PDP,"SPDP Message received");
-    if(change->instanceHandle == c_InstanceHandle_Unknown)
+    if(change->instance_handle == c_InstanceHandle_Unknown)
     {
         if(!this->getKey(change))
         {
@@ -62,14 +62,14 @@ void PDPSimpleListener::onNewCacheChangeAdded(RTPSReader* reader, const CacheCha
         //LOAD INFORMATION IN TEMPORAL RTPSParticipant PROXY DATA
         ParticipantProxyData participant_data;
         CDRMessage_t msg;
-        msg.msg_endian = change->serializedPayload.encapsulation == PL_CDR_BE ? BIGEND:LITTLEEND;
-        msg.length = change->serializedPayload.length;
-        memcpy(msg.buffer,change->serializedPayload.data,msg.length);
+        msg.msg_endian = change->serialized_payload.encapsulation == PL_CDR_BE ? BIGEND:LITTLEEND;
+        msg.length = change->serialized_payload.length;
+        memcpy(msg.buffer,change->serialized_payload.data,msg.length);
         if(participant_data.readFromCDRMessage(&msg))
         {
             //AFTER CORRECTLY READING IT
             //CHECK IF IS THE SAME RTPSParticipant
-            change->instanceHandle = participant_data.m_key;
+            change->instance_handle = participant_data.m_key;
             if(participant_data.m_guid == mp_SPDP->getRTPSParticipant()->getGuid())
             {
                 logInfo(RTPS_PDP,"Message from own RTPSParticipant, removing");
@@ -138,7 +138,7 @@ void PDPSimpleListener::onNewCacheChangeAdded(RTPSReader* reader, const CacheCha
     else
     {
         GUID_t guid;
-        iHandle2GUID(guid, change->instanceHandle);
+        iHandle2GUID(guid, change->instance_handle);
 
         this->mp_SPDP->removeRemoteParticipant(guid);
         RTPSParticipantDiscoveryInfo info;
@@ -153,50 +153,48 @@ void PDPSimpleListener::onNewCacheChangeAdded(RTPSReader* reader, const CacheCha
     //Remove change form history.
     this->mp_SPDP->mp_SPDPReaderHistory->remove_change(change);
 
-	return;
+    return;
 }
 
 bool PDPSimpleListener::getKey(CacheChange_t* change)
 {
-	SerializedPayload_t* pl = &change->serializedPayload;
-	CDRMessage::initCDRMsg(&aux_msg);
+    SerializedPayload_t* pl = &change->serialized_payload;
+    CDRMessage::initCDRMsg(&aux_msg);
     // TODO CHange because it create a buffer to remove after.
     free(aux_msg.buffer);
-	aux_msg.buffer = pl->data;
-	aux_msg.length = pl->length;
-	aux_msg.max_size = pl->max_size;
-	aux_msg.msg_endian = pl->encapsulation == PL_CDR_BE ? BIGEND : LITTLEEND;
-	bool valid = false;
-	uint16_t pid;
-	uint16_t plength;
-	while(aux_msg.pos < aux_msg.length)
-	{
-		valid = true;
-		valid&=CDRMessage::readUInt16(&aux_msg,(uint16_t*)&pid);
-		valid&=CDRMessage::readUInt16(&aux_msg,&plength);
-		if(pid == PID_SENTINEL)
-		{
-			break;
-		}
-		if(pid == PID_PARTICIPANT_GUID)
-		{
-			valid &= CDRMessage::readData(&aux_msg,change->instanceHandle.value,16);
-			aux_msg.buffer = nullptr;
-			return true;
-		}
-		if(pid == PID_KEY_HASH)
-		{
-			valid &= CDRMessage::readData(&aux_msg,change->instanceHandle.value,16);
-			aux_msg.buffer = nullptr;
-			return true;
-		}
-		aux_msg.pos+=plength;
-	}
-	aux_msg.buffer = nullptr;
-	return false;
+    aux_msg.buffer = pl->data;
+    aux_msg.length = pl->length;
+    aux_msg.max_size = pl->max_size;
+    aux_msg.msg_endian = pl->encapsulation == PL_CDR_BE ? BIGEND : LITTLEEND;
+    bool valid = false;
+    uint16_t pid;
+    uint16_t plength;
+    while(aux_msg.pos < aux_msg.length)
+    {
+        valid = true;
+        valid&=CDRMessage::readUInt16(&aux_msg,(uint16_t*)&pid);
+        valid&=CDRMessage::readUInt16(&aux_msg,&plength);
+        if(pid == PID_SENTINEL)
+        {
+            break;
+        }
+        if(pid == PID_PARTICIPANT_GUID)
+        {
+            valid &= CDRMessage::readData(&aux_msg, change->instance_handle.value,16);
+            aux_msg.buffer = nullptr;
+            return true;
+        }
+        if(pid == PID_KEY_HASH)
+        {
+            valid &= CDRMessage::readData(&aux_msg, change->instance_handle.value,16);
+            aux_msg.buffer = nullptr;
+            return true;
+        }
+        aux_msg.pos+=plength;
+    }
+    aux_msg.buffer = nullptr;
+    return false;
 }
-
-
 
 }
 } /* namespace rtps */

@@ -40,21 +40,23 @@ class StatelessWriter : public RTPSWriter
 {
     friend class RTPSParticipantImpl;
 
-    StatelessWriter(RTPSParticipantImpl*,GUID_t& guid,WriterAttributes& att,WriterHistory* hist,WriterListener* listen=nullptr);
+    StatelessWriter(RTPSParticipantImpl*, GUID_t& guid, WriterAttributes& att, WriterHistory& hist,
+            WriterListener* listen = nullptr);
+
     public:
     virtual ~StatelessWriter();
     /**
      * Add a specific change to all ReaderLocators.
      * @param p Pointer to the change.
      */
-    void unsent_change_added_to_history(CacheChange_t* p);
+    bool unsent_change_added_to_history(const CacheChange_t& change) override;
 
     /**
      * Indicate the writer that a change has been removed by the history due to some HistoryQos requirement.
      * @param a_change Pointer to the change that is going to be removed.
      * @return True if removed correctly.
      */
-    bool change_removed_by_history(CacheChange_t* a_change);
+    bool change_removed_by_history(const SequenceNumber_t& sequence_number, const InstanceHandle_t& handle) override;
     /**
      * Add a matched reader.
      * @param ratt Attributes of the reader to add.
@@ -93,15 +95,13 @@ class StatelessWriter : public RTPSWriter
             const SequenceNumber_t& seqNum, const FragmentNumber_t fragNum);
 
     //!Reset the unsent changes.
-    void unsent_changes_reset();
+    void resent_changes();
 
     /**
      * Get the number of matched readers
      * @return Number of matched readers
      */
     inline size_t getMatchedReadersSize() const {return m_matched_readers.size();};
-
-    bool try_remove_change(std::chrono::microseconds&, std::unique_lock<std::recursive_mutex>&) { return remove_older_changes(1); }
 
     void add_flow_controller(std::unique_ptr<FlowController> controller);
 

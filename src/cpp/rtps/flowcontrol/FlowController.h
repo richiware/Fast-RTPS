@@ -42,7 +42,7 @@ class FlowController
 {
     public:
         //! Called when a change is finally dispatched.
-        static void NotifyControllersChangeSent(CacheChange_t*);
+        static void NotifyControllersChangeSent(const CacheChange_t* const);
 
         //! Controller operator. Transforms the vector of changes in place.
         virtual void operator()(RTPSWriterCollector<ReaderLocator*>& changesToSend) = 0;
@@ -52,7 +52,7 @@ class FlowController
         FlowController();
 
     private:
-        virtual void NotifyChangeSent(CacheChange_t*){};
+        virtual void NotifyChangeSent(const CacheChange_t* const){};
         void RegisterAsListeningController();
         void DeRegisterAsListeningController();
 

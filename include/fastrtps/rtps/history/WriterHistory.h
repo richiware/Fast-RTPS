@@ -17,73 +17,64 @@
  *
  */
 
-#ifndef WRITERHISTORY_H_
-#define WRITERHISTORY_H_
+#ifndef _RTPS_HISTORY_WRITERHISTORY_H_
+#define _RTPS_HISTORY_WRITERHISTORY_H_
 
-#include "History.h"
+#include "../../fastrtps_dll.h"
+#include "CacheChangePool.h"
+
+#include <memory>
+// C++14 #include <experimental/propagate_const>
 
 namespace eprosima {
 namespace fastrtps{
 namespace rtps {
 
-class RTPSWriter;
+class HistoryAttributes;
+struct SequenceNumber_t;
 
 /**
  * Class WriterHistory, container of the different CacheChanges of a writer
  * @ingroup WRITER_MODULE
  */
-class WriterHistory : public History
+class WriterHistory
 {
-    friend class RTPSWriter;
-
     public:
+
+    class impl;
 
     /**
      * Constructor of the WriterHistory.
      */
-    RTPS_DllAPI WriterHistory(const HistoryAttributes&  att);
-    RTPS_DllAPI virtual ~WriterHistory();
+    RTPS_DllAPI WriterHistory(const HistoryAttributes& attributes);
 
-    /**
-     * Update the maximum and minimum sequenceNumber cacheChanges.
-     */
-    RTPS_DllAPI void updateMaxMinSeqNum();
+    RTPS_DllAPI ~WriterHistory();
+
     /**
      * Add a CacheChange_t to the ReaderHistory.
      * @param a_change Pointer to the CacheChange to add.
      * @return True if added.
      */
-    RTPS_DllAPI bool add_change(CacheChange_t* a_change);
-    /**
-     * Remove a specific change from the history.
-     * @param a_change Pointer to the CacheChange_t.
-     * @return True if removed.
-     */
-    RTPS_DllAPI bool remove_change(CacheChange_t* a_change);
+    RTPS_DllAPI bool add_change(CacheChange_ptr& change);
 
-    virtual bool remove_change_g(CacheChange_t* a_change);
-
-    RTPS_DllAPI bool remove_change(const SequenceNumber_t& sequence_number);
-
-    RTPS_DllAPI CacheChange_t* remove_change_and_reuse(const SequenceNumber_t& sequence_number);
+    RTPS_DllAPI CacheChange_ptr remove_change(const SequenceNumber_t& sequence_number);
 
     /**
      * Remove the CacheChange_t with the minimum sequenceNumber.
      * @return True if correctly removed.
      */
-    RTPS_DllAPI bool remove_min_change();
+    RTPS_DllAPI CacheChange_ptr remove_min_change();
 
-    RTPS_DllAPI SequenceNumber_t next_sequence_number() const { return m_lastCacheChangeSeqNum + 1; }
+    private:
 
-    protected:
-    //!Last CacheChange Sequence Number added to the History.
-    SequenceNumber_t m_lastCacheChangeSeqNum;
-    //!Pointer to the associated RTPSWriter;
-    RTPSWriter* mp_writer;
+    friend impl& get_implementation(WriterHistory& history);
+
+    //C++14 std::experimental::propagate_const<std::unique_ptr<impl::WriterHistory>> impl_;
+    std::unique_ptr<WriterHistory::impl> impl_;
 };
 
-}
-} /* namespace fastrtps */
-} /* namespace eprosima */
+} //namespace rtps
+} //namespace fastrtps
+} //namespace eprosima
 
-#endif /* WRITERHISTORY_H_ */
+#endif /* _RTPS_HISTORY_WRITERHISTORY_H_ */

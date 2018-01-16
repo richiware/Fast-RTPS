@@ -31,8 +31,9 @@
 #include <fastrtps/rtps/writer/timedevent/NackSupressionDuration.h>
 #include <fastrtps/rtps/writer/timedevent/NackResponseDelay.h>
 #include <fastrtps/rtps/writer/timedevent/InitialHeartbeat.h>
+#include "timedevent/CleanupEvent.h"
 
-#include <fastrtps/rtps/history/WriterHistory.h>
+#include "../history/WriterHistoryImpl.h"
 
 #include <fastrtps/log/Log.h>
 #include <fastrtps/utils/TimeConversion.h>
@@ -45,15 +46,14 @@
 
 using namespace eprosima::fastrtps::rtps;
 
-
-StatefulWriter::StatefulWriter(RTPSParticipantImpl* pimpl,GUID_t& guid,
-        WriterAttributes& att,WriterHistory* hist,WriterListener* listen):
+StatefulWriter::StatefulWriter(RTPSParticipantImpl* pimpl, GUID_t& guid,
+        WriterAttributes& att, WriterHistory& hist, WriterListener* listen):
     RTPSWriter(pimpl, guid, att, hist, listen),
     mp_periodicHB(nullptr), m_times(att.times),
-    all_acked_(false), may_remove_change_(false),
-    disableHeartbeatPiggyback_(att.disableHeartbeatPiggyback),
+    all_acked_(false), disable_heartbeat_piggyback_(att.disableHeartbeatPiggyback),
     sendBufferSize_(pimpl->get_min_network_send_buffer_size()),
-    currentUsageSendBufferSize_(static_cast<int32_t>(pimpl->get_min_network_send_buffer_size()))
+    currentUsageSendBufferSize_(static_cast<int32_t>(pimpl->get_min_network_send_buffer_size())),
+    cleanup_event_(nullptr)
 {
     m_heartbeatCount = 0;
     if(guid.entityId == c_EntityId_SEDPPubWriter)
@@ -64,7 +64,11 @@ StatefulWriter::StatefulWriter(RTPSParticipantImpl* pimpl,GUID_t& guid,
         m_HBReaderEntityId= c_EntityId_ReaderLiveliness;
     else
         m_HBReaderEntityId = c_EntityId_Unknown;
-    mp_periodicHB = new PeriodicHeartbeat(this,TimeConv::Time_t2MilliSecondsDouble(m_times.heartbeatPeriod));
+    mp_periodicHB = new PeriodicHeartbeat(*this, TimeConv::Time_t2MilliSecondsDouble(m_times.heartbeatPeriod));
+    if(att.endpoint.durabilityKind == VOLATILE)
+    {
+        cleanup_event_ = new CleanupEvent(*this, 0);
+    }
 }
 
 
@@ -74,76 +78,86 @@ StatefulWriter::~StatefulWriter()
 
     logInfo(RTPS_WRITER,"StatefulWriter destructor");
 
-    for(std::vector<ReaderProxy*>::iterator it = matched_readers.begin();
-            it != matched_readers.end(); ++it)
-        (*it)->destroy_timers();
+    for(auto remote_reader : matched_readers_)
+    {
+        remote_reader->destroy_timers();
+    }
 
     if(mp_periodicHB !=nullptr)
         delete(mp_periodicHB);
 
-    for(std::vector<ReaderProxy*>::iterator it = matched_readers.begin();
-            it!=matched_readers.end();++it)
-        delete(*it);
+    for(auto remote_reader : matched_readers_)
+    {
+        delete(remote_reader);
+    }
 }
 
-/*
- *	CHANGE-RELATED METHODS
- */
 
-void StatefulWriter::unsent_change_added_to_history(CacheChange_t* change)
+/**
+ * This method must be used only by WriterHistory. WriterHistory's mutex should have been taken.
+ * On debug this precondition is check.
+ */
+bool StatefulWriter::unsent_change_added_to_history(const CacheChange_t& change)
 {
-    std::lock_guard<std::recursive_mutex> guard(*mp_mutex);
+#if defined(__DEBUG)
+    assert(history_.get_mutex_owner() == history_.get_thread_id());
+#endif
+
+    std::lock_guard<std::mutex> guard(mutex_);
 
     //TODO Think about when set liveliness assertion when writer is asynchronous.
     this->setLivelinessAsserted(true);
 
-    if(!matched_readers.empty())
+    if(!matched_readers_.empty())
     {
         if(!isAsync())
         {
             //TODO(Ricardo) Temporal.
             bool expectsInlineQos = false;
 
-            for(auto it = matched_readers.begin(); it != matched_readers.end(); ++it)
+            for(auto remote_reader : matched_readers_)
             {
                 ChangeForReader_t changeForReader(change);
 
                 // TODO(Ricardo) Study next case: Not push mode, writer reliable and reader besteffort.
-                if(m_pushMode)
+                if(push_mode_)
                 {
-                    if((*it)->m_att.endpoint.reliabilityKind == RELIABLE)
+                    if(remote_reader->m_att.endpoint.reliabilityKind == RELIABLE)
                     {
-                        changeForReader.setStatus(UNDERWAY);
+                        changeForReader.set_status(UNDERWAY);
                     }
                     else
                     {
-                        changeForReader.setStatus(ACKNOWLEDGED);
+                        changeForReader.set_status(ACKNOWLEDGED);
                     }
                 }
                 else
                 {
-                    changeForReader.setStatus(UNACKNOWLEDGED);
+                    changeForReader.set_status(UNACKNOWLEDGED);
                 }
 
-                (*it)->mp_mutex->lock();
-                changeForReader.setRelevance((*it)->rtps_is_relevant(change));
-                (*it)->addChange(changeForReader);
-                expectsInlineQos |= (*it)->m_att.expectsInlineQos;
-                (*it)->mp_mutex->unlock();
+                remote_reader->mp_mutex->lock();
+                changeForReader.set_relevance(remote_reader->rtps_is_relevant(change));
+                remote_reader->add_change(changeForReader);
+                expectsInlineQos |= remote_reader->m_att.expectsInlineQos;
+                remote_reader->mp_mutex->unlock();
 
-                if((*it)->mp_nackSupression != nullptr) // It is reliable
-                    (*it)->mp_nackSupression->restart_timer();
+                if(remote_reader->mp_nackSupression != nullptr) // It is reliable
+                {
+                    remote_reader->mp_nackSupression->restart_timer();
+                }
             }
 
             RTPSMessageGroup group(mp_RTPSParticipant, this,  RTPSMessageGroup::WRITER, m_cdrmessages);
-            if(!group.add_data(*change, mAllRemoteReaders, mAllShrinkedLocatorList, expectsInlineQos))
+            if(!group.add_data(change, mAllRemoteReaders, mAllShrinkedLocatorList, expectsInlineQos))
             {
-                logError(RTPS_WRITER, "Error sending change " << change->sequenceNumber);
+                logError(RTPS_WRITER, "Error sending change " << change.sequence_number);
             }
 
             // Heartbeat piggyback.
-            if(!disableHeartbeatPiggyback_)
+            if(!disable_heartbeat_piggyback_)
             {
+            /*
                 if(mp_history->isFull())
                 {
                     send_heartbeat_nts_(mAllRemoteReaders, mAllShrinkedLocatorList, group);
@@ -157,28 +171,38 @@ void StatefulWriter::unsent_change_added_to_history(CacheChange_t* change)
                         send_heartbeat_nts_(mAllRemoteReaders, mAllShrinkedLocatorList, group);
                     }
                 }
+            */
+
+                //TODO(Ricardo) Revisar cambio
+                currentUsageSendBufferSize_ -= group.get_current_bytes_processed();
+
+                if(currentUsageSendBufferSize_ < 0)
+                {
+                    send_heartbeat_nts_(mAllRemoteReaders, mAllShrinkedLocatorList, group,
+                            history_.get_min_sequence_number_nts(), history_.get_max_sequence_number_nts());
+                }
             }
 
             this->mp_periodicHB->restart_timer();
         }
         else
         {
-            for(auto it = matched_readers.begin(); it != matched_readers.end(); ++it)
+            for(auto remote_reader : matched_readers_)
             {
                 ChangeForReader_t changeForReader(change);
 
-                if(m_pushMode)
+                if(push_mode_)
                 {
-                    changeForReader.setStatus(UNSENT);
+                    changeForReader.set_status(UNSENT);
                 }
                 else
                 {
-                    changeForReader.setStatus(UNACKNOWLEDGED);
+                    changeForReader.set_status(UNACKNOWLEDGED);
                 }
 
-                std::lock_guard<std::recursive_mutex> rguard(*(*it)->mp_mutex);
-                changeForReader.setRelevance((*it)->rtps_is_relevant(change));
-                (*it)->addChange(changeForReader);
+                std::lock_guard<std::recursive_mutex> rguard(*remote_reader->mp_mutex);
+                changeForReader.set_relevance(remote_reader->rtps_is_relevant(change));
+                remote_reader->add_change(changeForReader);
             }
         }
     }
@@ -186,64 +210,78 @@ void StatefulWriter::unsent_change_added_to_history(CacheChange_t* change)
     {
         logInfo(RTPS_WRITER,"No reader proxy to add change.");
     }
-}
-
-
-bool StatefulWriter::change_removed_by_history(CacheChange_t* a_change)
-{
-    std::lock_guard<std::recursive_mutex> guard(*mp_mutex);
-    logInfo(RTPS_WRITER,"Change "<< a_change->sequenceNumber << " to be removed.");
-
-    // Invalidate CacheChange pointer in ReaderProxies.
-    for(std::vector<ReaderProxy*>::iterator it = this->matched_readers.begin();
-            it!=this->matched_readers.end();++it)
-    {
-        (*it)->setNotValid(a_change);
-    }
-
-    std::unique_lock<std::mutex> may_lock(may_remove_change_mutex_);
-    may_remove_change_ = 2;
-    may_remove_change_cond_.notify_one();
 
     return true;
 }
 
+
+/**
+ * This method must be used only by WriterHistory. WriterHistory's mutex should have been taken.
+ * On debug this precondition is check.
+ */
+bool StatefulWriter::change_removed_by_history(const SequenceNumber_t& sequence_number,
+        const InstanceHandle_t&)
+{
+#if defined(__DEBUG)
+    assert(history_.get_mutex_owner() == history_.get_thread_id());
+#endif
+
+    logInfo(RTPS_WRITER,"CacheChange "<< sequence_number << " to be removed.");
+
+    std::lock_guard<std::mutex> guard(mutex_);
+
+    // Invalidate CacheChange pointer in ReaderProxies.
+    for(auto remote_reader : matched_readers_)
+    {
+        remote_reader->setNotValid(sequence_number);
+    }
+
+    return true;
+}
+
+/*
+ * This function must to be call only from AsyncWriterThread.
+ */
 void StatefulWriter::send_any_unsent_changes()
 {
-    std::lock_guard<std::recursive_mutex> guard(*mp_mutex);
+    std::unique_lock<std::mutex> history_lock(history_.lock_for_transaction());
 
     RTPSWriterCollector<ReaderProxy*> relevantChanges;
     StatefulWriterOrganizer notRelevantChanges;
 
-    for(auto remoteReader : matched_readers)
+    std::unique_lock<std::mutex> lock(mutex_);
+    for(auto remoteReader : matched_readers_)
     {
         std::lock_guard<std::recursive_mutex> rguard(*remoteReader->mp_mutex);
-        std::vector<ChangeForReader_t*> unsentChanges = remoteReader->get_unsent_changes();
+        std::vector<ChangeForReader_t*> unsent_changes = remoteReader->get_unsent_changes();
 
-        for(auto unsentChange : unsentChanges)
+        for(auto unsent_change : unsent_changes)
         {
-            if(unsentChange->isRelevant() && unsentChange->isValid())
+            if(unsent_change->is_relevant())
             {
-                if(m_pushMode)
+                if(push_mode_)
                 {
-                    relevantChanges.add_change(unsentChange->getChange(), remoteReader, unsentChange->getUnsentFragments());
+                    const CacheChange_t* const cachechange =
+                        history_.get_change_nts(unsent_change->get_sequence_number());
+                    assert(cachechange != nullptr);
+                    relevantChanges.add_change(cachechange, remoteReader, unsent_change->get_unsent_fragments());
                 }
                 else // Change status to UNACKNOWLEDGED
                 {
-                    remoteReader->set_change_to_status(unsentChange->getSequenceNumber(), UNACKNOWLEDGED);
+                    remoteReader->set_change_to_status(unsent_change->get_sequence_number(), UNACKNOWLEDGED);
                 }
             }
             else
             {
-                notRelevantChanges.add_sequence_number(unsentChange->getSequenceNumber(), remoteReader);
-                remoteReader->set_change_to_status(unsentChange->getSequenceNumber(), UNDERWAY); //TODO(Ricardo) Review
+                notRelevantChanges.add_sequence_number(unsent_change->get_sequence_number(), remoteReader);
+                remoteReader->set_change_to_status(unsent_change->get_sequence_number(), UNDERWAY); //TODO(Ricardo) Review
             }
         }
     }
 
 
 
-    if(m_pushMode)
+    if(push_mode_)
     {
         // Clear all relevant changes through the local controllers first
         for (auto& controller : m_controllers)
@@ -264,7 +302,7 @@ void StatefulWriter::send_any_unsent_changes()
             std::vector<LocatorList_t> locatorLists;
             bool expectsInlineQos = false;
 
-            for(auto remoteReader : changeToSend.remoteReaders)
+            for(auto remoteReader : changeToSend.remote_readers)
             {
                 remote_readers.push_back(remoteReader->m_att.guid);
                 LocatorList_t locators(remoteReader->m_att.endpoint.unicastLocatorList);
@@ -275,18 +313,18 @@ void StatefulWriter::send_any_unsent_changes()
 
             // TODO(Ricardo) Flowcontroller has to be used in RTPSMessageGroup. Study.
             // And controllers are notified about the changes being sent
-            FlowController::NotifyControllersChangeSent(changeToSend.cacheChange);
+            FlowController::NotifyControllersChangeSent(changeToSend.cachechange);
 
-            if(changeToSend.fragmentNumber != 0)
+            if(changeToSend.fragment_number != 0)
             {
-                if(group.add_data_frag(*changeToSend.cacheChange, changeToSend.fragmentNumber, remote_readers,
+                if(group.add_data_frag(*changeToSend.cachechange, changeToSend.fragment_number, remote_readers,
                             mp_RTPSParticipant->network_factory().ShrinkLocatorLists(locatorLists),
                             expectsInlineQos))
                 {
-                    for(auto remoteReader : changeToSend.remoteReaders)
+                    for(auto remoteReader : changeToSend.remote_readers)
                     {
                         std::lock_guard<std::recursive_mutex> rguard(*remoteReader->mp_mutex);
-                        bool allFragmentsSent = remoteReader->mark_fragment_as_sent_for_change(changeToSend.cacheChange, changeToSend.fragmentNumber);
+                        bool allFragmentsSent = remoteReader->mark_fragment_as_sent_for_change(changeToSend.sequence_number, changeToSend.fragment_number);
 
                         if(remoteReader->m_att.endpoint.reliabilityKind == RELIABLE)
                         {
@@ -299,41 +337,42 @@ void StatefulWriter::send_any_unsent_changes()
                 }
                 else
                 {
-                    logError(RTPS_WRITER, "Error sending fragment (" << changeToSend.sequenceNumber <<
-                            ", " << changeToSend.fragmentNumber << ")");
+                    logError(RTPS_WRITER, "Error sending fragment (" << changeToSend.sequence_number <<
+                            ", " << changeToSend.fragment_number << ")");
                 }
             }
             else
             {
-                if(group.add_data(*changeToSend.cacheChange, remote_readers,
+                if(group.add_data(*changeToSend.cachechange, remote_readers,
                             mp_RTPSParticipant->network_factory().ShrinkLocatorLists(locatorLists),
                             expectsInlineQos))
                 {
-                    for(auto remoteReader : changeToSend.remoteReaders)
+                    for(auto remoteReader : changeToSend.remote_readers)
                     {
                         std::lock_guard<std::recursive_mutex> rguard(*remoteReader->mp_mutex);
                         if(remoteReader->m_att.endpoint.reliabilityKind == RELIABLE)
                         {
-                            remoteReader->set_change_to_status(changeToSend.sequenceNumber, UNDERWAY);
+                            remoteReader->set_change_to_status(changeToSend.sequence_number, UNDERWAY);
                             activateHeartbeatPeriod = true;
                             assert(remoteReader->mp_nackSupression != nullptr);
                             remoteReader->mp_nackSupression->restart_timer();
                         }
                         else
                         {
-                            remoteReader->set_change_to_status(changeToSend.sequenceNumber, ACKNOWLEDGED);
+                            remoteReader->set_change_to_status(changeToSend.sequence_number, ACKNOWLEDGED);
                         }
                     }
                 }
                 else
                 {
-                    logError(RTPS_WRITER, "Error sending change " << changeToSend.sequenceNumber);
+                    logError(RTPS_WRITER, "Error sending change " << changeToSend.sequence_number);
                 }
             }
 
             // Heartbeat piggyback.
-            if(!disableHeartbeatPiggyback_)
+            if(!disable_heartbeat_piggyback_)
             {
+                /*
                 if(mp_history->isFull())
                 {
                     send_heartbeat_nts_(mAllRemoteReaders, mAllShrinkedLocatorList, group);
@@ -347,6 +386,16 @@ void StatefulWriter::send_any_unsent_changes()
                     {
                         send_heartbeat_nts_(mAllRemoteReaders, mAllShrinkedLocatorList, group);
                     }
+                }
+                */
+                //TODO(Ricardo) Revisar cambio
+                currentUsageSendBufferSize_ -= group.get_current_bytes_processed() - lastBytesProcessed;
+                lastBytesProcessed = group.get_current_bytes_processed();
+
+                if(currentUsageSendBufferSize_ < 0)
+                {
+                    send_heartbeat_nts_(mAllRemoteReaders, mAllShrinkedLocatorList, group,
+                            history_.get_min_sequence_number_nts(), history_.get_max_sequence_number_nts());
                 }
             }
         }
@@ -373,7 +422,8 @@ void StatefulWriter::send_any_unsent_changes()
     else
     {
         RTPSMessageGroup group(mp_RTPSParticipant, this, RTPSMessageGroup::WRITER, m_cdrmessages);
-        send_heartbeat_nts_(mAllRemoteReaders, mAllShrinkedLocatorList, group, true);
+        send_heartbeat_nts_(mAllRemoteReaders, mAllShrinkedLocatorList, group, history_.get_min_sequence_number_nts(),
+                history_.get_max_sequence_number_nts(), true);
     }
 
     logInfo(RTPS_WRITER, "Finish sending unsent changes");
@@ -385,19 +435,21 @@ void StatefulWriter::send_any_unsent_changes()
  */
 bool StatefulWriter::matched_reader_add(const RemoteReaderAttributes& rdata)
 {
-    std::lock_guard<std::recursive_mutex> guard(*mp_mutex);
-
     if(rdata.guid == c_Guid_Unknown)
     {
         logError(RTPS_WRITER,"Reliable Writer need GUID_t of matched readers");
         return false;
     }
 
+    std::unique_lock<std::mutex> history_lock(history_.lock_for_transaction());
+
     std::vector<GUID_t> allRemoteReaders;
     std::vector<LocatorList_t> allLocatorLists;
 
+    std::lock_guard<std::mutex> guard(mutex_);
+
     // Check if it is already matched.
-    for(std::vector<ReaderProxy*>::iterator it=matched_readers.begin();it!=matched_readers.end();++it)
+    for(std::vector<ReaderProxy*>::iterator it = matched_readers_.begin(); it != matched_readers_.end(); ++it)
     {
         std::lock_guard<std::recursive_mutex> rguard(*(*it)->mp_mutex);
         if((*it)->m_att.guid == rdata.guid)
@@ -423,44 +475,50 @@ bool StatefulWriter::matched_reader_add(const RemoteReaderAttributes& rdata)
     ReaderProxy* rp = new ReaderProxy(rdata,m_times,this);
     std::set<SequenceNumber_t> not_relevant_changes;
 
-    SequenceNumber_t current_seq = get_seq_num_min();
-    SequenceNumber_t max_seq = get_seq_num_max();
+    SequenceNumber_t current_seq = history_.get_min_sequence_number_nts();
+    SequenceNumber_t max_seq = history_.get_max_sequence_number_nts();
 
     if(current_seq != SequenceNumber_t::unknown())
     {
         (void)max_seq;
         assert(max_seq != SequenceNumber_t::unknown());
 
-        for(std::vector<CacheChange_t*>::iterator cit = mp_history->changesBegin();
-                cit != mp_history->changesEnd(); ++cit)
+        if(rp->m_att.endpoint.durabilityKind >= TRANSIENT_LOCAL
+                && this->getAttributes()->durabilityKind == TRANSIENT_LOCAL)
         {
-            while((*cit)->sequenceNumber != current_seq)
+            for(; current_seq <= max_seq; ++current_seq)
+            {
+                const CacheChange_t* const change =
+                    history_.get_change_nts(current_seq);
+                if(change != nullptr)
+                {
+                    ChangeForReader_t changeForReader(*change);
+                    changeForReader.set_relevance(rp->rtps_is_relevant(*change));
+                    if(!rp->rtps_is_relevant(*change))
+                        not_relevant_changes.insert(changeForReader.get_sequence_number());
+                    changeForReader.set_status(UNACKNOWLEDGED);
+                    rp->add_change(changeForReader);
+                }
+                else
+                {
+                    ChangeForReader_t changeForReader(current_seq);
+                    changeForReader.set_relevance(false);
+                    not_relevant_changes.insert(current_seq);
+                    changeForReader.set_status(UNACKNOWLEDGED);
+                    rp->add_change(changeForReader);
+                }
+            }
+        }
+        else
+        {
+            for(; current_seq <= max_seq; ++current_seq)
             {
                 ChangeForReader_t changeForReader(current_seq);
-                changeForReader.setRelevance(false);
+                changeForReader.set_relevance(false);
                 not_relevant_changes.insert(current_seq);
-                changeForReader.setStatus(UNACKNOWLEDGED);
-                rp->addChange(changeForReader);
-                ++current_seq;
+                changeForReader.set_status(UNACKNOWLEDGED);
+                rp->add_change(changeForReader);
             }
-
-            ChangeForReader_t changeForReader(*cit);
-
-            if(rp->m_att.endpoint.durabilityKind >= TRANSIENT_LOCAL && this->getAttributes()->durabilityKind == TRANSIENT_LOCAL)
-            {
-                changeForReader.setRelevance(rp->rtps_is_relevant(*cit));
-                if(!rp->rtps_is_relevant(*cit))
-                    not_relevant_changes.insert(changeForReader.getSequenceNumber());
-            }
-            else
-            {
-                changeForReader.setRelevance(false);
-                not_relevant_changes.insert(changeForReader.getSequenceNumber());
-            }
-
-            changeForReader.setStatus(UNACKNOWLEDGED);
-            rp->addChange(changeForReader);
-            ++current_seq;
         }
 
         assert(max_seq + 1 == current_seq);
@@ -486,7 +544,7 @@ bool StatefulWriter::matched_reader_add(const RemoteReaderAttributes& rdata)
     // The state has to be updated.
     this->mp_periodicHB->restart_timer();
 
-    matched_readers.push_back(rp);
+    matched_readers_.push_back(rp);
 
     logInfo(RTPS_WRITER, "Reader Proxy "<< rp->m_att.guid<< " added to " << this->m_guid.entityId << " with "
             <<rp->m_att.endpoint.unicastLocatorList.size()<<"(u)-"
@@ -498,21 +556,22 @@ bool StatefulWriter::matched_reader_add(const RemoteReaderAttributes& rdata)
 bool StatefulWriter::matched_reader_remove(const RemoteReaderAttributes& rdata)
 {
     ReaderProxy *rproxy = nullptr;
-    std::unique_lock<std::recursive_mutex> lock(*mp_mutex);
+    std::unique_lock<std::mutex> lock(mutex_);
 
     std::vector<GUID_t> allRemoteReaders;
     std::vector<LocatorList_t> allLocatorLists;
 
-    auto it = matched_readers.begin();
-    while(it != matched_readers.end())
+    auto it = matched_readers_.begin();
+    while(it != matched_readers_.end())
     {
         std::lock_guard<std::recursive_mutex> rguard(*(*it)->mp_mutex);
 
         if((*it)->m_att.guid == rdata.guid)
         {
             logInfo(RTPS_WRITER, "Reader Proxy removed: " << (*it)->m_att.guid);
+            assert(rproxy == nullptr);
             rproxy = std::move(*it);
-            it = matched_readers.erase(it);
+            it = matched_readers_.erase(it);
 
             continue;
         }
@@ -526,8 +585,10 @@ bool StatefulWriter::matched_reader_remove(const RemoteReaderAttributes& rdata)
 
     update_cached_info_nts(std::move(allRemoteReaders), allLocatorLists);
 
-    if(matched_readers.size()==0)
+    if(matched_readers_.size() == 0)
+    {
         this->mp_periodicHB->cancel_timer();
+    }
 
     lock.unlock();
 
@@ -535,7 +596,7 @@ bool StatefulWriter::matched_reader_remove(const RemoteReaderAttributes& rdata)
     {
         delete rproxy;
 
-        check_acked_status();
+        check_acked_status_nts_();
 
         return true;
     }
@@ -546,66 +607,29 @@ bool StatefulWriter::matched_reader_remove(const RemoteReaderAttributes& rdata)
 
 bool StatefulWriter::matched_reader_is_matched(const RemoteReaderAttributes& rdata)
 {
-    std::lock_guard<std::recursive_mutex> guard(*mp_mutex);
-    for(std::vector<ReaderProxy*>::iterator it=matched_readers.begin();it!=matched_readers.end();++it)
+    std::lock_guard<std::mutex> guard(mutex_);
+    for(auto remote_reader : matched_readers_)
     {
-        std::lock_guard<std::recursive_mutex> rguard(*(*it)->mp_mutex);
-        if((*it)->m_att.guid == rdata.guid)
+        std::lock_guard<std::recursive_mutex> rguard(*remote_reader->mp_mutex);
+        if(remote_reader->m_att.guid == rdata.guid)
         {
             return true;
         }
     }
     return false;
-}
-
-bool StatefulWriter::matched_reader_lookup(GUID_t& readerGuid,ReaderProxy** RP)
-{
-    std::lock_guard<std::recursive_mutex> guard(*mp_mutex);
-    std::vector<ReaderProxy*>::iterator it;
-    for(it=matched_readers.begin();it!=matched_readers.end();++it)
-    {
-        std::lock_guard<std::recursive_mutex> rguard(*(*it)->mp_mutex);
-        if((*it)->m_att.guid == readerGuid)
-        {
-            *RP = *it;
-            return true;
-        }
-    }
-    return false;
-}
-
-bool StatefulWriter::is_acked_by_all(CacheChange_t* change)
-{
-    std::lock_guard<std::recursive_mutex> guard(*mp_mutex);
-
-    if(change->writerGUID != this->getGuid())
-    {
-        logWarning(RTPS_WRITER,"The given change is not from this Writer");
-        return false;
-    }
-
-    for(auto it = matched_readers.begin(); it!=matched_readers.end(); ++it)
-    {
-        if(!(*it)->change_is_acked(change->sequenceNumber))
-        {
-            logInfo(RTPS_WRITER, "Change " << change->sequenceNumber << " not acked." << endl);
-            return false;
-        }
-    }
-    return true;
 }
 
 bool StatefulWriter::wait_for_all_acked(const Duration_t& max_wait)
 {
-    std::unique_lock<std::recursive_mutex> lock(*mp_mutex);
+    std::unique_lock<std::mutex> lock(mutex_);
     std::unique_lock<std::mutex> all_acked_lock(all_acked_mutex_);
 
     all_acked_ = true;
 
-    for(auto it = matched_readers.begin(); it != matched_readers.end(); ++it)
+    for(auto remote_reader : matched_readers_)
     {
-        std::lock_guard<std::recursive_mutex> rguard(*(*it)->mp_mutex);
-        if((*it)->countChangesForReader() > 0)
+        std::lock_guard<std::recursive_mutex> rguard(*remote_reader->mp_mutex);
+        if(remote_reader->countChangesForReader() > 0)
         {
             all_acked_ = false;
             break;
@@ -622,59 +646,27 @@ bool StatefulWriter::wait_for_all_acked(const Duration_t& max_wait)
     return all_acked_;
 }
 
-void StatefulWriter::check_acked_status()
+void StatefulWriter::check_acked_status_nts_()
 {
-    std::unique_lock<std::recursive_mutex> lock(*mp_mutex);
-
     bool all_acked = true;
-    SequenceNumber_t min_low_mark;
 
-    for(auto it = matched_readers.begin(); it != matched_readers.end(); ++it)
+    for(auto remote_reader : matched_readers_)
     {
-        std::lock_guard<std::recursive_mutex> rguard(*(*it)->mp_mutex);
+        std::lock_guard<std::recursive_mutex> rguard(*remote_reader->mp_mutex);
 
-        if(min_low_mark == SequenceNumber_t() || (*it)->get_low_mark() < min_low_mark)
-        {
-            min_low_mark = (*it)->get_low_mark();
-        }
-
-        if((*it)->countChangesForReader() > 0)
+        if(remote_reader->countChangesForReader() > 0)
         {
             all_acked = false;
+            break;
         }
     }
 
     // If VOLATILE, remove samples acked.
+    //TODO If min_low_mark automatically calculate, only call if change value.
     if(m_att.durabilityKind == VOLATILE)
     {
-        std::vector<CacheChange_t*> to_remove;
-        for(SequenceNumber_t current_seq = get_seq_num_min(); current_seq <= min_low_mark; ++current_seq)
-        {
-            for(std::vector<CacheChange_t*>::iterator cit = mp_history->changesBegin();
-                    cit != mp_history->changesEnd(); ++cit)
-            {
-                if((*cit)->sequenceNumber == current_seq)
-                {
-                    to_remove.push_back(*cit);
-                }
-            }
-        }
-        for(auto cit = to_remove.begin(); cit != to_remove.end(); ++cit)
-        {
-            mp_history->remove_change_g(*cit);
-        }
-    }
-    else
-    {
-        SequenceNumber_t calc = min_low_mark < get_seq_num_min() ? SequenceNumber_t() :
-            (min_low_mark - get_seq_num_min()) + 1;
-
-        if(calc > SequenceNumber_t())
-        {
-            std::unique_lock<std::mutex> may_lock(may_remove_change_mutex_);
-            may_remove_change_ = 1;
-            may_remove_change_cond_.notify_one();
-        }
+        assert(cleanup_event_);
+        cleanup_event_->restart_timer();
     }
 
     if(all_acked)
@@ -685,51 +677,35 @@ void StatefulWriter::check_acked_status()
     }
 }
 
-bool StatefulWriter::try_remove_change(std::chrono::microseconds& microseconds,
-        std::unique_lock<std::recursive_mutex>& lock)
+void StatefulWriter::cleanup_()
 {
-    logInfo(RTPS_WRITER, "Starting process try remove change for writer " << getGuid());
+    assert(m_att.durabilityKind == VOLATILE);
 
-    SequenceNumber_t min_low_mark;
+    //TODO Instead of calculate min_low_mark, always autocalculate when ack is received.
+    SequenceNumber_t min_low_mark, history_min_sequence_number;
 
-    for(auto it = matched_readers.begin(); it != matched_readers.end(); ++it)
+    std::unique_lock<std::mutex> history_lock(history_.lock_for_transaction());
+
     {
-        std::lock_guard<std::recursive_mutex> rguard(*(*it)->mp_mutex);
+        std::unique_lock<std::mutex> lock(mutex_);
 
-        if(min_low_mark == SequenceNumber_t() || (*it)->get_low_mark() < min_low_mark)
+        for(auto remote_reader : matched_readers_)
         {
-            min_low_mark = (*it)->get_low_mark();
+            std::lock_guard<std::recursive_mutex> rguard(*remote_reader->mp_mutex);
+
+            if(remote_reader->get_low_mark_nts() < min_low_mark)
+            {
+                min_low_mark = remote_reader->get_low_mark_nts();
+            }
         }
     }
 
-    SequenceNumber_t calc = min_low_mark < get_seq_num_min() ? SequenceNumber_t() :
-        (min_low_mark - get_seq_num_min()) + 1;
-    unsigned int may_remove_change = 1;
+    // Unlock before call history_.remove_change_nts_, because will lock again the mutex.
 
-    if(calc <= SequenceNumber_t())
+    while((history_min_sequence_number = history_.get_min_sequence_number_nts()) <= min_low_mark)
     {
-        lock.unlock();
-        std::unique_lock<std::mutex> may_lock(may_remove_change_mutex_);
-        may_remove_change_ = 0;
-        may_remove_change_cond_.wait_for(may_lock, microseconds,
-                [&]() { return may_remove_change_ > 0; });
-        may_remove_change = may_remove_change_;
-        may_lock.unlock();
-        lock.lock();
+        history_.remove_change_nts(history_min_sequence_number);
     }
-
-    // Some changes acked
-    if(may_remove_change == 1)
-    {
-        return mp_history->remove_min_change();
-    }
-    // Waiting a change was removed.
-    else if(may_remove_change == 2)
-    {
-        return true;
-    }
-
-    return false;
 }
 
 /*
@@ -742,20 +718,22 @@ void StatefulWriter::updateAttributes(WriterAttributes& att)
 
 void StatefulWriter::updateTimes(WriterTimes& times)
 {
-    std::lock_guard<std::recursive_mutex> guard(*mp_mutex);
+    std::lock_guard<std::mutex> guard(mutex_);
     if(m_times.heartbeatPeriod != times.heartbeatPeriod)
     {
         this->mp_periodicHB->update_interval(times.heartbeatPeriod);
     }
+
     if(m_times.nackResponseDelay != times.nackResponseDelay)
     {
-        for(std::vector<ReaderProxy*>::iterator it = this->matched_readers.begin();
-                it!=this->matched_readers.end();++it)
+        for(auto remote_reader : matched_readers_)
         {
-            std::lock_guard<std::recursive_mutex> rguard(*(*it)->mp_mutex);
+            std::lock_guard<std::recursive_mutex> rguard(*remote_reader->mp_mutex);
 
-            if((*it)->mp_nackResponse != nullptr) // It is reliable
-                (*it)->mp_nackResponse->update_interval(times.nackResponseDelay);
+            if(remote_reader->mp_nackResponse != nullptr) // It is reliable
+            {
+                remote_reader->mp_nackResponse->update_interval(times.nackResponseDelay);
+            }
         }
     }
     if(m_times.heartbeatPeriod != times.heartbeatPeriod)
@@ -764,22 +742,22 @@ void StatefulWriter::updateTimes(WriterTimes& times)
     }
     if(m_times.nackResponseDelay != times.nackResponseDelay)
     {
-        for(std::vector<ReaderProxy*>::iterator it = this->matched_readers.begin();
-                it!=this->matched_readers.end();++it)
+        for(auto remote_reader : matched_readers_)
         {
-            std::lock_guard<std::recursive_mutex> rguard(*(*it)->mp_mutex);
-            (*it)->mp_nackResponse->update_interval(times.nackResponseDelay);
+            std::lock_guard<std::recursive_mutex> rguard(*remote_reader->mp_mutex);
+            remote_reader->mp_nackResponse->update_interval(times.nackResponseDelay);
         }
     }
     if(m_times.nackSupressionDuration != times.nackSupressionDuration)
     {
-        for(std::vector<ReaderProxy*>::iterator it = this->matched_readers.begin();
-                it!=this->matched_readers.end();++it)
+        for(auto remote_reader : matched_readers_)
         {
-            std::lock_guard<std::recursive_mutex> rguard(*(*it)->mp_mutex);
+            std::lock_guard<std::recursive_mutex> rguard(*remote_reader->mp_mutex);
 
-            if((*it)->mp_nackSupression != nullptr) // It is reliable
-                (*it)->mp_nackSupression->update_interval(times.nackSupressionDuration);
+            if(remote_reader->mp_nackSupression != nullptr) // It is reliable
+            {
+                remote_reader->mp_nackSupression->update_interval(times.nackSupressionDuration);
+            }
         }
     }
     m_times = times;
@@ -792,59 +770,94 @@ void StatefulWriter::add_flow_controller(std::unique_ptr<FlowController> control
 
 SequenceNumber_t StatefulWriter::next_sequence_number() const
 {
-    return mp_history->next_sequence_number();
+    std::lock_guard<std::mutex> guard(mutex_);
+    return next_sequence_number_nts();
 }
 
-void StatefulWriter::send_heartbeat_to_nts(ReaderProxy& remoteReaderProxy, bool final)
+void StatefulWriter::send_heartbeat(bool final)
+{
+    SequenceNumber_t first_seq;
+    SequenceNumber_t last_seq;
+    {
+        std::unique_lock<std::mutex> history_lock(history_.lock_for_transaction());
+        first_seq = history_.get_min_sequence_number_nts();
+        last_seq = history_.get_max_sequence_number_nts();
+    }
+
+    std::lock_guard<std::mutex> guard(mutex_);
+    RTPSMessageGroup group(mp_RTPSParticipant, this, RTPSMessageGroup::WRITER, m_cdrmessages);
+    send_heartbeat_nts_(mAllRemoteReaders, mAllShrinkedLocatorList, group, first_seq, last_seq, final);
+}
+
+void StatefulWriter::send_heartbeat_to(const ReaderProxy& remote_reader, bool final)
+{
+    SequenceNumber_t first_seq;
+    SequenceNumber_t last_seq;
+    {
+        std::unique_lock<std::mutex> history_lock(history_.lock_for_transaction());
+        first_seq = history_.get_min_sequence_number_nts();
+        last_seq = history_.get_max_sequence_number_nts();
+    }
+
+    std::lock_guard<std::mutex> guard(mutex_);
+    send_heartbeat_to_nts(remote_reader, first_seq, last_seq, final);
+}
+
+void StatefulWriter::send_heartbeat_to_nts(const ReaderProxy& remote_reader, SequenceNumber_t first_seq,
+        SequenceNumber_t last_seq, bool final)
 {
     RTPSMessageGroup group(mp_RTPSParticipant, this, RTPSMessageGroup::WRITER, m_cdrmessages);
-    LocatorList_t locators(remoteReaderProxy.m_att.endpoint.unicastLocatorList);
-    locators.push_back(remoteReaderProxy.m_att.endpoint.multicastLocatorList);
+    LocatorList_t locators(remote_reader.m_att.endpoint.unicastLocatorList);
+    locators.push_back(remote_reader.m_att.endpoint.multicastLocatorList);
 
-    send_heartbeat_nts_(std::vector<GUID_t>{remoteReaderProxy.m_att.guid},
-            locators, group, final);
+    send_heartbeat_nts_(std::vector<GUID_t>{remote_reader.m_att.guid}, locators, group, first_seq, last_seq, final);
 }
 
 void StatefulWriter::send_heartbeat_nts_(const std::vector<GUID_t>& remote_readers, const LocatorList_t &locators,
-        RTPSMessageGroup& message_group, bool final)
+        RTPSMessageGroup& message_group, SequenceNumber_t first_seq, SequenceNumber_t last_seq, bool final)
 {
-    SequenceNumber_t firstSeq = get_seq_num_min();
-    SequenceNumber_t lastSeq = get_seq_num_max();
-
-    if (firstSeq == c_SequenceNumber_Unknown || lastSeq == c_SequenceNumber_Unknown)
+    if (first_seq == c_SequenceNumber_Unknown || last_seq == c_SequenceNumber_Unknown)
     {
-        firstSeq = next_sequence_number();
-        lastSeq = SequenceNumber_t(0, 0);
+        first_seq = next_sequence_number_nts();
+        last_seq = SequenceNumber_t(0, 0);
     }
     else
     {
-        (void)firstSeq;
-        assert(firstSeq <= lastSeq);
+        (void)first_seq;
+        assert(first_seq <= last_seq);
     }
 
     incrementHBCount();
 
     // FinalFlag is always false because this class is used only by StatefulWriter in Reliable.
     message_group.add_heartbeat(remote_readers,
-            firstSeq, lastSeq, m_heartbeatCount, final, false, locators);
+            first_seq, last_seq, m_heartbeatCount, final, false, locators);
 
     // Update calculate of heartbeat piggyback.
     currentUsageSendBufferSize_ = static_cast<int32_t>(sendBufferSize_);
 
-    logInfo(RTPS_WRITER, getGuid().entityId << " Sending Heartbeat (" << firstSeq << " - " << lastSeq <<")" );
+    logInfo(RTPS_WRITER, getGuid().entityId << " Sending Heartbeat (" << first_seq << " - " << last_seq <<")" );
 }
 
 void StatefulWriter::process_acknack(const GUID_t reader_guid, uint32_t ack_count,
                         const SequenceNumberSet_t& sn_set, bool final_flag)
 {
-    std::unique_lock<std::recursive_mutex> lock(*mp_mutex);
-
-    for(auto remote_reader : matched_readers)
+    SequenceNumber_t first_seq;
+    SequenceNumber_t last_seq;
     {
-        std::lock_guard<std::recursive_mutex> reader_guard(*remote_reader->mp_mutex);
+        std::unique_lock<std::mutex> history_lock(history_.lock_for_transaction());
+        first_seq = history_.get_min_sequence_number_nts();
+        last_seq = history_.get_max_sequence_number_nts();
+    }
 
+    std::unique_lock<std::mutex> lock(mutex_);
+
+    for(auto remote_reader : matched_readers_)
+    {
         if(remote_reader->m_att.guid == reader_guid)
         {
+            std::lock_guard<std::recursive_mutex> reader_guard(*remote_reader->mp_mutex);
+
             if(remote_reader->m_lastAcknackCount < ack_count)
             {
                 remote_reader->m_lastAcknackCount = ack_count;
@@ -859,7 +872,7 @@ void StatefulWriter::process_acknack(const GUID_t reader_guid, uint32_t ack_coun
                 {
                     if(sn_set.base == SequenceNumber_t(0, 0) && sn_set.isSetEmpty())
                     {
-                        send_heartbeat_to_nts(*remote_reader, true);
+                        send_heartbeat_to_nts(*remote_reader, first_seq, last_seq, true);
                     }
 
                     mp_periodicHB->restart_timer();
@@ -867,7 +880,32 @@ void StatefulWriter::process_acknack(const GUID_t reader_guid, uint32_t ack_coun
 
                 // Check if all CacheChange are acknowledge, because a user could be waiting
                 // for this, of if VOLATILE should be removed CacheChanges
-                check_acked_status();
+                check_acked_status_nts_();
+            }
+            break;
+        }
+    }
+}
+
+void StatefulWriter::process_nackfrag(const GUID_t reader_guid, uint32_t nackfrag_count,
+        const SequenceNumber_t& writer_sn, const FragmentNumberSet_t& fn_set)
+{
+    std::unique_lock<std::mutex> lock(mutex_);
+
+    for(auto remote_reader : matched_readers_)
+    {
+        if(remote_reader->m_att.guid == reader_guid)
+        {
+            std::lock_guard<std::recursive_mutex> reader_guard(*remote_reader->mp_mutex);
+
+            if(remote_reader->last_nackfrag_count() < nackfrag_count)
+            {
+                remote_reader->last_nackfrag_count() = nackfrag_count;
+                // TODO Not doing Acknowledged.
+                if(remote_reader->requested_fragment_set(writer_sn, fn_set))
+                {
+                    remote_reader->mp_nackResponse->restart_timer();
+                }
             }
             break;
         }

@@ -84,7 +84,7 @@ int32_t ParameterList::readParameterListfromCDRMsg(CDRMessage_t*msg, ParameterLi
         else
             return -1;
         if(change != NULL)
-            change->serializedPayload.encapsulation = (uint16_t)encapsulation;
+            change->serialized_payload.encapsulation = (uint16_t)encapsulation;
         msg->pos +=2;
     }
 
@@ -312,7 +312,7 @@ int32_t ParameterList::readParameterListfromCDRMsg(CDRMessage_t*msg, ParameterLi
                         p->length = 16;
                         valid&=CDRMessage::readData(msg,p->key.value,16);
                         if(change != NULL)
-                            change->instanceHandle = p->key;
+                            change->instance_handle = p->key;
                         IF_VALID_ADD
                     }
                 case PID_SENTINEL:

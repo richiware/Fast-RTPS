@@ -16,214 +16,221 @@
  *
  */
 
-#include <fastrtps/rtps/history/WriterHistory.h>
-
-#include <fastrtps/log/Log.h>
+#include "WriterHistoryImpl.h"
 #include <fastrtps/rtps/writer/RTPSWriter.h>
+#include <fastrtps/log/Log.h>
 
 #include <mutex>
+
+#if defined(__DEBUG)
+#include <sys/syscall.h>
+#include <unistd.h>
+#include <pthread.h>
+#endif
 
 namespace eprosima {
 namespace fastrtps{
 namespace rtps {
 
-
 typedef std::pair<InstanceHandle_t,std::vector<CacheChange_t*>> t_pairKeyChanges;
 typedef std::vector<t_pairKeyChanges> t_vectorPairKeyChanges;
 
-
-WriterHistory::WriterHistory(const HistoryAttributes& att):
-    History(att),
-    mp_writer(nullptr)
-    {
-
-    }
-
-WriterHistory::~WriterHistory()
+WriterHistory::WriterHistory(const HistoryAttributes& attributes) :
+    impl_(new WriterHistory::impl(attributes))
 {
-    // TODO Auto-generated destructor stub
 }
 
-bool WriterHistory::add_change(CacheChange_t* a_change)
-{
-    if(mp_writer == nullptr || mp_mutex == nullptr)
-    {
-        logError(RTPS_HISTORY,"You need to create a Writer with this History before adding any changes");
-        return false;
-    }
+WriterHistory::~WriterHistory() = default;
 
-    std::lock_guard<std::recursive_mutex> guard(*mp_mutex);
-    if(a_change->writerGUID != mp_writer->getGuid())
-    {
-        logError(RTPS_HISTORY,"Change writerGUID "<< a_change->writerGUID << " different than Writer GUID "<< mp_writer->getGuid());
-        return false;
-    }
-    if((m_att.memoryPolicy==PREALLOCATED_MEMORY_MODE) && a_change->serializedPayload.length > m_att.payloadMaxSize)
+WriterHistory::impl::impl(const HistoryAttributes& attributes): attributes_(attributes)
+{
+}
+
+bool WriterHistory::add_change(CacheChange_ptr& change)
+{
+    return impl_->add_change(change);
+}
+
+bool WriterHistory::impl::add_change(CacheChange_ptr& change)
+{
+    assert(change);
+
+    if((attributes_.memoryPolicy == PREALLOCATED_MEMORY_MODE) &&
+            change->serialized_payload.length > attributes_.payloadMaxSize)
     {
         logError(RTPS_HISTORY,
-                "Change payload size of '" << a_change->serializedPayload.length <<
-                "' bytes is larger than the history payload size of '" << m_att.payloadMaxSize <<
+                "Change payload size of '" << change->serialized_payload.length <<
+                "' bytes is larger than the history payload size of '" << attributes_.payloadMaxSize <<
                 "' bytes and cannot be resized.");
         return false;
     }
 
-    if(m_isHistoryFull)
+    std::unique_lock<std::mutex> lock(mutex_);
+
+    bool add_permitted = true;
+
+    if(call_after_adding_change_)
     {
-        logWarning(RTPS_HISTORY,"History full for writer " << a_change->writerGUID);
-        return false;
+        add_permitted = call_after_adding_change_(*change);
     }
 
-    ++m_lastCacheChangeSeqNum;
-    a_change->sequenceNumber = m_lastCacheChangeSeqNum;
-    m_changes.push_back(a_change);
-    if(static_cast<int32_t>(m_changes.size()) == m_att.maximumReservedCaches)
-        m_isHistoryFull = true;
-
-    logInfo(RTPS_HISTORY,"Change "<< a_change->sequenceNumber << " added with "<<a_change->serializedPayload.length<< " bytes");
-
-    updateMaxMinSeqNum();
-    mp_writer->unsent_change_added_to_history(a_change);
-
-    return true;
-}
-
-bool WriterHistory::remove_change(CacheChange_t* a_change)
-{
-    if(mp_writer == nullptr || mp_mutex == nullptr)
+    if(add_permitted)
     {
-        logError(RTPS_HISTORY,"You need to create a Writer with this History before removing any changes");
-        return false;
-    }
+        logInfo(RTPS_HISTORY, "Change " << change->sequence_number << " added with "
+                << change->serialized_payload.length << " bytes");
 
-    std::lock_guard<std::recursive_mutex> guard(*mp_mutex);
-    if(a_change == nullptr)
-    {
-        logError(RTPS_HISTORY,"Pointer is not valid")
-            return false;
-    }
-    if(a_change->writerGUID != mp_writer->getGuid())
-    {
-        // cout << "a change " << a_change->sequenceNumber<< endl;
-        // cout << "a change "<< a_change->writerGUID << endl;
-        // cout << "writer: "<< mp_writer->getGuid()<<endl;
-        logError(RTPS_HISTORY,"Change writerGUID "<< a_change->writerGUID << " different than Writer GUID "<< mp_writer->getGuid());
-        return false;
-    }
+        changes_.emplace_hint(changes_.end(), change->sequence_number, std::move(change));
 
-    for(std::vector<CacheChange_t*>::iterator chit = m_changes.begin();
-            chit!=m_changes.end();++chit)
-    {
-        if((*chit)->sequenceNumber == a_change->sequenceNumber)
-        {
-            mp_writer->change_removed_by_history(a_change);
-            m_changePool.release_Cache(a_change);
-            m_changes.erase(chit);
-            updateMaxMinSeqNum();
-            m_isHistoryFull = false;
-            return true;
-        }
-    }
-    logWarning(RTPS_HISTORY,"SequenceNumber "<<a_change->sequenceNumber << " not found");
-    return false;
-}
-
-bool WriterHistory::remove_change_g(CacheChange_t* a_change)
-{
-    return remove_change(a_change);
-}
-
-bool WriterHistory::remove_change(const SequenceNumber_t& sequence_number)
-{
-    if(mp_writer == nullptr || mp_mutex == nullptr)
-    {
-        logError(RTPS_HISTORY,"You need to create a Writer with this History before removing any changes");
-        return false;
-    }
-
-    std::lock_guard<std::recursive_mutex> guard(*mp_mutex);
-
-    for(std::vector<CacheChange_t*>::iterator chit = m_changes.begin();
-            chit!=m_changes.end();++chit)
-    {
-        if((*chit)->sequenceNumber == sequence_number)
-        {
-            mp_writer->change_removed_by_history(*chit);
-            m_changePool.release_Cache(*chit);
-            m_changes.erase(chit);
-            updateMaxMinSeqNum();
-            m_isHistoryFull = false;
-            return true;
-        }
-    }
-
-    logWarning(RTPS_HISTORY,"SequenceNumber " <<  sequence_number << " not found");
-    return false;
-}
-
-CacheChange_t* WriterHistory::remove_change_and_reuse(const SequenceNumber_t& sequence_number)
-{
-    if(mp_writer == nullptr || mp_mutex == nullptr)
-    {
-        logError(RTPS_HISTORY,"You need to create a Writer with this History before removing any changes");
-        return nullptr;
-    }
-
-    std::lock_guard<std::recursive_mutex> guard(*mp_mutex);
-
-    for(std::vector<CacheChange_t*>::iterator chit = m_changes.begin();
-            chit!=m_changes.end();++chit)
-    {
-        if((*chit)->sequenceNumber == sequence_number)
-        {
-            CacheChange_t* change = *chit;
-            mp_writer->change_removed_by_history(change);
-            m_changes.erase(chit);
-            updateMaxMinSeqNum();
-            m_isHistoryFull = false;
-            return change;
-        }
-    }
-
-    logWarning(RTPS_HISTORY,"SequenceNumber " <<  sequence_number << " not found");
-    return nullptr;
-}
-
-void WriterHistory::updateMaxMinSeqNum()
-{
-    if(m_changes.size()==0)
-    {
-        mp_minSeqCacheChange = mp_invalidCache;
-        mp_maxSeqCacheChange = mp_invalidCache;
-    }
-    else
-    {
-        mp_minSeqCacheChange = m_changes.front();
-        mp_maxSeqCacheChange = m_changes.back();
-    }
-}
-
-
-bool WriterHistory::remove_min_change()
-{
-
-    if(mp_writer == nullptr || mp_mutex == nullptr)
-    {
-        logError(RTPS_HISTORY,"You need to create a Writer with this History before removing any changes");
-        return false;
-    }
-
-    std::lock_guard<std::recursive_mutex> guard(*mp_mutex);
-    if(m_changes.size() > 0 && remove_change_g(mp_minSeqCacheChange))
-    {
-        updateMaxMinSeqNum();
         return true;
     }
-    else
-        return false;
+
+    return false;
 }
 
-//TODO Hacer metodos de remove_all_changes. y hacer los metodos correspondientes en los writers y publishers.
-
+CacheChange_ptr WriterHistory::remove_change(const SequenceNumber_t& sequence_number)
+{
+    return impl_->remove_change(sequence_number);
 }
+
+CacheChange_ptr WriterHistory::impl::remove_change(const SequenceNumber_t& sequence_number)
+{
+    std::unique_lock<std::mutex> lock(mutex_);
+    iterator change_it = changes_.find(sequence_number);
+    return remove_change_nts_(change_it);
+}
+
+CacheChange_ptr WriterHistory::impl::remove_change_nts(const SequenceNumber_t& sequence_number)
+{
+    iterator change_it = changes_.find(sequence_number);
+    return remove_change_nts_(change_it);
+}
+
+CacheChange_ptr WriterHistory::impl::remove_change_nts_(iterator& element)
+{
+    if(element != changes_.end())
+    {
+        bool remove_permitted = true;
+
+        if(call_after_deleting_change_)
+        {
+            remove_permitted = call_after_deleting_change_(element->first, element->second->instance_handle);
+        }
+
+        if(remove_permitted)
+        {
+            CacheChange_ptr change_to_remove(std::move(element->second));
+            assert(change_to_remove);
+            changes_.erase(element);
+            return change_to_remove;
+        }
+    }
+
+    return CacheChange_ptr();
+}
+
+CacheChange_ptr WriterHistory::remove_min_change()
+{
+    return impl_->remove_min_change();
+}
+
+CacheChange_ptr WriterHistory::impl::remove_min_change()
+{
+    std::unique_lock<std::mutex> lock(mutex_);
+    auto change_it = changes_.begin();
+    return remove_change_nts_(change_it);
+}
+
+void WriterHistory::impl::clear()
+{
+    std::unique_lock<std::mutex> lock(mutex_);
+    changes_.clear();
+}
+
+SequenceNumber_t WriterHistory::impl::get_min_sequence_number_nts() const
+{
+#if defined(__DEBUG)
+    assert(get_mutex_owner() == get_thread_id());
+#endif
+
+    if(changes_.size() > 0)
+    {
+        return changes_.begin()->first;
+    }
+
+    return SequenceNumber_t::unknown();
+}
+
+SequenceNumber_t WriterHistory::impl::get_max_sequence_number_nts() const
+{
+#if defined(__DEBUG)
+    assert(get_mutex_owner() == get_thread_id());
+#endif
+
+    if(changes_.size() > 0)
+    {
+        return changes_.rbegin()->first;
+    }
+
+    return SequenceNumber_t::unknown();
+}
+
+/*
+ * This function has to be used having WriterHistory's mutex lock.
+ * On debug it check this precondition.
+ */
+const CacheChange_t* WriterHistory::impl::get_change_nts(const SequenceNumber_t& sequence_number) const
+{
+#if defined(__DEBUG)
+    assert(get_mutex_owner() == get_thread_id());
+#endif
+
+    CacheChange_t* cachechange = nullptr;
+    auto cachechange_it = changes_.find(sequence_number);
+
+    if(cachechange_it != changes_.end())
+    {
+        cachechange = &*cachechange_it->second;
+    }
+
+    return cachechange;
+}
+
+WriterHistory::impl::const_iterator WriterHistory::impl::begin_nts()
+{
+#if defined(__DEBUG)
+    assert(get_mutex_owner() == get_thread_id());
+#endif
+
+    return changes_.cbegin();
+}
+
+WriterHistory::impl::const_iterator WriterHistory::impl::end_nts()
+{
+#if defined(__DEBUG)
+    assert(get_mutex_owner() == get_thread_id());
+#endif
+
+    return changes_.cend();
+}
+
+std::unique_lock<std::mutex> WriterHistory::impl::lock_for_transaction()
+{
+    return std::unique_lock<std::mutex>(mutex_);
+}
+
+#if defined(__DEBUG)
+int WriterHistory::impl::get_mutex_owner() const
+{
+    auto mutex = mutex_.native_handle();
+    return mutex->__data.__owner;
+}
+
+int WriterHistory::impl::get_thread_id() const
+{
+    return syscall(__NR_gettid);
+}
+#endif
+
 } /* namespace rtps */
+} /* namespace fastrtps */
 } /* namespace eprosima */

@@ -32,6 +32,7 @@
 #include <fastrtps/utils/eClock.h>
 
 #include <fastrtps/rtps/writer/RTPSWriter.h>
+#include "history/WriterHistoryImpl.h"
 #include <fastrtps/rtps/reader/RTPSReader.h>
 
 namespace eprosima {
@@ -175,14 +176,15 @@ bool RTPSDomain::removeRTPSParticipant(RTPSParticipant* p)
     return false;
 }
 
-RTPSWriter* RTPSDomain::createRTPSWriter(RTPSParticipant* p, WriterAttributes& watt, WriterHistory* hist, WriterListener* listen)
+RTPSWriter* RTPSDomain::createRTPSWriter(RTPSParticipant* p, WriterAttributes& watt, WriterHistory& hist,
+        WriterListener* listen)
 {
     for(auto it= m_RTPSParticipants.begin();it!=m_RTPSParticipants.end();++it)
     {
         if(it->first->getGuid().guidPrefix == p->getGuid().guidPrefix)
         {
             RTPSWriter* writ;
-            if(it->second->createWriter(&writ,watt,hist,listen))
+            if(it->second->createWriter(&writ, watt, hist,listen))
                 return writ;
             return nullptr;
         }
