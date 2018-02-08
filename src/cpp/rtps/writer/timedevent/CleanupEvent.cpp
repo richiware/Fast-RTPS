@@ -20,7 +20,7 @@
 #include "CleanupEvent.h"
 #include <fastrtps/rtps/resources/ResourceEvent.h>
 #include "../../participant/RTPSParticipantImpl.h"
-#include <fastrtps/rtps/writer/StatefulWriter.h>
+#include "../StatefulWriterImpl.h"
 #include <fastrtps/log/Log.h>
 
 #include <mutex>
@@ -36,11 +36,16 @@ CleanupEvent::~CleanupEvent()
     destroy();
 }
 
-CleanupEvent::CleanupEvent(StatefulWriter& writer, double interval) :
-    TimedEvent(writer.getRTPSParticipant()->getEventResource().getIOService(),
-            writer.getRTPSParticipant()->getEventResource().getThread(), interval),
+CleanupEvent::CleanupEvent(StatefulWriter::impl& writer, double interval) :
+    TimedEvent(writer.participant().getEventResource().getIOService(),
+            writer.participant().getEventResource().getThread(), interval),
     writer_(writer)
 {
+}
+
+void CleanupEvent::cleanup()
+{
+    writer_.cleanup_();
 }
 
 void CleanupEvent::event(EventCode code, const char* msg)
@@ -51,7 +56,7 @@ void CleanupEvent::event(EventCode code, const char* msg)
 
     if(code == EVENT_SUCCESS)
     {
-        writer_.cleanup_();
+        cleanup();
     }
     else if(code == EVENT_ABORT)
     {

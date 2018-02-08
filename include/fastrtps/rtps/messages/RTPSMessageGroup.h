@@ -17,13 +17,14 @@
  *
  */
 
-#ifndef RTPSMESSAGEGROUP_H_
-#define RTPSMESSAGEGROUP_H_
+#ifndef __RTPS_MESSAGES_RTPSMESSAGEGROUP_H__
+#define __RTPS_MESSAGES_RTPSMESSAGEGROUP_H__
 #ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
 
 #include "../messages/RTPSMessageCreator.h"
 #include "../../qos/ParameterList.h"
-#include <fastrtps/rtps/common/FragmentNumber.h>
+#include "../common/FragmentNumber.h"
+#include "../participant/RTPSParticipant.h"
 
 #include <vector>
 #include <cassert>
@@ -32,7 +33,6 @@ namespace eprosima {
 namespace fastrtps{
 namespace rtps {
 
-class RTPSParticipantImpl;
 class Endpoint;
 
 /**
@@ -79,7 +79,7 @@ class RTPSMessageGroup
             READER
         };
 
-        RTPSMessageGroup(RTPSParticipantImpl* participant, Endpoint* endpoint, ENDPOINT_TYPE,
+        RTPSMessageGroup(RTPSParticipant::impl& participant, Endpoint* endpoint, ENDPOINT_TYPE,
                 RTPSMessageGroup_t& msg_group);
 
         ~RTPSMessageGroup();
@@ -129,7 +129,7 @@ class RTPSMessageGroup
 
         bool add_info_ts_in_buffer(const std::vector<GUID_t>& remote_readers);
 
-        RTPSParticipantImpl* participant_;
+        RTPSParticipant::impl& participant_;
 
         Endpoint* endpoint_;
 
@@ -152,9 +152,9 @@ class RTPSMessageGroup
         std::vector<GuidPrefix_t> current_remote_participants_;
 };
 
-} /* namespace rtps */
-} /* namespace fastrtps */
-} /* namespace eprosima */
+} // namespace rtps
+} // namespace fastrtps
+} // namespace eprosima
 
 #endif
-#endif /* RTPSMESSAGEGROUP_H_ */
+#endif // __RTPS_MESSAGES_RTPSMESSAGEGROUP_H__

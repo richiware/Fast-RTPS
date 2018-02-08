@@ -18,60 +18,41 @@
  */
 
 #include <fastrtps/rtps/builtin/discovery/participant/PDPSimple.h>
-#include <fastrtps/rtps/builtin/discovery/participant/PDPSimpleListener.h>
-
+#include "PDPSimpleListener.h"
 #include <fastrtps/rtps/builtin/BuiltinProtocols.h>
 #include <fastrtps/rtps/builtin/liveliness/WLP.h>
-
 #include <fastrtps/rtps/builtin/data/ParticipantProxyData.h>
 #include <fastrtps/rtps/builtin/discovery/participant/timedevent/RemoteParticipantLeaseDuration.h>
 #include <fastrtps/rtps/builtin/data/ReaderProxyData.h>
 #include <fastrtps/rtps/builtin/data/WriterProxyData.h>
-
 #include <fastrtps/rtps/builtin/discovery/endpoint/EDPSimple.h>
 #include <fastrtps/rtps/builtin/discovery/endpoint/EDPStatic.h>
-
 #include <fastrtps/rtps/resources/AsyncWriterThread.h>
-
 #include <fastrtps/rtps/builtin/discovery/participant/timedevent/ResendParticipantProxyDataPeriod.h>
-
-
 #include "../../../participant/RTPSParticipantImpl.h"
-
-#include <fastrtps/rtps/writer/StatelessWriter.h>
-#include <fastrtps/rtps/reader/StatelessReader.h>
-#include <fastrtps/rtps/reader/StatefulReader.h>
+#include "../../../reader/StatefulReaderImpl.h"
+#include "../../../writer/StatelessWriterImpl.h"
 #include <fastrtps/rtps/reader/WriterProxy.h>
-
 #include "../../../history/WriterHistoryImpl.h"
 #include <fastrtps/rtps/history/ReaderHistory.h>
 #include <fastrtps/rtps/history/CacheChangePool.h>
-
-
 #include <fastrtps/utils/TimeConversion.h>
-
 #include <fastrtps/log/Log.h>
 
 #include <mutex>
 
-using namespace eprosima::fastrtps;
+using namespace eprosima::fastrtps::rtps;
 
-namespace eprosima {
-namespace fastrtps{
-namespace rtps {
-
-
-PDPSimple::PDPSimple(BuiltinProtocols* built):
+PDPSimple::PDPSimple(BuiltinProtocols* built, RTPSParticipant::impl& participant) :
     mp_builtin(built),
-    mp_RTPSParticipant(nullptr),
-    mp_SPDPWriter(nullptr),
-    mp_SPDPReader(nullptr),
+    participant_(participant),
+    mp_WLP(nullptr),
     mp_EDP(nullptr),
     m_hasChangedLocalPDP(true),
     mp_resendParticipantTimer(nullptr),
     mp_listener(nullptr),
-    mp_SPDPWriterHistory(nullptr),
-    mp_SPDPReaderHistory(nullptr),
+    spdp_writer_history_(nullptr),
+    spdp_reader_history_(nullptr),
     mp_mutex(new std::recursive_mutex())
     {
 
@@ -82,13 +63,19 @@ PDPSimple::~PDPSimple()
     if(mp_resendParticipantTimer != nullptr)
         delete(mp_resendParticipantTimer);
 
+    participant_.remove_writer(spdp_writer_);
+    participant_.remove_reader(spdp_reader_);
+    delete(spdp_writer_history_);
+    delete(spdp_reader_history_);
+
     if(mp_EDP!=nullptr)
         delete(mp_EDP);
 
-    mp_RTPSParticipant->deleteUserEndpoint(mp_SPDPWriter);
-    mp_RTPSParticipant->deleteUserEndpoint(mp_SPDPReader);
-    delete(mp_SPDPWriterHistory);
-    delete(mp_SPDPReaderHistory);
+    if(mp_WLP != nullptr)
+    {
+        delete(mp_WLP);
+        mp_WLP = nullptr;
+    }
 
     delete(mp_listener);
     for(auto it = this->m_participantProxies.begin();
@@ -102,24 +89,24 @@ PDPSimple::~PDPSimple()
 
 void PDPSimple::initializeParticipantProxyData(ParticipantProxyData* participant_data)
 {
-    participant_data->m_leaseDuration = mp_RTPSParticipant->getAttributes().builtin.leaseDuration;
+    participant_data->m_leaseDuration = participant_.getAttributes().builtin.leaseDuration;
     set_VendorId_eProsima(participant_data->m_VendorId);
 
     participant_data->m_availableBuiltinEndpoints |= DISC_BUILTIN_ENDPOINT_PARTICIPANT_ANNOUNCER;
     participant_data->m_availableBuiltinEndpoints |= DISC_BUILTIN_ENDPOINT_PARTICIPANT_DETECTOR;
-    if(mp_RTPSParticipant->getAttributes().builtin.use_WriterLivelinessProtocol)
+    if(participant_.getAttributes().builtin.use_WriterLivelinessProtocol)
     {
         participant_data->m_availableBuiltinEndpoints |= BUILTIN_ENDPOINT_PARTICIPANT_MESSAGE_DATA_WRITER;
         participant_data->m_availableBuiltinEndpoints |= BUILTIN_ENDPOINT_PARTICIPANT_MESSAGE_DATA_READER;
     }
-    if(mp_RTPSParticipant->getAttributes().builtin.use_SIMPLE_EndpointDiscoveryProtocol)
+    if(participant_.getAttributes().builtin.use_SIMPLE_EndpointDiscoveryProtocol)
     {
-        if(mp_RTPSParticipant->getAttributes().builtin.m_simpleEDP.use_PublicationWriterANDSubscriptionReader)
+        if(participant_.getAttributes().builtin.m_simpleEDP.use_PublicationWriterANDSubscriptionReader)
         {
             participant_data->m_availableBuiltinEndpoints |= DISC_BUILTIN_ENDPOINT_PUBLICATION_ANNOUNCER;
             participant_data->m_availableBuiltinEndpoints |= DISC_BUILTIN_ENDPOINT_SUBSCRIPTION_DETECTOR;
         }
-        if(mp_RTPSParticipant->getAttributes().builtin.m_simpleEDP.use_PublicationReaderANDSubscriptionWriter)
+        if(participant_.getAttributes().builtin.m_simpleEDP.use_PublicationReaderANDSubscriptionWriter)
         {
             participant_data->m_availableBuiltinEndpoints |= DISC_BUILTIN_ENDPOINT_PUBLICATION_DETECTOR;
             participant_data->m_availableBuiltinEndpoints |= DISC_BUILTIN_ENDPOINT_SUBSCRIPTION_ANNOUNCER;
@@ -127,13 +114,13 @@ void PDPSimple::initializeParticipantProxyData(ParticipantProxyData* participant
     }
 
 #if HAVE_SECURITY
-    participant_data->m_availableBuiltinEndpoints |= mp_RTPSParticipant->security_manager().builtin_endpoints();
+    participant_data->m_availableBuiltinEndpoints |= participant_.security_manager().builtin_endpoints();
 #endif
 
-    participant_data->m_defaultUnicastLocatorList = mp_RTPSParticipant->getAttributes().defaultUnicastLocatorList;
-    participant_data->m_defaultMulticastLocatorList = mp_RTPSParticipant->getAttributes().defaultMulticastLocatorList;
+    participant_data->m_defaultUnicastLocatorList = participant_.getAttributes().defaultUnicastLocatorList;
+    participant_data->m_defaultMulticastLocatorList = participant_.getAttributes().defaultMulticastLocatorList;
     participant_data->m_expectsInlineQos = false;
-    participant_data->m_guid = mp_RTPSParticipant->getGuid();
+    participant_data->m_guid = participant_.guid();
     for(uint8_t i = 0; i<16; ++i)
     {
         if(i<12)
@@ -146,37 +133,42 @@ void PDPSimple::initializeParticipantProxyData(ParticipantProxyData* participant
     participant_data->m_metatrafficMulticastLocatorList = this->mp_builtin->m_metatrafficMulticastLocatorList;
     participant_data->m_metatrafficUnicastLocatorList = this->mp_builtin->m_metatrafficUnicastLocatorList;
 
-    participant_data->m_participantName = std::string(mp_RTPSParticipant->getAttributes().getName());
+    participant_data->m_participantName = std::string(participant_.getAttributes().getName());
 
-    participant_data->m_userData = mp_RTPSParticipant->getAttributes().userData;
+    participant_data->m_userData = participant_.getAttributes().userData;
 
 #if HAVE_SECURITY
     IdentityToken* identity_token = nullptr;
-    if(mp_RTPSParticipant->security_manager().get_identity_token(&identity_token) && identity_token != nullptr)
+    if(participant_.security_manager().get_identity_token(&identity_token) && identity_token != nullptr)
     {
         participant_data->identity_token_ = std::move(*identity_token);
-        mp_RTPSParticipant->security_manager().return_identity_token(identity_token);
+        participant_.security_manager().return_identity_token(identity_token);
     }
 #endif
 }
 
-bool PDPSimple::initPDP(RTPSParticipantImpl* part)
+bool PDPSimple::init()
 {
     logInfo(RTPS_PDP,"Beginning");
-    mp_RTPSParticipant = part;
-    m_discovery = mp_RTPSParticipant->getAttributes().builtin;
+    m_discovery = participant_.getAttributes().builtin;
     //CREATE ENDPOINTS
     if(!createSPDPEndpoints())
         return false;
     //UPDATE METATRAFFIC.
-    mp_builtin->updateMetatrafficLocators(this->mp_SPDPReader->getAttributes()->unicastLocatorList);
+    mp_builtin->updateMetatrafficLocators(spdp_reader_->getAttributes()->unicastLocatorList);
     m_participantProxies.push_back(new ParticipantProxyData());
     initializeParticipantProxyData(m_participantProxies.front());
+
+    if(mp_builtin->m_att.use_WriterLivelinessProtocol)
+    {
+        mp_WLP = new WLP(this, participant_); //TODO(Ricardo) Change
+        mp_WLP->init();
+    }
 
     //INIT EDP
     if(m_discovery.use_STATIC_EndpointDiscoveryProtocol)
     {
-        mp_EDP = (EDP*)(new EDPStatic(this,mp_RTPSParticipant));
+        mp_EDP = (EDP*)(new EDPStatic(*this, participant_));
         if(!mp_EDP->initEDP(m_discovery)){
             logError(RTPS_PDP,"Endpoint discovery configuration failed");
             return false;
@@ -185,7 +177,7 @@ bool PDPSimple::initPDP(RTPSParticipantImpl* part)
     }
     else if(m_discovery.use_SIMPLE_EndpointDiscoveryProtocol)
     {
-        mp_EDP = (EDP*)(new EDPSimple(this,mp_RTPSParticipant));
+        mp_EDP = (EDP*)(new EDPSimple(*this, participant_));
         if(!mp_EDP->initEDP(m_discovery)){
             logError(RTPS_PDP,"Endpoint discovery configuration failed");
             return false;
@@ -197,10 +189,13 @@ bool PDPSimple::initPDP(RTPSParticipantImpl* part)
         return false;
     }
 
-    if(!mp_RTPSParticipant->enableReader(mp_SPDPReader))
+    if(!participant_.enable_reader(*spdp_reader_))
+    {
         return false;
+    }
 
-    mp_resendParticipantTimer = new ResendParticipantProxyDataPeriod(this,TimeConv::Time_t2MilliSecondsDouble(m_discovery.leaseDuration_announcementperiod));
+    mp_resendParticipantTimer = new ResendParticipantProxyDataPeriod(*this,
+            TimeConv::Time_t2MilliSecondsDouble(m_discovery.leaseDuration_announcementperiod));
 
     return true;
 }
@@ -231,9 +226,9 @@ void PDPSimple::announceParticipantState(bool new_change, bool dispose)
             this->mp_mutex->unlock();
 
             // TODO Reuse change returned by this function
-            mp_SPDPWriterHistory->remove_min_change();
+            spdp_writer_history_->remove_min_change();
             // TODO(Ricardo) Change DISCOVERY_PARTICIPANT_DATA_MAX_SIZE with getLocalParticipantProxyData()->size().
-            CacheChange_ptr change = mp_SPDPWriter->new_change([]() -> uint32_t {return DISCOVERY_PARTICIPANT_DATA_MAX_SIZE;}, ALIVE, key);
+            CacheChange_ptr change = spdp_writer_->new_change([]() -> uint32_t {return DISCOVERY_PARTICIPANT_DATA_MAX_SIZE;}, ALIVE, key);
 
             if(change)
             {
@@ -253,14 +248,15 @@ void PDPSimple::announceParticipantState(bool new_change, bool dispose)
                 ParameterList::writeParameterListToCDRMsg(&aux_msg, &parameter_list, true);
                 change->serialized_payload.length = (uint16_t)aux_msg.length;
 
-                mp_SPDPWriterHistory->add_change(change);
+                spdp_writer_history_->add_change(change);
             }
 
             m_hasChangedLocalPDP = false;
         }
         else
         {
-            mp_SPDPWriter->resent_changes();
+            //TODO(Ricardo) Review this function
+            spdp_writerless_->resent_changes();
         }
     }
     else
@@ -270,8 +266,8 @@ void PDPSimple::announceParticipantState(bool new_change, bool dispose)
         this->mp_mutex->unlock();
 
         // TODO Reuse change returned by this function
-        mp_SPDPWriterHistory->remove_min_change();
-        CacheChange_ptr change = mp_SPDPWriter->new_change([]() ->
+        spdp_writer_history_->remove_min_change();
+        CacheChange_ptr change = spdp_writer_->new_change([]() ->
                 uint32_t {return DISCOVERY_PARTICIPANT_DATA_MAX_SIZE;},
                 NOT_ALIVE_DISPOSED_UNREGISTERED, getLocalParticipantProxyData()->m_key);
 
@@ -293,7 +289,7 @@ void PDPSimple::announceParticipantState(bool new_change, bool dispose)
             ParameterList::writeParameterListToCDRMsg(&aux_msg, &parameter_list, true);
             change->serialized_payload.length = (uint16_t)aux_msg.length;
 
-            mp_SPDPWriterHistory->add_change(change);
+            spdp_writer_history_->add_change(change);
         }
     }
 
@@ -339,9 +335,9 @@ bool PDPSimple::lookupWriterProxyData(const GUID_t& writer, WriterProxyData& wda
     return false;
 }
 
-bool PDPSimple::removeReaderProxyData(const GUID_t& reader_guid)
+bool PDPSimple::removeReaderProxyData(const GUID_t& spdp_reader_guid)
 {
-    logInfo(RTPS_PDP, "Removing reader proxy data " << reader_guid);
+    logInfo(RTPS_PDP, "Removing reader proxy data " << spdp_reader_guid);
     std::lock_guard<std::recursive_mutex> guardPDP(*this->mp_mutex);
 
     for (auto pit = m_participantProxies.begin();
@@ -350,9 +346,9 @@ bool PDPSimple::removeReaderProxyData(const GUID_t& reader_guid)
         for (auto rit = (*pit)->m_readers.begin();
                 rit != (*pit)->m_readers.end(); ++rit)
         {
-            if((*rit)->guid() == reader_guid)
+            if((*rit)->guid() == spdp_reader_guid)
             {
-                mp_EDP->unpairReaderProxy((*pit)->m_guid, reader_guid);
+                mp_EDP->unpairReaderProxy((*pit)->m_guid, spdp_reader_guid);
                 delete *rit;
                 (*pit)->m_readers.erase(rit);
                 return true;
@@ -363,9 +359,9 @@ bool PDPSimple::removeReaderProxyData(const GUID_t& reader_guid)
     return false;
 }
 
-bool PDPSimple::removeWriterProxyData(const GUID_t& writer_guid)
+bool PDPSimple::removeWriterProxyData(const GUID_t& spdp_writer_guid)
 {
-    logInfo(RTPS_PDP, "Removing writer proxy data " << writer_guid);
+    logInfo(RTPS_PDP, "Removing writer proxy data " << spdp_writer_guid);
     std::lock_guard<std::recursive_mutex> guardPDP(*this->mp_mutex);
 
     for (auto pit = m_participantProxies.begin();
@@ -374,9 +370,9 @@ bool PDPSimple::removeWriterProxyData(const GUID_t& writer_guid)
         for (auto wit = (*pit)->m_writers.begin();
                 wit != (*pit)->m_writers.end(); ++wit)
         {
-            if((*wit)->guid() == writer_guid)
+            if((*wit)->guid() == spdp_writer_guid)
             {
-                mp_EDP->unpairWriterProxy((*pit)->m_guid, writer_guid);
+                mp_EDP->unpairWriterProxy((*pit)->m_guid, spdp_writer_guid);
                 delete *wit;
                 (*pit)->m_writers.erase(wit);
                 return true;
@@ -412,57 +408,64 @@ bool PDPSimple::createSPDPEndpoints()
     hatt.payloadMaxSize = DISCOVERY_PARTICIPANT_DATA_MAX_SIZE;
     hatt.initialReservedCaches = 20;
     hatt.maximumReservedCaches = 100;
-    mp_SPDPWriterHistory = new WriterHistory(hatt);
+    spdp_writer_history_ = new WriterHistory::impl(hatt);
     WriterAttributes watt;
     watt.endpoint.endpointKind = WRITER;
     watt.endpoint.durabilityKind = TRANSIENT_LOCAL;
     watt.endpoint.reliabilityKind = BEST_EFFORT;
     watt.endpoint.topicKind = WITH_KEY;
-    if(mp_RTPSParticipant->getRTPSParticipantAttributes().throughputController.bytesPerPeriod != UINT32_MAX &&
-            mp_RTPSParticipant->getRTPSParticipantAttributes().throughputController.periodMillisecs != 0)
+    if(participant_.getRTPSParticipantAttributes().throughputController.bytesPerPeriod != UINT32_MAX &&
+            participant_.getRTPSParticipantAttributes().throughputController.periodMillisecs != 0)
         watt.mode = ASYNCHRONOUS_WRITER;
-    RTPSWriter* wout;
-    if(mp_RTPSParticipant->createWriter(&wout, watt, *mp_SPDPWriterHistory, nullptr, c_EntityId_SPDPWriter, true))
+    spdp_writer_ = participant_.create_writer(watt, *spdp_writer_history_, nullptr, c_EntityId_SPDPWriter, true);
+
+    if(spdp_writer_)
     {
 #if HAVE_SECURITY
-        mp_RTPSParticipant->set_endpoint_rtps_protection_supports(wout, false);
+        participant_.set_endpoint_rtps_protection_supports(spdp_writer_.get(), false);
 #endif
-        mp_SPDPWriter = dynamic_cast<StatelessWriter*>(wout);
+
+        spdp_writerless_ = dynamic_cast<StatelessWriter::impl*>(spdp_writer_.get());
+
         for(LocatorListIterator lit = mp_builtin->m_initialPeersList.begin();
                 lit != mp_builtin->m_initialPeersList.end(); ++lit)
-            mp_SPDPWriter->add_locator(*lit);
+        {
+            spdp_writerless_->add_locator(*lit);
+        }
     }
     else
     {
         logError(RTPS_PDP,"SimplePDP Writer creation failed");
-        delete(mp_SPDPWriterHistory);
-        mp_SPDPWriterHistory = nullptr;
+        delete(spdp_writer_history_);
+        spdp_writer_history_ = nullptr;
         return false;
     }
+
     hatt.payloadMaxSize = DISCOVERY_PARTICIPANT_DATA_MAX_SIZE;
     hatt.initialReservedCaches = 250;
     hatt.maximumReservedCaches = 5000;
-    mp_SPDPReaderHistory = new ReaderHistory(hatt);
+    spdp_reader_history_ = new ReaderHistory(hatt);
     ReaderAttributes ratt;
     ratt.endpoint.multicastLocatorList = mp_builtin->m_metatrafficMulticastLocatorList;
     ratt.endpoint.unicastLocatorList = mp_builtin->m_metatrafficUnicastLocatorList;
     ratt.endpoint.topicKind = WITH_KEY;
     ratt.endpoint.durabilityKind = TRANSIENT_LOCAL;
     ratt.endpoint.reliabilityKind = BEST_EFFORT;
-    mp_listener = new PDPSimpleListener(this);
-    RTPSReader* rout;
-    if(mp_RTPSParticipant->createReader(&rout,ratt,mp_SPDPReaderHistory,mp_listener,c_EntityId_SPDPReader,true, false))
+    mp_listener = new PDPSimpleListener(*this);
+
+    spdp_reader_ = participant_.create_reader(ratt, spdp_reader_history_, mp_listener, c_EntityId_SPDPReader, true, false);
+
+    if(spdp_reader_)
     {
 #if HAVE_SECURITY
-        mp_RTPSParticipant->set_endpoint_rtps_protection_supports(rout, false);
+        participant_.set_endpoint_rtps_protection_supports(spdp_reader_.get(), false);
 #endif
-        mp_SPDPReader = dynamic_cast<StatelessReader*>(rout);
     }
     else
     {
         logError(RTPS_PDP,"SimplePDP Reader creation failed");
-        delete(mp_SPDPReaderHistory);
-        mp_SPDPReaderHistory = nullptr;
+        delete(spdp_reader_history_);
+        spdp_reader_history_ = nullptr;
         delete(mp_listener);
         mp_listener = nullptr;
         return false;
@@ -572,7 +575,7 @@ void PDPSimple::assignRemoteEndpoints(ParticipantProxyData* pdata)
         watt.endpoint.multicastLocatorList = pdata->m_metatrafficMulticastLocatorList;
         watt.endpoint.reliabilityKind = BEST_EFFORT;
         watt.endpoint.durabilityKind = TRANSIENT_LOCAL;
-        mp_SPDPReader->matched_writer_add(watt);
+        spdp_reader_->matched_writer_add(watt);
     }
     auxendp = endp;
     auxendp &=DISC_BUILTIN_ENDPOINT_PARTICIPANT_DETECTOR;
@@ -586,12 +589,12 @@ void PDPSimple::assignRemoteEndpoints(ParticipantProxyData* pdata)
         ratt.endpoint.multicastLocatorList = pdata->m_metatrafficMulticastLocatorList;
         ratt.endpoint.reliabilityKind = BEST_EFFORT;
         ratt.endpoint.durabilityKind = TRANSIENT_LOCAL;
-        mp_SPDPWriter->matched_reader_add(ratt);
+        spdp_writer_->matched_reader_add(ratt);
     }
 
 #if HAVE_SECURITY
     // Validate remote participant
-    mp_RTPSParticipant->security_manager().discovered_participant(*pdata);
+    participant_.security_manager().discovered_participant(*pdata);
 #else
     //Inform EDP of new RTPSParticipant data:
     notifyAboveRemoteEndpoints(*pdata);
@@ -625,10 +628,16 @@ void PDPSimple::notifyAboveRemoteEndpoints(const GUID_t& participant_guid)
 void PDPSimple::notifyAboveRemoteEndpoints(const ParticipantProxyData& pdata)
 {
     //Inform EDP of new RTPSParticipant data:
-    if(mp_EDP!=nullptr)
+    if(mp_EDP != nullptr)
+    {
         mp_EDP->assignRemoteEndpoints(pdata);
-    if(mp_builtin->mp_WLP !=nullptr)
-        mp_builtin->mp_WLP->assignRemoteEndpoints(pdata);
+    }
+
+    //TODO(Ricardo) This should be outside pdpsimple.
+    if(mp_WLP != nullptr)
+    {
+        mp_WLP->assignRemoteEndpoints(pdata);
+    }
 }
 
 
@@ -647,7 +656,7 @@ void PDPSimple::removeRemoteEndpoints(ParticipantProxyData* pdata)
         watt.endpoint.multicastLocatorList = pdata->m_metatrafficMulticastLocatorList;
         watt.endpoint.reliabilityKind = BEST_EFFORT;
         watt.endpoint.durabilityKind = TRANSIENT_LOCAL;
-        mp_SPDPReader->matched_writer_remove(watt);
+        spdp_reader_->matched_writer_remove(watt);
     }
     auxendp = endp;
     auxendp &=DISC_BUILTIN_ENDPOINT_PARTICIPANT_DETECTOR;
@@ -661,7 +670,7 @@ void PDPSimple::removeRemoteEndpoints(ParticipantProxyData* pdata)
         ratt.endpoint.multicastLocatorList = pdata->m_metatrafficMulticastLocatorList;
         ratt.endpoint.reliabilityKind = BEST_EFFORT;
         ratt.endpoint.durabilityKind = TRANSIENT_LOCAL;
-        mp_SPDPWriter->matched_reader_remove(ratt);
+        spdp_writer_->matched_reader_remove(ratt);
     }
 }
 
@@ -701,25 +710,26 @@ bool PDPSimple::removeRemoteParticipant(GUID_t& partGUID)
         }
 
 #if HAVE_SECURITY
-        mp_builtin->mp_participantImpl->security_manager().remove_participant(*pdata);
+        participant_.security_manager().remove_participant(*pdata);
 #endif
 
-        if(mp_builtin->mp_WLP != nullptr)
-            this->mp_builtin->mp_WLP->removeRemoteEndpoints(pdata);
+        if(mp_WLP != nullptr)
+        {
+            mp_WLP->removeRemoteEndpoints(pdata);
+        }
         this->mp_EDP->removeRemoteEndpoints(pdata);
         this->removeRemoteEndpoints(pdata);
 
-        this->mp_SPDPReaderHistory->getMutex()->lock();
-        for(std::vector<CacheChange_t*>::iterator it=this->mp_SPDPReaderHistory->changesBegin();
-                it!=this->mp_SPDPReaderHistory->changesEnd();++it)
+        spdp_reader_history_->getMutex()->lock();
+        for(auto it = spdp_reader_history_->changesBegin(); it != spdp_reader_history_->changesEnd(); ++it)
         {
             if((*it)->instance_handle == pdata->m_key)
             {
-                this->mp_SPDPReaderHistory->remove_change(*it);
+                spdp_reader_history_->remove_change(*it);
                 break;
             }
         }
-        this->mp_SPDPReaderHistory->getMutex()->unlock();
+        spdp_reader_history_->getMutex()->unlock();
 
         delete(pdata);
         return true;
@@ -767,7 +777,7 @@ void PDPSimple::assertLocalWritersLiveliness(LivelinessQosPolicyKind kind)
 
 void PDPSimple::assertRemoteWritersLiveliness(GuidPrefix_t& guidP,LivelinessQosPolicyKind kind)
 {
-    std::lock_guard<std::recursive_mutex> guardP(*mp_RTPSParticipant->getParticipantMutex());
+    std::lock_guard<std::recursive_mutex> guardP(*participant_.getParticipantMutex());
     std::lock_guard<std::recursive_mutex> pguard(*this->mp_mutex);
     logInfo(RTPS_LIVELINESS,"of type " << (kind==AUTOMATIC_LIVELINESS_QOS?"AUTOMATIC":"")
             <<(kind==MANUAL_BY_PARTICIPANT_LIVELINESS_QOS?"MANUAL_BY_PARTICIPANT":""));
@@ -783,12 +793,11 @@ void PDPSimple::assertRemoteWritersLiveliness(GuidPrefix_t& guidP,LivelinessQosP
                 if((*wit)->m_qos.m_liveliness.kind == kind)
                 {
                     (*wit)->isAlive(true);
-                    for(std::vector<RTPSReader*>::iterator rit = mp_RTPSParticipant->userReadersListBegin();
-                            rit!=mp_RTPSParticipant->userReadersListEnd();++rit)
+                    for(auto rit = participant_.userReadersListBegin(); rit != participant_.userReadersListEnd(); ++rit)
                     {
                         if((*rit)->getAttributes()->reliabilityKind == RELIABLE)
                         {
-                            StatefulReader* sfr = (StatefulReader*)(*rit);
+                            StatefulReader::impl* sfr = dynamic_cast<StatefulReader::impl*>(*rit);
                             WriterProxy* WP;
                             if(sfr->matched_writer_lookup((*wit)->guid(), &WP))
                             {
@@ -810,9 +819,13 @@ bool PDPSimple::newRemoteEndpointStaticallyDiscovered(const GUID_t& pguid, int16
     if(lookupParticipantProxyData(pguid, pdata))
     {
         if(kind == WRITER)
+        {
             dynamic_cast<EDPStatic*>(mp_EDP)->newRemoteWriter(pdata,userDefinedId);
+        }
         else
+        {
             dynamic_cast<EDPStatic*>(mp_EDP)->newRemoteReader(pdata,userDefinedId);
+        }
     }
     return false;
 }
@@ -828,7 +841,3 @@ CDRMessage_t PDPSimple::get_participant_proxy_data_serialized(Endianness_t endia
 
     return cdr_msg;
 }
-
-} /* namespace rtps */
-} /* namespace fastrtps */
-} /* namespace eprosima */

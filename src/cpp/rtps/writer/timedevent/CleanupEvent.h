@@ -20,13 +20,13 @@
 #ifndef __RTPS_WRITER_TIMEEVENT_CLEANUPEVENT_H__
 #define __RTPS_WRITER_TIMEEVENT_CLEANUPEVENT_H__
 #ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
+
 #include <fastrtps/rtps/resources/TimedEvent.h>
+#include <fastrtps/rtps/writer/StatefulWriter.h>
 
 namespace eprosima {
 namespace fastrtps{
 namespace rtps{
-
-class StatefulWriter;
 
 /**
  * InitialHeartbeat class, controls the initial send operation of HB.
@@ -36,7 +36,7 @@ class CleanupEvent : public TimedEvent
 {
     public:
 
-        CleanupEvent(StatefulWriter& writer, double interval);
+        CleanupEvent(StatefulWriter::impl& writer, double interval);
 
         virtual ~CleanupEvent();
 
@@ -48,7 +48,11 @@ class CleanupEvent : public TimedEvent
          */
         void event(EventCode code, const char* msg= nullptr);
 
-        StatefulWriter& writer_;
+        void cleanup();
+
+    private:
+
+        StatefulWriter::impl& writer_;
 };
 
 }

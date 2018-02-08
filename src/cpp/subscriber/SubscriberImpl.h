@@ -17,42 +17,44 @@
  *
  */
 
-#ifndef SUBSCRIBERIMPL_H_
-#define SUBSCRIBERIMPL_H_
+#ifndef __SUBSCRIBER_SUBSCRIBERIMPL_H__
+#define __SUBSCRIBER_SUBSCRIBERIMPL_H__
 #ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
+
+#include <fastrtps/subscriber/Subscriber.h>
 #include <fastrtps/rtps/common/Locator.h>
 #include <fastrtps/rtps/common/Guid.h>
-
 #include <fastrtps/attributes/SubscriberAttributes.h>
 #include <fastrtps/subscriber/SubscriberHistory.h>
 #include <fastrtps/rtps/reader/ReaderListener.h>
 #include <fastrtps/participant/Participant.h>
-
+#include "../rtps/reader/RTPSReaderImpl.h"
 
 namespace eprosima {
 namespace fastrtps {
-namespace rtps
-{
-    class RTPSReader;
-    class RTPSParticipant;
-}
-
-
 
 class TopicDataType;
-class SubscriberListener;
-class SampleInfo_t;
-class Subscriber;
 
 /**
  * Class SubscriberImpl, contains the actual implementation of the behaviour of the Subscriber.
  *  @ingroup FASTRTPS_MODULE
  */
-class SubscriberImpl
+class Subscriber::impl
 {
-    friend class Participant::impl;
-
     public:
+
+        class Listener
+        {
+            public:
+
+                Listener() = default;
+
+                virtual ~Listener() = default;
+
+                virtual void onNewDataMessage(Subscriber::impl&) {}
+
+                virtual void onSubscriptionMatched(Subscriber::impl&, const rtps::MatchingInfo&) {}
+        };
 
     /**
      * @param p
@@ -60,9 +62,14 @@ class SubscriberImpl
      * @param attr
      * @param listen
      */
-    SubscriberImpl(Participant::impl& p,TopicDataType* ptype,
-            SubscriberAttributes& attr,SubscriberListener* listen = nullptr);
-    virtual ~SubscriberImpl();
+    impl(Participant::impl& participant, TopicDataType* type,
+            const SubscriberAttributes& attr, Listener* listen = nullptr);
+
+    virtual ~impl();
+
+    bool init();
+
+    void deinit();
 
     /**
      * Method to block the current thread until an unread message is available
@@ -98,13 +105,13 @@ class SubscriberImpl
      * Get the Attributes of the Subscriber.
      * @return Attributes of the Subscriber.
      */
-    const SubscriberAttributes& getAttributes() const {return m_att;}
+    const SubscriberAttributes& getAttributes() const {return att_;}
 
     /**
      * Get topic data type
      * @return Topic data type
      */
-    TopicDataType* getType() {return mp_type;};
+    TopicDataType* getType() {return type_;}
 
     /*!
      * @brief Returns there is a clean state with all Publishers.
@@ -114,45 +121,48 @@ class SubscriberImpl
      */
     bool isInCleanState() const;
 
+    Participant::impl& participant() { return participant_; }
+
     private:
 
     //!Participant
     Participant::impl& participant_;
 
     //!Pointer to associated RTPSReader
-    rtps::RTPSReader* mp_reader;
+    std::shared_ptr<rtps::RTPSReader::impl> reader_;
 
     //! Pointer to the TopicDataType object.
-    TopicDataType* mp_type;
+    TopicDataType* type_;
 
     //!Attributes of the Subscriber
-    SubscriberAttributes m_att;
+    SubscriberAttributes att_;
 
     //!History
-    SubscriberHistory m_history;
+    SubscriberHistory history_;
 
     //!Listener
-    SubscriberListener* mp_listener;
-    class SubscriberReaderListener : public rtps::ReaderListener
+    Listener* listener_;
+
+    class SubscriberReaderListener : public rtps::RTPSReader::impl::Listener
     {
         public:
-            SubscriberReaderListener(SubscriberImpl* s): mp_subscriberImpl(s){};
 
-            virtual ~SubscriberReaderListener(){};
+            SubscriberReaderListener(Subscriber::impl& subscriber) :
+                subscriber_(subscriber) {}
 
-            void onReaderMatched(rtps::RTPSReader* reader, rtps::MatchingInfo& info);
+            virtual ~SubscriberReaderListener() = default;
 
-            void onNewCacheChangeAdded(rtps::RTPSReader* reader, const rtps::CacheChange_t* const change);
-            SubscriberImpl* mp_subscriberImpl;
-    }m_readerListener;
+            void onReaderMatched(rtps::RTPSReader::impl& reader, const rtps::MatchingInfo& info) override;
 
-    Subscriber* mp_userSubscriber;
-    //!RTPSParticipant
-    rtps::RTPSParticipant* mp_rtpsParticipant;
+            void onNewCacheChangeAdded(rtps::RTPSReader::impl& reader,
+                    const rtps::CacheChange_t* const change) override;
+
+            Subscriber::impl& subscriber_;
+    } m_readerListener;
 };
 
 
-} /* namespace fastrtps */
-} /* namespace eprosima */
+} // namespace fastrtps
+} // namespace eprosima
 #endif
-#endif /* SUBSCRIBERIMPL_H_ */
+#endif //__SUBSCRIBER_SUBSCRIBERIMPL_H__

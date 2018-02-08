@@ -55,7 +55,7 @@ class Domain
      * @param listen ParticipantListener Pointer.
      * @return Participant pointer. (nullptr if not created.)
      */
-    RTPS_DllAPI static Participant* createParticipant(const std::string &participant_profile,
+    RTPS_DllAPI static Participant* create_participant(const std::string &participant_profile,
                                                       ParticipantListener *listen = nullptr);
     /**
      * Create a Participant.
@@ -63,7 +63,7 @@ class Domain
      * @param listen ParticipantListener Pointer.
      * @return Participant pointer. (nullptr if not created.)
      */
-    RTPS_DllAPI static Participant* createParticipant(ParticipantAttributes &att,
+    RTPS_DllAPI static Participant* create_participant(ParticipantAttributes &att,
                                                       ParticipantListener *listen = nullptr);
 
     RTPS_DllAPI static void getDefaultParticipantAttributes(ParticipantAttributes& participant_attributes);
@@ -75,7 +75,7 @@ class Domain
      * @param listen Pointer to the PublisherListener.
      * @return Pointer to the created Publisher (nullptr if not created).
      */
-    RTPS_DllAPI static Publisher* createPublisher(Participant *part,
+    RTPS_DllAPI static Publisher* create_publisher(Participant& participant,
                                                   const std::string &publisher_profile,
                                                   PublisherListener *listen = nullptr);
 
@@ -86,7 +86,7 @@ class Domain
      * @param listen Pointer to the PublisherListener.
      * @return Pointer to the created Publisher (nullptr if not created).
      */
-    RTPS_DllAPI static Publisher* createPublisher(Participant *part,
+    RTPS_DllAPI static Publisher* create_publisher(Participant& participant,
                                                   PublisherAttributes &att,
                                                   PublisherListener *listen = nullptr);
 
@@ -120,13 +120,13 @@ class Domain
      * @param part Pointer to the participant.
      * @return True if correctly removed.
      */
-    RTPS_DllAPI static bool removeParticipant(Participant* part);
+    RTPS_DllAPI static bool remove_participant(Participant* participant);
     /**
      * Remove a Publisher.
      * @param pub Pointer to the Publisher.
      * @return True if correctly removed.
      */
-    RTPS_DllAPI static bool removePublisher(Publisher* pub);
+    RTPS_DllAPI static bool remove_publisher(Publisher* publisher);
     /**
      * Remove a Subscriber.
      * @param sub Pointer to the Subscriber.
@@ -149,7 +149,7 @@ class Domain
      * @param type Pointer to the Type.
      * @return True if correctly registered.
      */
-    RTPS_DllAPI static bool registerType(Participant* part, TopicDataType * type);
+    RTPS_DllAPI static bool register_type(Participant& participant, TopicDataType * type);
 
     /**
      * Unregister a type in a participant.

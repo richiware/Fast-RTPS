@@ -20,6 +20,7 @@
 #include <fastrtps/Domain.h>
 #include <fastrtps/rtps/RTPSDomain.h>
 
+//TODO (Ricardo) Remvoe header
 #include "participant/ParticipantImpl.h"
 
 #include <fastrtps/publisher/Publisher.h>
@@ -54,9 +55,9 @@ Domain::~Domain()
 
 void Domain::stopAll()
 {
-    while(m_participants.size() > 0)
+    while(!m_participants.empty())
     {
-        Domain::removeParticipant(*m_participants.begin());
+        delete *m_participants.begin();
     }
 
     //TODO Review sleep
@@ -64,13 +65,13 @@ void Domain::stopAll()
     Log::KillThread();
 }
 
-bool Domain::removeParticipant(Participant* part)
+bool Domain::remove_participant(Participant* participant)
 {
-    if(part!=nullptr)
+    if(participant != nullptr)
     {
         for(auto it = m_participants.begin(); it != m_participants.end(); ++it)
         {
-            if((*it)->getGuid() == part->getGuid())
+            if((*it)->getGuid() == participant->getGuid())
             {
                 //FOUND
                 delete(*it);
@@ -79,19 +80,20 @@ bool Domain::removeParticipant(Participant* part)
             }
         }
     }
+
     return false;
 }
 
-bool Domain::removePublisher(Publisher* pub)
+bool Domain::remove_publisher(Publisher* publisher)
 {
-    if(pub!=nullptr)
+    if(publisher != nullptr)
     {
         for(auto it = m_participants.begin();it!= m_participants.end();++it)
         {
-            if((*it)->getGuid().guidPrefix == pub->getGuid().guidPrefix)
+            if((*it)->getGuid().guidPrefix == publisher->getGuid().guidPrefix)
             {
-                //FOUND
-                return get_implementation(**it).removePublisher(pub);
+                delete publisher;
+                return true;
             }
         }
     }
@@ -114,7 +116,7 @@ bool Domain::removeSubscriber(Subscriber* sub)
     return false;
 }
 
-Participant* Domain::createParticipant(const std::string &participant_profile, ParticipantListener* listen)
+Participant* Domain::create_participant(const std::string &participant_profile, ParticipantListener* listen)
 {
     if (false == default_xml_profiles_loaded)
     {
@@ -128,24 +130,12 @@ Participant* Domain::createParticipant(const std::string &participant_profile, P
         logError(PARTICIPANT, "Problem loading profile '" << participant_profile << "'");
         return nullptr;
     }
-    return createParticipant(participant_att, listen);
+    return create_participant(participant_att, listen);
 }
 
-Participant* Domain::createParticipant(ParticipantAttributes& att,ParticipantListener* listener)
+Participant* Domain::create_participant(ParticipantAttributes& att,ParticipantListener* listener)
 {
     Participant* participant = new Participant(att, listener);
-    RTPSParticipant* part = RTPSDomain::createParticipant(att.rtps,
-            get_implementation(*participant).rtps_listener());
-
-    if(part == nullptr)
-    {
-        logError(PARTICIPANT,"Problem creating RTPSParticipant");
-        delete participant;
-        return nullptr;
-    }
-
-    get_implementation(*participant).rtps_participant(part);
-
     m_participants.push_back(participant);
     return participant;
 }
@@ -161,7 +151,7 @@ void Domain::getDefaultParticipantAttributes(ParticipantAttributes& participant_
     return XMLProfileManager::getDefaultParticipantAttributes(participant_attributes);
 }
 
-Publisher* Domain::createPublisher(Participant *part, const std::string &publisher_profile, PublisherListener *listen)
+Publisher* Domain::create_publisher(Participant &participant, const std::string &publisher_profile, PublisherListener *listen)
 {
     PublisherAttributes publisher_att;
     if ( XMLP_ret::XML_ERROR == XMLProfileManager::fillPublisherAttributes(publisher_profile, publisher_att))
@@ -169,18 +159,20 @@ Publisher* Domain::createPublisher(Participant *part, const std::string &publish
         logError(PUBLISHER, "Problem loading profile '" << publisher_profile << "'");
         return nullptr;
     }
-    return createPublisher(part, publisher_att, listen);
+
+    return create_publisher(participant, publisher_att, listen);
 }
 
-Publisher* Domain::createPublisher(Participant *part, PublisherAttributes &att, PublisherListener *listen)
+Publisher* Domain::create_publisher(Participant &participant, PublisherAttributes &att, PublisherListener *listen)
 {
     for (auto it = m_participants.begin(); it != m_participants.end(); ++it)
     {
-        if((*it)->getGuid() == part->getGuid())
+        if((*it)->getGuid() == participant.getGuid())
         {
-            return get_implementation(*part).createPublisher(att,listen);
+            return new Publisher(participant, att, listen);
         }
     }
+
     //TODO MOSTRAR MENSAJE DE ERROR WARNING y COMPROBAR QUE EL PUNTERO QUE ME PASA NO ES NULL
     return nullptr;
 }
@@ -242,17 +234,18 @@ bool Domain::getRegisteredType(Participant* part, const char* typeName, TopicDat
     return false;
 }
 
-bool Domain::registerType(Participant* part, TopicDataType* type)
+bool Domain::register_type(Participant& participant, TopicDataType* type)
 {
     //TODO El registro debería hacerse de manera que no tengamos un objeto del usuario sino que tengamos un objeto TopicDataTYpe propio para que no
     //haya problemas si el usuario lo destruye antes de tiempo.
     for (auto it = m_participants.begin(); it != m_participants.end();++it)
     {
-        if((*it)->getGuid() == part->getGuid())
+        if((*it)->getGuid() == participant.getGuid())
         {
-            return get_implementation(*part).registerType(type);
+            return participant.register_type(type);
         }
     }
+
     return false;
 }
 

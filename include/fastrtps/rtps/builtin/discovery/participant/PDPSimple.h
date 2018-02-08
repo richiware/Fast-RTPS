@@ -17,28 +17,28 @@
  *
  */
 
-#ifndef PDPSIMPLE_H_
-#define PDPSIMPLE_H_
+#ifndef __RTPS_BUILTIN_DISCOVERY_PARTICIPANT_PDPSIMPLE_H__
+#define __RTPS_BUILTIN_DISCOVERY_PARTICIPANT_PDPSIMPLE_H__
 #ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
 
-#include <mutex>
 #include "../../../common/Guid.h"
 #include "../../../attributes/RTPSParticipantAttributes.h"
 #include "../../../history/WriterHistory.h"
-
+#include "../../../participant/RTPSParticipant.h"
 #include "../../../../qos/QosPolicies.h"
+#include "../../../reader/StatelessReader.h"
+#include "../../../writer/StatelessWriter.h"
 
-
+#include <mutex>
+#include <memory>
 
 namespace eprosima {
 namespace fastrtps{
 namespace rtps {
 
-class StatelessWriter;
-class StatelessReader;
 class ReaderHistory;
-class RTPSParticipantImpl;
 class BuiltinProtocols;
+class WLP;
 class EDP;
 class ResendParticipantProxyDataPeriod;
 class RemoteParticipantLeaseDuration;
@@ -54,15 +54,19 @@ class PDPSimpleListener;
  */
 class PDPSimple 
 {
+    //TODO(Ricardo) REview friendship
     friend class ResendRTPSParticipantProxyDataPeriod;
     friend class RemoteRTPSParticipantLeaseDuration;
     friend class PDPSimpleListener;
+
     public:
+
     /**
      * Constructor
      * @param builtin Pointer to the BuiltinProcols object.
      */
-    PDPSimple(BuiltinProtocols* builtin);
+    PDPSimple(BuiltinProtocols* builtinRTPS, RTPSParticipant::impl& participant);
+
     virtual ~PDPSimple();
 
     void initializeParticipantProxyData(ParticipantProxyData* participant_data);
@@ -72,7 +76,7 @@ class PDPSimple
      * @param part Pointer to the RTPSParticipant.
      * @return True on success
      */
-    bool initPDP(RTPSParticipantImpl* part);
+    bool init();
 
     /**
      * Force the sending of our local DPD to all remote RTPSParticipants and multicast Locators.
@@ -172,6 +176,8 @@ class PDPSimple
      * @return pointer to the EDP object.
      */
     inline EDP* getEDP(){return mp_EDP;}
+
+    inline WLP* wlp() const { return mp_WLP; }
     /**
      * Get a cons_iterator to the beginning of the RTPSParticipant Proxies.
      * @return const_iterator.
@@ -214,7 +220,7 @@ class PDPSimple
      * Get the RTPS participant
      * @return RTPS participant
      */
-    inline RTPSParticipantImpl* getRTPSParticipant() const {return mp_RTPSParticipant;};
+    inline RTPSParticipant::impl& participant() const { return participant_; };
     /**
      * Get the mutex.
      * @return Pointer to the Mutex
@@ -224,14 +230,19 @@ class PDPSimple
     CDRMessage_t get_participant_proxy_data_serialized(Endianness_t endian);
 
     private:
+
     //!Pointer to the local RTPSParticipant.
-    RTPSParticipantImpl* mp_RTPSParticipant;
+    RTPSParticipant::impl& participant_;
+
     //!Discovery attributes.
     BuiltinAttributes m_discovery;
     //!Pointer to the SPDPWriter.
-    StatelessWriter* mp_SPDPWriter;
+    std::shared_ptr<RTPSWriter::impl> spdp_writer_;
+    StatelessWriter::impl* spdp_writerless_;
     //!Pointer to the SPDPReader.
-    StatelessReader* mp_SPDPReader;
+    std::shared_ptr<RTPSReader::impl> spdp_reader_;
+    //!Pointer to the WLP
+    WLP* mp_WLP;
     //!Pointer to the EDP object.
     EDP* mp_EDP;
     //!Registered RTPSParticipants (including the local one, that is the first one.)
@@ -243,9 +254,10 @@ class PDPSimple
     //!Listener for the SPDP messages.
     PDPSimpleListener* mp_listener;
     //!WriterHistory
-    WriterHistory* mp_SPDPWriterHistory;
+    //TODO(Ricardo) Object instead of pointer
+    WriterHistory::impl* spdp_writer_history_;
     //!Reader History
-    ReaderHistory* mp_SPDPReaderHistory;
+    ReaderHistory* spdp_reader_history_;
 
     /**
      * Create the SPDP Writer and Reader
@@ -258,8 +270,9 @@ class PDPSimple
 
 };
 
-}
-} /* namespace rtps */
-} /* namespace eprosima */
+} // namespace rtps
+} // namespace fastrtps
+} // namespace eprosima
+
 #endif
-#endif /* PDPSIMPLE_H_ */
+#endif // __RTPS_BUILTIN_DISCOVERY_PARTICIPANT_PDPSIMPLE_H__

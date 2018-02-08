@@ -18,19 +18,13 @@
  */
 
 #include <fastrtps/rtps/messages/MessageReceiver.h>
-
-#include <fastrtps/rtps/writer/StatefulWriter.h>
-#include <fastrtps/rtps/reader/StatefulReader.h>
-
+#include "../writer/StatefulWriterImpl.h"
+#include "../reader/RTPSReaderImpl.h"
 #include <fastrtps/rtps/writer/ReaderProxy.h>
 #include <fastrtps/rtps/reader/WriterProxy.h>
-
 #include <fastrtps/rtps/reader/timedevent/HeartbeatResponseDelay.h>
-
 #include <fastrtps/rtps/writer/timedevent/NackResponseDelay.h>
-
 #include <fastrtps/rtps/reader/ReaderListener.h>
-
 #include "../participant/RTPSParticipantImpl.h"
 
 #include <mutex>
@@ -50,9 +44,9 @@ namespace fastrtps{
 namespace rtps {
 
 
-MessageReceiver::MessageReceiver(RTPSParticipantImpl* participant) : participant_(participant) {}
+MessageReceiver::MessageReceiver(RTPSParticipant::impl& participant) : participant_(participant) {}
 
-MessageReceiver::MessageReceiver(RTPSParticipantImpl* participant, uint32_t rec_buffer_size) :
+MessageReceiver::MessageReceiver(RTPSParticipant::impl& participant, uint32_t rec_buffer_size) :
     m_rec_msg(rec_buffer_size),
 #if HAVE_SECURITY
     m_crypto_msg(rec_buffer_size),
@@ -84,56 +78,60 @@ MessageReceiver::~MessageReceiver()
     assert(AssociatedReaders.size() == 0);
 }
 
-void MessageReceiver::associateEndpoint(Endpoint *to_add){
+//TODO(Ricardo) Study if fails when is already there the writer, with an assertion.
+void MessageReceiver::associate_writer(RTPSWriter::impl* to_add)
+{
     bool found = false;
     std::lock_guard<std::mutex> guard(mtx);
-    if(to_add->getAttributes()->endpointKind == WRITER)
+    for(auto it = AssociatedWriters.begin(); it != AssociatedWriters.end(); ++it)
     {
-        for(auto it = AssociatedWriters.begin(); it != AssociatedWriters.end(); ++it)
+        if(*it == to_add)
         {
-            if( (*it) == (RTPSWriter*)to_add )
-            {
-                found = true;
-                break;
-            }
+            found = true;
+            break;
         }
-        if(!found) AssociatedWriters.push_back((RTPSWriter*)to_add);
     }
-    else
-    {
-        for(auto it = AssociatedReaders.begin(); it != AssociatedReaders.end(); ++it)
-        {
-            if( (*it) == (RTPSReader*)to_add )
-            {
-                found = true;
-                break;
-            }
-        }
-        if(!found) AssociatedReaders.push_back((RTPSReader*)to_add);
-    }
-    return;
+    if(!found) AssociatedWriters.push_back(to_add);
 }
-void MessageReceiver::removeEndpoint(Endpoint *to_remove){
 
+void MessageReceiver::associate_reader(RTPSReader::impl* to_add){
+    bool found = false;
     std::lock_guard<std::mutex> guard(mtx);
-    if(to_remove->getAttributes()->endpointKind == WRITER){
-        RTPSWriter* var = (RTPSWriter *)to_remove;
-        for(auto it=AssociatedWriters.begin(); it !=AssociatedWriters.end(); ++it){
-            if ((*it) == var){
-                AssociatedWriters.erase(it);
-                break;
-            }
-        }
-    }else{
-        RTPSReader *var = (RTPSReader *)to_remove;
-        for(auto it=AssociatedReaders.begin(); it !=AssociatedReaders.end(); ++it){
-            if ((*it) == var){
-                AssociatedReaders.erase(it);
-                break;
-            }
+    for(auto it = AssociatedReaders.begin(); it != AssociatedReaders.end(); ++it)
+    {
+        if(*it == to_add )
+        {
+            found = true;
+            break;
         }
     }
-    return;
+    if(!found) AssociatedReaders.push_back(to_add);
+}
+
+void MessageReceiver::remove_writer(RTPSWriter::impl* to_remove)
+{
+    std::lock_guard<std::mutex> guard(mtx);
+    for(auto it = AssociatedWriters.begin(); it !=AssociatedWriters.end(); ++it)
+    {
+        if(*it == to_remove)
+        {
+            AssociatedWriters.erase(it);
+            break;
+        }
+    }
+}
+
+void MessageReceiver::remove_reader(RTPSReader::impl *to_remove)
+{
+    std::lock_guard<std::mutex> guard(mtx);
+    for(auto it = AssociatedReaders.begin(); it !=AssociatedReaders.end(); ++it)
+    {
+        if(*it == to_remove)
+        {
+            AssociatedReaders.erase(it);
+            break;
+        }
+    }
 }
 
 
@@ -194,7 +192,7 @@ void MessageReceiver::processCDRMsg(const GuidPrefix_t& RTPSParticipantguidprefi
 #if HAVE_SECURITY
     CDRMessage_t* auxiliary_buffer = &m_crypto_msg;
 
-    int decode_ret = participant_->security_manager().decode_rtps_message(*msg, *auxiliary_buffer, sourceGuidPrefix);
+    int decode_ret = participant_.security_manager().decode_rtps_message(*msg, *auxiliary_buffer, sourceGuidPrefix);
 
     if(decode_ret < 0)
         return;
@@ -217,7 +215,7 @@ void MessageReceiver::processCDRMsg(const GuidPrefix_t& RTPSParticipantguidprefi
         CDRMessage_t* submessage = msg;
 
 #if HAVE_SECURITY
-        decode_ret = participant_->security_manager().decode_rtps_submessage(*msg, *auxiliary_buffer, sourceGuidPrefix);
+        decode_ret = participant_.security_manager().decode_rtps_submessage(*msg, *auxiliary_buffer, sourceGuidPrefix);
 
         if(decode_ret < 0)
             return;
@@ -227,7 +225,9 @@ void MessageReceiver::processCDRMsg(const GuidPrefix_t& RTPSParticipantguidprefi
 
         //First 4 bytes must contain: ID | flags | octets to next header
         if(!readSubmessageHeader(submessage, &submsgh))
+        {
             return;
+        }
 
         if(submessage->pos + submsgh.submessageLength > submessage->length)
         {
@@ -463,15 +463,14 @@ bool MessageReceiver::proc_Submsg_Data(CDRMessage_t* msg,SubmessageHeader_t* smh
 
     //WE KNOW THE READER THAT THE MESSAGE IS DIRECTED TO SO WE LOOK FOR IT:
 
-    RTPSReader* firstReader = nullptr;
+    RTPSReader::impl* firstReader = nullptr;
     if(AssociatedReaders.empty())
     {
         logWarning(RTPS_MSG_IN,IDSTRING"Data received when NO readers are listening");
         return false;
     }
 
-    for(std::vector<RTPSReader*>::iterator it=AssociatedReaders.begin();
-            it != AssociatedReaders.end(); ++it)
+    for(auto it= AssociatedReaders.begin(); it != AssociatedReaders.end(); ++it)
     {
         if((*it)->acceptMsgDirectedTo(readerID)) //add
         {
@@ -588,8 +587,7 @@ bool MessageReceiver::proc_Submsg_Data(CDRMessage_t* msg,SubmessageHeader_t* smh
     //FIXME: DO SOMETHING WITH PARAMETERLIST CREATED.
     logInfo(RTPS_MSG_IN,IDSTRING"from Writer " << ch.writer_guid << "; possible RTPSReaders: "<<AssociatedReaders.size());
     //Look for the correct reader to add the change
-    for(std::vector<RTPSReader*>::iterator it = AssociatedReaders.begin();
-            it != AssociatedReaders.end(); ++it)
+    for(auto it = AssociatedReaders.begin(); it != AssociatedReaders.end(); ++it)
     {
         if((*it)->acceptMsgDirectedTo(readerID))
         {
@@ -643,9 +641,8 @@ bool MessageReceiver::proc_Submsg_DataFrag(CDRMessage_t* msg, SubmessageHeader_t
         return false;
     }
 
-    RTPSReader* firstReader = nullptr;
-    for (std::vector<RTPSReader*>::iterator it = AssociatedReaders.begin();
-            it != AssociatedReaders.end(); ++it)
+    RTPSReader::impl* firstReader = nullptr;
+    for (auto it = AssociatedReaders.begin(); it != AssociatedReaders.end(); ++it)
     {
         if ((*it)->acceptMsgDirectedTo(readerID)) //add
         {
@@ -787,8 +784,7 @@ bool MessageReceiver::proc_Submsg_DataFrag(CDRMessage_t* msg, SubmessageHeader_t
     //FIXME: DO SOMETHING WITH PARAMETERLIST CREATED.
     logInfo(RTPS_MSG_IN, IDSTRING"from Writer " << ch.writer_guid << "; possible RTPSReaders: " << AssociatedReaders.size());
     //Look for the correct reader to add the change
-    for (std::vector<RTPSReader*>::iterator it = AssociatedReaders.begin();
-            it != AssociatedReaders.end(); ++it)
+    for(auto it = AssociatedReaders.begin(); it != AssociatedReaders.end(); ++it)
     {
         if ((*it)->acceptMsgDirectedTo(readerID))
         {
@@ -833,8 +829,7 @@ bool MessageReceiver::proc_Submsg_Heartbeat(CDRMessage_t* msg,SubmessageHeader_t
 
     std::lock_guard<std::mutex> guard(mtx);
     //Look for the correct reader and writers:
-    for (std::vector<RTPSReader*>::iterator it = AssociatedReaders.begin();
-            it != AssociatedReaders.end(); ++it)
+    for(auto it = AssociatedReaders.begin(); it != AssociatedReaders.end(); ++it)
     {
         if((*it)->acceptMsgDirectedTo(readerGUID.entityId))
         {
@@ -874,14 +869,14 @@ bool MessageReceiver::proc_Submsg_Acknack(CDRMessage_t* msg,SubmessageHeader_t* 
 
     std::lock_guard<std::mutex> guard(mtx);
     //Look for the correct writer to use the acknack
-    for (std::vector<RTPSWriter*>::iterator it = AssociatedWriters.begin();
+    for (std::vector<RTPSWriter::impl*>::iterator it = AssociatedWriters.begin();
             it != AssociatedWriters.end(); ++it)
     {
         if((*it)->getGuid() == writerGUID)
         {
             if((*it)->getAttributes()->reliabilityKind == RELIABLE)
             {
-                StatefulWriter* SF = (StatefulWriter*)(*it);
+                StatefulWriter::impl* SF = (StatefulWriter::impl*)(*it);
                 SF->process_acknack(readerGUID, Ackcount, SNSet, finalFlag);
                 return true;
             }
@@ -925,7 +920,7 @@ bool MessageReceiver::proc_Submsg_Gap(CDRMessage_t* msg,SubmessageHeader_t* smh,
         return false;
 
     std::lock_guard<std::mutex> guard(mtx);
-    for (std::vector<RTPSReader*>::iterator it = AssociatedReaders.begin();
+    for(auto it = AssociatedReaders.begin();
             it != AssociatedReaders.end(); ++it)
     {
         if((*it)->acceptMsgDirectedTo(readerGUID.entityId))
@@ -1038,14 +1033,14 @@ bool MessageReceiver::proc_Submsg_NackFrag(CDRMessage_t*msg, SubmessageHeader_t*
 
     std::lock_guard<std::mutex> guard(mtx);
     //Look for the correct writer to use the acknack
-    for (std::vector<RTPSWriter*>::iterator it = AssociatedWriters.begin();
+    for (std::vector<RTPSWriter::impl*>::iterator it = AssociatedWriters.begin();
             it != AssociatedWriters.end(); ++it)
     {
         if ((*it)->getGuid() == writerGUID)
         {
             if ((*it)->getAttributes()->reliabilityKind == RELIABLE)
             {
-                StatefulWriter* SF = (StatefulWriter*)(*it);
+                StatefulWriter::impl* SF = (StatefulWriter::impl*)(*it);
                 SF->process_nackfrag(readerGUID, Ackcount, writerSN, fnState);
                 return true;
             }
@@ -1089,8 +1084,7 @@ bool MessageReceiver::proc_Submsg_HeartbeatFrag(CDRMessage_t*msg, SubmessageHead
 
     std::lock_guard<std::mutex> guard(mtx);
     //Look for the correct reader and writers:
-    for (std::vector<RTPSReader*>::iterator it = AssociatedReaders.begin();
-            it != AssociatedReaders.end(); ++it)
+    for(auto it = AssociatedReaders.begin(); it != AssociatedReaders.end(); ++it)
     {
         /* XXX TODO PROCESS
            if ((*it)->acceptMsgDirectedTo(readerGUID.entityId))

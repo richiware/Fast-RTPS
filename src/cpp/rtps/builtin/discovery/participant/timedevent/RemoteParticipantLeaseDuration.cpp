@@ -38,12 +38,11 @@ namespace fastrtps{
 namespace rtps {
 
 
-RemoteParticipantLeaseDuration::RemoteParticipantLeaseDuration(PDPSimple* p_SPDP,
-        ParticipantProxyData* pdata,
-        double interval):
-    TimedEvent(p_SPDP->getRTPSParticipant()->getEventResource().getIOService(),
-            p_SPDP->getRTPSParticipant()->getEventResource().getThread(), interval, TimedEvent::ON_SUCCESS),
-    mp_PDP(p_SPDP),
+RemoteParticipantLeaseDuration::RemoteParticipantLeaseDuration(PDPSimple& pdpsimple,
+        ParticipantProxyData* pdata, double interval) :
+    TimedEvent(pdpsimple.participant().getEventResource().getIOService(),
+            pdpsimple.participant().getEventResource().getThread(), interval, TimedEvent::ON_SUCCESS),
+    pdpsimple_(pdpsimple),
     mp_participantProxyData(pdata)
     {
 
@@ -71,12 +70,13 @@ void RemoteParticipantLeaseDuration::event(EventCode code, const char* msg)
 
         // Set pointer to null because this call will be delete itself.
         mp_participantProxyData->mp_leaseDurationTimer = nullptr;
-        mp_PDP->removeRemoteParticipant(mp_participantProxyData->m_guid);
+        pdpsimple_.removeRemoteParticipant(mp_participantProxyData->m_guid);
 
-        if(mp_PDP->getRTPSParticipant()->getListener()!=nullptr)
-            mp_PDP->getRTPSParticipant()->getListener()->onRTPSParticipantDiscovery(
-                    mp_PDP->getRTPSParticipant()->getUserRTPSParticipant(),
-                    info);
+        if(pdpsimple_.participant().listener() != nullptr)
+        {
+            pdpsimple_.participant().listener()->onRTPSParticipantDiscovery(
+                    pdpsimple_.participant(), info);
+        }
     }
     else if(code == EVENT_ABORT)
     {

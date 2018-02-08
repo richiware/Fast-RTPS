@@ -19,7 +19,7 @@
 
 #include <fastrtps/rtps/messages/RTPSMessageGroup.h>
 #include <fastrtps/rtps/messages/RTPSMessageCreator.h>
-#include <fastrtps/rtps/writer/RTPSWriter.h>
+#include "../writer/RTPSWriterImpl.h"
 #include "../participant/RTPSParticipantImpl.h"
 #include "../flowcontrol/FlowController.h"
 
@@ -135,7 +135,7 @@ EntityId_t get_entity_id(const std::vector<GUID_t> endpoints)
     return entityid;
 }
 
-RTPSMessageGroup::RTPSMessageGroup(RTPSParticipantImpl* participant, Endpoint* endpoint, ENDPOINT_TYPE type,
+RTPSMessageGroup::RTPSMessageGroup(RTPSParticipant::impl& participant, Endpoint* endpoint, ENDPOINT_TYPE type,
         RTPSMessageGroup_t& msg_group) :
     participant_(participant), endpoint_(endpoint), full_msg_(&msg_group.rtpsmsg_fullmsg_),
     submessage_msg_(&msg_group.rtpsmsg_submessage_), currentBytesSent_(0)
@@ -143,7 +143,6 @@ RTPSMessageGroup::RTPSMessageGroup(RTPSParticipantImpl* participant, Endpoint* e
     , type_(type), encrypt_msg_(&msg_group.rtpsmsg_encrypt_)
 #endif
 {
-    assert(participant);
     assert(endpoint);
     (void)type;
 
@@ -176,7 +175,7 @@ bool RTPSMessageGroup::check_preconditions(const LocatorList_t& locator_list,
 
     return locator_list == current_locators_
 #if HAVE_SECURITY
-        && (!participant_->is_rtps_protected() || !endpoint_->supports_rtps_protection() ||
+        && (!participant_.is_rtps_protected() || !endpoint_->supports_rtps_protection() ||
          compare_remote_participants(remote_participants, current_remote_participants_))
 #endif
         ;
@@ -195,14 +194,14 @@ void RTPSMessageGroup::send()
     {
 #if HAVE_SECURITY
         // TODO(Ricardo) Control message size if it will be encrypted.
-        if(participant_->is_rtps_protected() && endpoint_->supports_rtps_protection())
+        if(participant_.is_rtps_protected() && endpoint_->supports_rtps_protection())
         {
-            participant_->security_manager().encode_rtps_message(*full_msg_, current_remote_participants_);
+            participant_.security_manager().encode_rtps_message(*full_msg_, current_remote_participants_);
         }
 #endif
 
         for(const auto& lit : current_locators_)
-            participant_->sendSync(full_msg_, endpoint_, lit);
+            participant_.sendSync(full_msg_, endpoint_, lit);
 
         currentBytesSent_ += full_msg_->length;
     }
@@ -288,7 +287,7 @@ bool RTPSMessageGroup::add_info_dst_in_buffer(CDRMessage_t* buffer, const std::v
             buffer->pos = from_buffer_position;
             if(type_ == WRITER)
             {
-                if(!participant_->security_manager().encode_writer_submessage(*buffer, endpoint_->getGuid(),
+                if(!participant_.security_manager().encode_writer_submessage(*buffer, endpoint_->getGuid(),
                             remote_endpoints))
                 {
                     logError(RTPS_WRITER, "Cannot encrypt INFO_DST submessage for writer " << endpoint_->getGuid());
@@ -297,7 +296,7 @@ bool RTPSMessageGroup::add_info_dst_in_buffer(CDRMessage_t* buffer, const std::v
             }
             else
             {
-                if(!participant_->security_manager().encode_reader_submessage(*buffer, endpoint_->getGuid(),
+                if(!participant_.security_manager().encode_reader_submessage(*buffer, endpoint_->getGuid(),
                             remote_endpoints))
                 {
                     logError(RTPS_READER, "Cannot encrypt INFO_DST submessage for reader " << endpoint_->getGuid());
@@ -332,7 +331,7 @@ bool RTPSMessageGroup::add_info_ts_in_buffer(const std::vector<GUID_t>& remote_r
     if(endpoint_->is_submessage_protected())
     {
         submessage_msg_->pos = from_buffer_position;
-        if(!participant_->security_manager().encode_writer_submessage(*submessage_msg_, endpoint_->getGuid(),
+        if(!participant_.security_manager().encode_writer_submessage(*submessage_msg_, endpoint_->getGuid(),
                     remote_readers))
         {
             logError(RTPS_WRITER, "Cannot encrypt DATA submessage for writer " << endpoint_->getGuid());
@@ -379,7 +378,7 @@ bool RTPSMessageGroup::add_data(const CacheChange_t& change, const std::vector<G
         CDRMessage::initCDRMsg(encrypt_msg_);
 
         // If payload protection, encode payload
-        if(!participant_->security_manager().encode_serialized_payload(change.serialized_payload,
+        if(!participant_.security_manager().encode_serialized_payload(change.serialized_payload,
                     *encrypt_msg_, endpoint_->getGuid()))
         {
             logError(RTPS_WRITER, "Error encoding change " << change.sequence_number);
@@ -405,7 +404,7 @@ bool RTPSMessageGroup::add_data(const CacheChange_t& change, const std::vector<G
     if(endpoint_->is_submessage_protected())
     {
         submessage_msg_->pos = from_buffer_position;
-        if(!participant_->security_manager().encode_writer_submessage(*submessage_msg_, endpoint_->getGuid(),
+        if(!participant_.security_manager().encode_writer_submessage(*submessage_msg_, endpoint_->getGuid(),
                     remote_readers))
         {
             logError(RTPS_WRITER, "Cannot encrypt DATA submessage for writer " << endpoint_->getGuid());
@@ -458,7 +457,7 @@ bool RTPSMessageGroup::add_data_frag(const CacheChange_t& change, const uint32_t
         CDRMessage::initCDRMsg(encrypt_msg_);
 
         // If payload protection, encode payload
-        if(!participant_->security_manager().encode_serialized_payload(change_to_add.serialized_payload,
+        if(!participant_.security_manager().encode_serialized_payload(change_to_add.serialized_payload,
                     *encrypt_msg_, endpoint_->getGuid()))
         {
             logError(RTPS_WRITER, "Error encoding change " << change.sequence_number);
@@ -485,7 +484,7 @@ bool RTPSMessageGroup::add_data_frag(const CacheChange_t& change, const uint32_t
     if(endpoint_->is_submessage_protected())
     {
         submessage_msg_->pos = from_buffer_position;
-        if(!participant_->security_manager().encode_writer_submessage(*submessage_msg_, endpoint_->getGuid(),
+        if(!participant_.security_manager().encode_writer_submessage(*submessage_msg_, endpoint_->getGuid(),
                     remote_readers))
         {
             logError(RTPS_WRITER, "Cannot encrypt DATA submessage for writer " << endpoint_->getGuid());
@@ -520,7 +519,7 @@ bool RTPSMessageGroup::add_heartbeat(const std::vector<GUID_t>& remote_readers, 
     if(endpoint_->is_submessage_protected())
     {
         submessage_msg_->pos = from_buffer_position;
-        if(!participant_->security_manager().encode_writer_submessage(*submessage_msg_, endpoint_->getGuid(),
+        if(!participant_.security_manager().encode_writer_submessage(*submessage_msg_, endpoint_->getGuid(),
                     remote_readers))
         {
             logError(RTPS_WRITER, "Cannot encrypt HEARTBEAT submessage for writer " << endpoint_->getGuid());
@@ -564,7 +563,7 @@ bool RTPSMessageGroup::add_gap(std::set<SequenceNumber_t>& changesSeqNum,
         if(endpoint_->is_submessage_protected())
         {
             submessage_msg_->pos = from_buffer_position;
-            if(!participant_->security_manager().encode_writer_submessage(*submessage_msg_, endpoint_->getGuid(),
+            if(!participant_.security_manager().encode_writer_submessage(*submessage_msg_, endpoint_->getGuid(),
                         remote_readers))
             {
                 logError(RTPS_WRITER, "Cannot encrypt DATA submessage for writer " << endpoint_->getGuid());
@@ -603,7 +602,7 @@ bool RTPSMessageGroup::add_acknack(const GUID_t& remote_writer, SequenceNumberSe
     if(endpoint_->is_submessage_protected())
     {
         submessage_msg_->pos = from_buffer_position;
-        if(!participant_->security_manager().encode_reader_submessage(*submessage_msg_, endpoint_->getGuid(),
+        if(!participant_.security_manager().encode_reader_submessage(*submessage_msg_, endpoint_->getGuid(),
                     std::vector<GUID_t>{remote_writer}))
         {
             logError(RTPS_READER, "Cannot encrypt ACKNACK submessage for writer " << endpoint_->getGuid());
@@ -635,7 +634,7 @@ bool RTPSMessageGroup::add_nackfrag(const GUID_t& remote_writer, SequenceNumber_
     if(endpoint_->is_submessage_protected())
     {
         submessage_msg_->pos = from_buffer_position;
-        if(!participant_->security_manager().encode_reader_submessage(*submessage_msg_, endpoint_->getGuid(),
+        if(!participant_.security_manager().encode_reader_submessage(*submessage_msg_, endpoint_->getGuid(),
                     std::vector<GUID_t>{remote_writer}))
         {
             logError(RTPS_READER, "Cannot encrypt ACKNACK submessage for writer " << endpoint_->getGuid());

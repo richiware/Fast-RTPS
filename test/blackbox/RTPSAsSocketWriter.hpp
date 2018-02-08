@@ -20,10 +20,10 @@
 #ifndef _TEST_BLACKBOX_RTPSASSOCKETWRITER_HPP_
 #define _TEST_BLACKBOX_RTPSASSOCKETWRITER_HPP_
 
-#include <fastrtps/rtps/RTPSDomain.h>
 #include <fastrtps/rtps/participant/RTPSParticipant.h>
 #include <fastrtps/rtps/attributes/RTPSParticipantAttributes.h>
-#include <fastrtps/rtps/writer/RTPSWriter.h>
+#include <fastrtps/rtps/writer/StatefulWriter.h>
+#include <fastrtps/rtps/writer/StatelessWriter.h>
 #include <fastrtps/rtps/attributes/HistoryAttributes.h>
 #include <fastrtps/rtps/history/WriterHistory.h>
 #include <fastrtps/rtps/rtps_fwd.h>
@@ -71,9 +71,13 @@ class RTPSAsSocketWriter
         virtual ~RTPSAsSocketWriter()
         {
             if(participant_ != nullptr)
-                eprosima::fastrtps::rtps::RTPSDomain::removeRTPSParticipant(participant_);
+            {
+                delete participant_;
+            }
             if(history_ != nullptr)
-                delete(history_);
+            {
+                delete history_;
+            }
         }
 
         void init()
@@ -84,7 +88,8 @@ class RTPSAsSocketWriter
             pattr.builtin.use_WriterLivelinessProtocol = false;
             pattr.builtin.domainId = (uint32_t)GET_PID() % 230;
             pattr.participantID = 2;
-            participant_ = eprosima::fastrtps::rtps::RTPSDomain::createParticipant(pattr);
+            participant_ = new eprosima::fastrtps::rtps::RTPSParticipant(pattr,
+                    eprosima::fastrtps::rtps::GuidPrefix_t::unknown());
             ASSERT_NE(participant_, nullptr);
 
             //Create writerhistory
@@ -92,7 +97,14 @@ class RTPSAsSocketWriter
             history_ = new eprosima::fastrtps::rtps::WriterHistory(hattr_);
 
             //Create writer
-            writer_ = eprosima::fastrtps::rtps::RTPSDomain::createRTPSWriter(participant_, writer_attr_, *history_);
+            if(writer_attr_.endpoint.reliabilityKind == eprosima::fastrtps::rtps::ReliabilityKind_t::RELIABLE)
+            {
+                writer_ = new eprosima::fastrtps::rtps::StatefulWriter(*participant_, writer_attr_, *history_);
+            }
+            else
+            {
+                writer_ = new eprosima::fastrtps::rtps::StatelessWriter(*participant_, writer_attr_, *history_);
+            }
             ASSERT_NE(writer_, nullptr);
 
             register_reader();
@@ -166,7 +178,7 @@ class RTPSAsSocketWriter
             }
 
             //Add remote reader (in this case a reader in the same machine)
-            eprosima::fastrtps::rtps::GUID_t guid = participant_->getGuid();
+            eprosima::fastrtps::rtps::GUID_t guid = participant_->guid();
 
             eprosima::fastrtps::rtps::RemoteReaderAttributes rattr;
             eprosima::fastrtps::rtps::Locator_t loc;

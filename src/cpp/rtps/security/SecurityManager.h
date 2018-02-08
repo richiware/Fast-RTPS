@@ -19,7 +19,7 @@
 #define _RTPS_SECURITY_SECURITYMANAGER_H_
 
 #include <rtps/security/SecurityPluginFactory.h>
-
+#include <fastrtps/rtps/participant/RTPSParticipant.h>
 #include <fastrtps/rtps/security/authentication/Handshake.h>
 #include <fastrtps/rtps/security/common/ParticipantGenericMessage.h>
 #include <fastrtps/rtps/reader/ReaderListener.h>
@@ -29,6 +29,9 @@
 #include <fastrtps/rtps/builtin/data/ReaderProxyData.h>
 #include <fastrtps/rtps/builtin/data/WriterProxyData.h>
 #include <fastrtps/rtps/builtin/data/ParticipantProxyData.h>
+#include "../reader/RTPSReaderImpl.h"
+#include <fastrtps/rtps/writer/RTPSWriter.h>
+#include <fastrtps/rtps/history/WriterHistory.h>
 
 #include <map>
 #include <mutex>
@@ -40,12 +43,6 @@ namespace eprosima {
 namespace fastrtps {
 namespace rtps {
 
-class RTPSParticipantImpl;
-class StatelessWriter;
-class StatelessReader;
-class StatefulWriter;
-class StatefulReader;
-class WriterHistory;
 class ReaderHistory;
 
 namespace security {
@@ -59,7 +56,7 @@ class SecurityManager
 
     public:
 
-        SecurityManager(RTPSParticipantImpl* participant);
+        SecurityManager(RTPSParticipant::impl& participant);
 
         ~SecurityManager();
 
@@ -97,7 +94,7 @@ class SecurityManager
 
         uint32_t builtin_endpoints();
 
-        RTPSParticipantImpl* participant() { return participant_; }
+        RTPSParticipant::impl& participant() { return participant_; }
 
         bool encode_rtps_message(CDRMessage_t& message,
                 const std::vector<GuidPrefix_t>& receiving_list);
@@ -237,14 +234,14 @@ class SecurityManager
 
         };
 
-        class ParticipantStatelessMessageListener: public eprosima::fastrtps::rtps::ReaderListener
+        class ParticipantStatelessMessageListener: public eprosima::fastrtps::rtps::RTPSReader::impl::Listener
         {
             public:
                 ParticipantStatelessMessageListener(SecurityManager &manager) : manager_(manager) {};
 
                 ~ParticipantStatelessMessageListener(){};
 
-                void onNewCacheChangeAdded(RTPSReader* reader, const CacheChange_t* const change);
+                void onNewCacheChangeAdded(RTPSReader::impl& reader, const CacheChange_t* const change) override;
 
             private:
 
@@ -253,14 +250,14 @@ class SecurityManager
                 SecurityManager &manager_;
         } participant_stateless_message_listener_;
 
-        class ParticipantVolatileMessageListener: public eprosima::fastrtps::rtps::ReaderListener
+        class ParticipantVolatileMessageListener: public eprosima::fastrtps::rtps::RTPSReader::impl::Listener
         {
             public:
                 ParticipantVolatileMessageListener(SecurityManager &manager) : manager_(manager) {};
 
                 ~ParticipantVolatileMessageListener(){};
 
-                void onNewCacheChangeAdded(RTPSReader* reader, const CacheChange_t* const change);
+                void onNewCacheChangeAdded(RTPSReader::impl& reader, const CacheChange_t* const change) override;
 
             private:
 
@@ -323,14 +320,14 @@ class SecurityManager
                 const DiscoveredParticipantInfo::AuthUniquePtr& remote_participant_info,
                 SharedSecretHandle* shared_secret_handle);
 
-        RTPSParticipantImpl* participant_;
-        StatelessWriter* participant_stateless_message_writer_;
-        WriterHistory* participant_stateless_message_writer_history_;
-        StatelessReader* participant_stateless_message_reader_;
+        RTPSParticipant::impl& participant_;
+        std::shared_ptr<RTPSWriter::impl> participant_stateless_message_writer_;
+        WriterHistory::impl* participant_stateless_message_writer_history_;
+        std::shared_ptr<RTPSReader::impl> participant_stateless_message_reader_;
         ReaderHistory* participant_stateless_message_reader_history_;
-        StatefulWriter* participant_volatile_message_secure_writer_;
-        WriterHistory* participant_volatile_message_secure_writer_history_;
-        StatefulReader* participant_volatile_message_secure_reader_;
+        std::shared_ptr<RTPSWriter::impl> participant_volatile_message_secure_writer_;
+        WriterHistory::impl* participant_volatile_message_secure_writer_history_;
+        std::shared_ptr<RTPSReader::impl> participant_volatile_message_secure_reader_;
         ReaderHistory* participant_volatile_message_secure_reader_history_;
         SecurityPluginFactory factory_;
 

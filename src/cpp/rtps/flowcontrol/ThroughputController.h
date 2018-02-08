@@ -17,15 +17,14 @@
 
 #include "FlowController.h"
 #include <fastrtps/rtps/flowcontrol/ThroughputControllerDescriptor.h>
+#include <fastrtps/rtps/participant/RTPSParticipant.h>
+#include <fastrtps/rtps/writer/RTPSWriter.h>
 
 #include <thread>
 
-namespace eprosima{
-namespace fastrtps{
-namespace rtps{
-
-class RTPSWriter;
-class RTPSParticipantImpl;
+namespace eprosima {
+namespace fastrtps {
+namespace rtps {
 
 /**
  * Simple filter that only clears changes up to a certain accumulated payload size.
@@ -35,31 +34,33 @@ class RTPSParticipantImpl;
  */
 class ThroughputController : public FlowController
 {
-public:
-   ThroughputController(const ThroughputControllerDescriptor&, const RTPSWriter* associatedWriter);
-   ThroughputController(const ThroughputControllerDescriptor&, const RTPSParticipantImpl* associatedParticipant);
+    public:
 
-   virtual void operator()(RTPSWriterCollector<ReaderLocator*>& changesToSend);
-   virtual void operator()(RTPSWriterCollector<ReaderProxy*>& changesToSend);
+        ThroughputController(const ThroughputControllerDescriptor&, const RTPSWriter::impl* associatedWriter);
+        ThroughputController(const ThroughputControllerDescriptor&,
+                const RTPSParticipant::impl* associatedParticipant);
 
-private:
+        virtual void operator()(RTPSWriterCollector<ReaderLocator*>& changesToSend);
+        virtual void operator()(RTPSWriterCollector<ReaderProxy*>& changesToSend);
 
-   bool process_change_nts_(const CacheChange_t* const change, const SequenceNumber_t& seqNum,
-        const FragmentNumber_t fragNum);
+    private:
 
-   uint32_t mBytesPerPeriod;
-   uint32_t mAccumulatedPayloadSize;
-   uint32_t mPeriodMillisecs;
-   std::recursive_mutex mThroughputControllerMutex;
+        bool process_change_nts_(const CacheChange_t* const change, const SequenceNumber_t& seqNum,
+                const FragmentNumber_t fragNum);
 
-   const RTPSParticipantImpl* mAssociatedParticipant;
-   const RTPSWriter* mAssociatedWriter;
+        uint32_t mBytesPerPeriod;
+        uint32_t mAccumulatedPayloadSize;
+        uint32_t mPeriodMillisecs;
+        std::recursive_mutex mThroughputControllerMutex;
 
-   /*
-    * Schedules the filter to be refreshed in period ms. When it does, its capacity
-    * will be partially restored, by "sizeToRestore" bytes.
-    */
-   void ScheduleRefresh(uint32_t sizeToRestore);
+        const RTPSParticipant::impl* mAssociatedParticipant;
+        const RTPSWriter::impl* mAssociatedWriter;
+
+        /*
+         * Schedules the filter to be refreshed in period ms. When it does, its capacity
+         * will be partially restored, by "sizeToRestore" bytes.
+         */
+        void ScheduleRefresh(uint32_t sizeToRestore);
 };
 
 } // namespace rtps

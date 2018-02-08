@@ -21,6 +21,7 @@
 #include <fastrtps/rtps/resources/ResourceEvent.h>
 #include <fastrtps/rtps/writer/ReaderProxy.h>
 #include "../../participant/RTPSParticipantImpl.h"
+#include "../StatefulWriterImpl.h"
 #include <fastrtps/log/Log.h>
 
 #include <mutex>
@@ -37,8 +38,8 @@ InitialHeartbeat::~InitialHeartbeat()
 }
 
 InitialHeartbeat::InitialHeartbeat(const ReaderProxy& remote_reader, double interval) :
-    TimedEvent(remote_reader.mp_SFW->getRTPSParticipant()->getEventResource().getIOService(),
-            remote_reader.mp_SFW->getRTPSParticipant()->getEventResource().getThread(), interval),
+    TimedEvent(remote_reader.writer_.participant().getEventResource().getIOService(),
+            remote_reader.writer_.participant().getEventResource().getThread(), interval),
     remote_reader_(remote_reader)
 {
 }
@@ -51,7 +52,7 @@ void InitialHeartbeat::event(EventCode code, const char* msg)
 
     if(code == EVENT_SUCCESS)
     {
-        remote_reader_.mp_SFW->send_heartbeat_to(remote_reader_, false);
+        remote_reader_.writer_.send_heartbeat_to(remote_reader_, false);
     }
     else if(code == EVENT_ABORT)
     {

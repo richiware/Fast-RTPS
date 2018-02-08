@@ -16,44 +16,48 @@
 
 #include <fastrtps/rtps/resources/AsyncInterestTree.h>
 #include <rtps/participant/RTPSParticipantImpl.h>
+#include <rtps/writer/RTPSWriterImpl.h>
 
 using namespace eprosima::fastrtps::rtps;
 
 AsyncInterestTree::AsyncInterestTree():
-   mActiveInterest(&mInterestAlpha),
-   mHiddenInterest(&mInterestBeta)
+    mActiveInterest(&mInterestAlpha),
+    mHiddenInterest(&mInterestBeta)
 {
 }
 
-void AsyncInterestTree::RegisterInterest(const RTPSWriter* writer)
+void AsyncInterestTree::RegisterInterest(const RTPSWriter::impl& writer)
 {
-   std::unique_lock<std::mutex> guard(mMutexHidden);
-   mHiddenInterest->insert(writer); 
+    std::unique_lock<std::mutex> guard(mMutexHidden);
+    mHiddenInterest->insert(&writer);
 }
 
-void AsyncInterestTree::RegisterInterest(const RTPSParticipantImpl* participant)
+void AsyncInterestTree::RegisterInterest(const RTPSParticipant::impl& participant)
 {
-   std::lock_guard<std::recursive_mutex> guard_participant(*participant->getParticipantMutex());
-   std::unique_lock<std::mutex> guard(mMutexHidden);
-   auto writers = participant->getAllWriters();
+    std::lock_guard<std::recursive_mutex> guard_participant(*participant.getParticipantMutex());
+    std::unique_lock<std::mutex> guard(mMutexHidden);
+    auto& writers = participant.getAllWriters();
 
-   for (auto writer : writers)
-      mHiddenInterest->insert(writer); 
+    for (auto writer : writers)
+    {
+        //TODO(Ricardo) Review get_implementation
+        mHiddenInterest->insert(writer.get());
+    }
 }
 
 void AsyncInterestTree::Swap()
 {
-   std::unique_lock<std::mutex> activeGuard(mMutexActive);
-   std::unique_lock<std::mutex> hiddenGuard(mMutexHidden);
+    std::unique_lock<std::mutex> activeGuard(mMutexActive);
+    std::unique_lock<std::mutex> hiddenGuard(mMutexHidden);
 
-   mActiveInterest->clear();
-   auto swap = mActiveInterest;
-   mActiveInterest = mHiddenInterest;
-   mHiddenInterest = swap;
+    mActiveInterest->clear();
+    auto swap = mActiveInterest;
+    mActiveInterest = mHiddenInterest;
+    mHiddenInterest = swap;
 }
 
-std::set<const RTPSWriter*> AsyncInterestTree::GetInterestedWriters() const
+std::set<const RTPSWriter::impl*> AsyncInterestTree::GetInterestedWriters() const
 {
-   std::unique_lock<std::mutex> activeGuard(mMutexActive);
-   return *mActiveInterest;
+    std::unique_lock<std::mutex> activeGuard(mMutexActive);
+    return *mActiveInterest;
 }

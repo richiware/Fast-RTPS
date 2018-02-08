@@ -22,12 +22,8 @@
 #include <fastrtps/log/Log.h>
 #include <rtps/participant/RTPSParticipantImpl.h>
 #include <fastrtps/rtps/participant/RTPSParticipantListener.h>
-
-#include <fastrtps/rtps/writer/StatelessWriter.h>
-#include <fastrtps/rtps/reader/StatelessReader.h>
-#include <fastrtps/rtps/writer/StatefulWriter.h>
-#include <fastrtps/rtps/reader/StatefulReader.h>
-#include <fastrtps/rtps/history/WriterHistory.h>
+#include <rtps/writer/RTPSWriterImpl.h>
+#include <rtps/history/WriterHistoryImpl.h>
 #include <fastrtps/rtps/history/ReaderHistory.h>
 #include <fastrtps/rtps/attributes/HistoryAttributes.h>
 #include <fastrtps/rtps/builtin/data/ParticipantProxyData.h>
@@ -60,7 +56,7 @@ bool usleep_bool()
     return true;
 }
 
-SecurityManager::SecurityManager(RTPSParticipantImpl *participant) : 
+SecurityManager::SecurityManager(RTPSParticipant::impl& participant) : 
     participant_stateless_message_listener_(*this),
     participant_volatile_message_secure_listener_(*this),
     participant_(participant),
@@ -79,7 +75,6 @@ SecurityManager::SecurityManager(RTPSParticipantImpl *participant) :
     auth_last_sequence_number_(1),
     crypto_last_sequence_number_(1)
 {
-    assert(participant != nullptr);
 }
 
 SecurityManager::~SecurityManager()
@@ -91,7 +86,7 @@ bool SecurityManager::init()
 {
     SecurityException exception;
 
-    authentication_plugin_ = factory_.create_authentication_plugin(participant_->getRTPSParticipantAttributes().properties);
+    authentication_plugin_ = factory_.create_authentication_plugin(participant_.getRTPSParticipantAttributes().properties);
 
     if(authentication_plugin_ != nullptr)
     {
@@ -103,9 +98,9 @@ bool SecurityManager::init()
         {
             ret = authentication_plugin_->validate_local_identity(&local_identity_handle_,
                 adjusted_participant_key,
-                participant_->getRTPSParticipantAttributes().builtin.domainId,
-                participant_->getRTPSParticipantAttributes(),
-                participant_->getGuid(),
+                participant_.getRTPSParticipantAttributes().builtin.domainId,
+                participant_.getRTPSParticipantAttributes(),
+                participant_.guid(),
                 exception);
         } while(ret == VALIDATION_PENDING_RETRY && usleep_bool());
 
@@ -115,9 +110,9 @@ bool SecurityManager::init()
             assert(!local_identity_handle_->nil());
 
             // Set participant guid
-            participant_->setGuid(adjusted_participant_key);
+            participant_.guid(adjusted_participant_key);
 
-            crypto_plugin_ = factory_.create_cryptography_plugin(participant_->getRTPSParticipantAttributes().properties);
+            crypto_plugin_ = factory_.create_cryptography_plugin(participant_.getRTPSParticipantAttributes().properties);
 
             if(crypto_plugin_ != nullptr)
             {
@@ -125,7 +120,7 @@ bool SecurityManager::init()
 
                 local_participant_crypto_handle_ = crypto_plugin_->cryptokeyfactory()->register_local_participant(*local_identity_handle_,
                         nil_handle,
-                        participant_->getRTPSParticipantAttributes().properties.properties(),
+                        participant_.getRTPSParticipantAttributes().properties.properties(),
                         exception);
 
                 if(local_participant_crypto_handle_ != nullptr)
@@ -147,7 +142,7 @@ bool SecurityManager::init()
                 // Create RTPS entities
                 if(create_entities())
                 {
-                    logInfo(SECURITY, "Initialized security manager for participant " << participant_->getGuid());
+                    logInfo(SECURITY, "Initialized security manager for participant " << participant_.guid());
                     return true;
                 }
             }
@@ -318,7 +313,7 @@ bool SecurityManager::discovered_participant(const ParticipantProxyData& partici
 {
     if(authentication_plugin_ == nullptr)
     {
-        participant_->pdpsimple()->notifyAboveRemoteEndpoints(participant_data);
+        participant_.pdpsimple()->notifyAboveRemoteEndpoints(participant_data);
         return true;
     }
 
@@ -374,12 +369,12 @@ bool SecurityManager::discovered_participant(const ParticipantProxyData& partici
                         participant_data.m_guid);
 
                 // Inform user about authenticated remote participant.
-                if(participant_->getListener() != nullptr)
+                if(participant_.listener() != nullptr)
                 {
                     RTPSParticipantAuthenticationInfo info;
                     info.status(UNAUTHORIZED_RTPSPARTICIPANT);
                     info.guid(participant_data.m_guid);
-                    participant_->getListener()->onRTPSParticipantAuthentication(participant_->getUserRTPSParticipant(), info);
+                    participant_.listener()->onRTPSParticipantAuthentication(participant_, info);
                 }
                 //TODO(Ricardo) cryptograhy registration in AUTHENTICAITON_OK
 
@@ -476,7 +471,7 @@ bool SecurityManager::on_process_handshake(const GUID_t& remote_participant_guid
                 &handshake_message,
                 *local_identity_handle_,
                 *remote_participant_info->identity_handle_,
-                participant_->pdpsimple()->get_participant_proxy_data_serialized(BIGEND),
+                participant_.pdpsimple()->get_participant_proxy_data_serialized(BIGEND),
                 exception);
     }
     else if(remote_participant_info->auth_status_ == AUTHENTICATION_WAITING_REQUEST)
@@ -487,7 +482,7 @@ bool SecurityManager::on_process_handshake(const GUID_t& remote_participant_guid
                 std::move(message_in),
                 *remote_participant_info->identity_handle_,
                 *local_identity_handle_,
-                participant_->pdpsimple()->get_participant_proxy_data_serialized(BIGEND),
+                participant_.pdpsimple()->get_participant_proxy_data_serialized(BIGEND),
                 exception);
     }
     else if(remote_participant_info->auth_status_ == AUTHENTICATION_WAITING_REPLY ||
@@ -503,12 +498,12 @@ bool SecurityManager::on_process_handshake(const GUID_t& remote_participant_guid
     if(ret == VALIDATION_FAILED)
     {
         // Inform user about authenticated remote participant.
-        if(participant_->getListener() != nullptr)
+        if(participant_.listener() != nullptr)
         {
             RTPSParticipantAuthenticationInfo info;
             info.status(UNAUTHORIZED_RTPSPARTICIPANT);
             info.guid(remote_participant_guid);
-            participant_->getListener()->onRTPSParticipantAuthentication(participant_->getUserRTPSParticipant(), info);
+            participant_.listener()->onRTPSParticipantAuthentication(participant_, info);
         }
 
         if(strlen(exception.what()) > 0)
@@ -711,22 +706,25 @@ bool SecurityManager::create_participant_stateless_message_writer()
     hatt.payloadMaxSize = 5000;
     hatt.initialReservedCaches = 20;
     hatt.maximumReservedCaches = 100;
-    participant_stateless_message_writer_history_ = new WriterHistory(hatt);
+    participant_stateless_message_writer_history_ = new WriterHistory::impl(hatt);
     WriterAttributes watt;
     watt.endpoint.endpointKind = WRITER;
     watt.endpoint.reliabilityKind = BEST_EFFORT;
     watt.endpoint.topicKind = NO_KEY;
 
-    if(participant_->getRTPSParticipantAttributes().throughputController.bytesPerPeriod != UINT32_MAX &&
-            participant_->getRTPSParticipantAttributes().throughputController.periodMillisecs != 0)
-        watt.mode = ASYNCHRONOUS_WRITER;
-
-    RTPSWriter* wout = nullptr;
-    if(participant_->createWriter(&wout, watt, *participant_stateless_message_writer_history_, nullptr,
-                participant_stateless_message_writer_entity_id, true))
+    if(participant_.getRTPSParticipantAttributes().throughputController.bytesPerPeriod != UINT32_MAX &&
+            participant_.getRTPSParticipantAttributes().throughputController.periodMillisecs != 0)
     {
-        participant_->set_endpoint_rtps_protection_supports(wout, false);
-        participant_stateless_message_writer_ = dynamic_cast<StatelessWriter*>(wout);
+        watt.mode = ASYNCHRONOUS_WRITER;
+    }
+
+    participant_stateless_message_writer_ = participant_.create_writer(watt,
+            *participant_stateless_message_writer_history_, nullptr,
+            participant_stateless_message_writer_entity_id, true);
+
+    if(participant_stateless_message_writer_)
+    {
+        participant_.set_endpoint_rtps_protection_supports(participant_stateless_message_writer_.get(), false);
         auth_source_guid = participant_stateless_message_writer_->getGuid();
 
         return true;
@@ -743,7 +741,7 @@ void SecurityManager::delete_participant_stateless_message_writer()
 {
     if(participant_stateless_message_writer_ != nullptr)
     {
-        participant_->deleteUserEndpoint(participant_stateless_message_writer_);
+        participant_.remove_writer(participant_stateless_message_writer_);
         participant_stateless_message_writer_ = nullptr;
     }
 
@@ -764,16 +762,16 @@ bool SecurityManager::create_participant_stateless_message_reader()
     ReaderAttributes ratt;
     ratt.endpoint.topicKind = NO_KEY;
     ratt.endpoint.reliabilityKind = BEST_EFFORT;
-    ratt.endpoint.multicastLocatorList = participant_->getRTPSParticipantAttributes().builtin.metatrafficMulticastLocatorList;
-    ratt.endpoint.unicastLocatorList = participant_->getRTPSParticipantAttributes().builtin.metatrafficUnicastLocatorList;
+    ratt.endpoint.multicastLocatorList = participant_.getRTPSParticipantAttributes().builtin.metatrafficMulticastLocatorList;
+    ratt.endpoint.unicastLocatorList = participant_.getRTPSParticipantAttributes().builtin.metatrafficUnicastLocatorList;
 
-    RTPSReader* rout = nullptr;
-    if(participant_->createReader(&rout, ratt, participant_stateless_message_reader_history_, &participant_stateless_message_listener_,
-                participant_stateless_message_reader_entity_id, true, true))
+    participant_stateless_message_reader_ = participant_.create_reader(ratt,
+            participant_stateless_message_reader_history_, &participant_stateless_message_listener_,
+                participant_stateless_message_reader_entity_id, true, true);
+
+    if(participant_stateless_message_reader_)
     {
-        participant_->set_endpoint_rtps_protection_supports(rout, false);
-        participant_stateless_message_reader_ = dynamic_cast<StatelessReader*>(rout);
-
+        participant_.set_endpoint_rtps_protection_supports(participant_stateless_message_reader_.get(), false);
         return true;
     }
 
@@ -787,7 +785,7 @@ void SecurityManager::delete_participant_stateless_message_reader()
 {
     if(participant_stateless_message_reader_ != nullptr)
     {
-        participant_->deleteUserEndpoint(participant_stateless_message_reader_);
+        participant_.remove_reader(participant_stateless_message_reader_);
         participant_stateless_message_reader_ = nullptr;
     }
 
@@ -825,25 +823,28 @@ bool SecurityManager::create_participant_volatile_message_secure_writer()
     hatt.payloadMaxSize = 5000;
     hatt.initialReservedCaches = 100;
     hatt.maximumReservedCaches = 5000;
-    participant_volatile_message_secure_writer_history_ = new WriterHistory(hatt);
+    participant_volatile_message_secure_writer_history_ = new WriterHistory::impl(hatt);
     WriterAttributes watt;
     watt.endpoint.endpointKind = WRITER;
     watt.endpoint.reliabilityKind = RELIABLE;
     watt.endpoint.topicKind = NO_KEY;
     watt.endpoint.durabilityKind = VOLATILE;
-    watt.endpoint.unicastLocatorList = participant_->getRTPSParticipantAttributes().builtin.metatrafficUnicastLocatorList;
+    watt.endpoint.unicastLocatorList = participant_.getRTPSParticipantAttributes().builtin.metatrafficUnicastLocatorList;
     // TODO(Ricardo) Study keep_all
 
-    if(participant_->getRTPSParticipantAttributes().throughputController.bytesPerPeriod != UINT32_MAX &&
-            participant_->getRTPSParticipantAttributes().throughputController.periodMillisecs != 0)
-        watt.mode = ASYNCHRONOUS_WRITER;
-
-    RTPSWriter* wout = nullptr;
-    if(participant_->createWriter(&wout, watt, *participant_volatile_message_secure_writer_history_, nullptr,
-                participant_volatile_message_secure_writer_entity_id, true))
+    if(participant_.getRTPSParticipantAttributes().throughputController.bytesPerPeriod != UINT32_MAX &&
+            participant_.getRTPSParticipantAttributes().throughputController.periodMillisecs != 0)
     {
-        participant_->set_endpoint_rtps_protection_supports(wout, false);
-        participant_volatile_message_secure_writer_ = dynamic_cast<StatefulWriter*>(wout);
+        watt.mode = ASYNCHRONOUS_WRITER;
+    }
+
+    participant_volatile_message_secure_writer_ = participant_.create_writer(watt,
+            *participant_volatile_message_secure_writer_history_, nullptr,
+            participant_volatile_message_secure_writer_entity_id, true);
+
+    if(participant_volatile_message_secure_writer_)
+    {
+        participant_.set_endpoint_rtps_protection_supports(participant_volatile_message_secure_writer_.get(), false);
 
         return true;
     }
@@ -859,7 +860,7 @@ void SecurityManager::delete_participant_volatile_message_secure_writer()
 {
     if(participant_volatile_message_secure_writer_ != nullptr)
     {
-        participant_->deleteUserEndpoint(participant_volatile_message_secure_writer_);
+        participant_.remove_writer(participant_volatile_message_secure_writer_);
         participant_volatile_message_secure_writer_ = nullptr;
     }
 
@@ -881,15 +882,15 @@ bool SecurityManager::create_participant_volatile_message_secure_reader()
     ratt.endpoint.topicKind = NO_KEY;
     ratt.endpoint.reliabilityKind = RELIABLE;
     ratt.endpoint.durabilityKind = VOLATILE;
-    ratt.endpoint.unicastLocatorList = participant_->getRTPSParticipantAttributes().builtin.metatrafficUnicastLocatorList;
+    ratt.endpoint.unicastLocatorList = participant_.getRTPSParticipantAttributes().builtin.metatrafficUnicastLocatorList;
 
-    RTPSReader* rout = nullptr;
-    if(participant_->createReader(&rout, ratt, participant_volatile_message_secure_reader_history_, &participant_volatile_message_secure_listener_,
-                participant_volatile_message_secure_reader_entity_id, true, true))
+    participant_volatile_message_secure_reader_ = participant_.create_reader(ratt,
+            participant_volatile_message_secure_reader_history_, &participant_volatile_message_secure_listener_,
+            participant_volatile_message_secure_reader_entity_id, true, true);
+
+    if(participant_volatile_message_secure_reader_ )
     {
-        participant_->set_endpoint_rtps_protection_supports(rout, false);
-        participant_volatile_message_secure_reader_ = dynamic_cast<StatefulReader*>(rout);
-
+        participant_.set_endpoint_rtps_protection_supports(participant_volatile_message_secure_reader_.get(), false);
         return true;
     }
 
@@ -903,7 +904,7 @@ void SecurityManager::delete_participant_volatile_message_secure_reader()
 {
     if(participant_volatile_message_secure_reader_ != nullptr)
     {
-        participant_->deleteUserEndpoint(participant_volatile_message_secure_reader_);
+        participant_.remove_reader(participant_volatile_message_secure_reader_);
         participant_volatile_message_secure_reader_ = nullptr;
     }
 
@@ -1011,7 +1012,7 @@ void SecurityManager::process_participant_stateless_message(const CacheChange_t*
             logInfo(SECURITY, "Bad ParticipantGenericMessage. message_identity.source_guid is GUID_t::unknown()");
             return;
         }
-        if(message.destination_participant_key() != participant_->getGuid())
+        if(message.destination_participant_key() != participant_.guid())
         {
             logInfo(SECURITY, "Destination of ParticipantGenericMessage is not me");
             return;
@@ -1214,7 +1215,7 @@ void SecurityManager::process_participant_volatile_message_secure(const CacheCha
             logInfo(SECURITY, "Bad ParticipantGenericMessage. message_identity.source_guid is GUID_t::unknown()");
             return;
         }
-        if(message.destination_participant_key() != participant_->getGuid())
+        if(message.destination_participant_key() != participant_.guid())
         {
             logInfo(SECURITY, "Destination of ParticipantGenericMessage is not me");
             return;
@@ -1272,7 +1273,7 @@ void SecurityManager::process_participant_volatile_message_secure(const CacheCha
             logInfo(SECURITY, "Bad ParticipantGenericMessage. message_identity.source_guid is GUID_t::unknown()");
             return;
         }
-        if(message.destination_participant_key() != participant_->getGuid())
+        if(message.destination_participant_key() != participant_.guid())
         {
             logInfo(SECURITY, "Destination of ParticipantGenericMessage is not me");
             return;
@@ -1329,7 +1330,7 @@ void SecurityManager::process_participant_volatile_message_secure(const CacheCha
         // If writer was found and setting of crypto tokens works, then tell core to match writer and reader.
         if(writer_guid != GUID_t::unknown())
         {
-            participant_->pdpsimple()->getEDP()->pairing_remote_reader_with_local_writer_after_crypto(writer_guid,
+            participant_.pdpsimple()->getEDP()->pairing_remote_reader_with_local_writer_after_crypto(writer_guid,
                     reader_data);
         }
     }
@@ -1340,7 +1341,7 @@ void SecurityManager::process_participant_volatile_message_secure(const CacheCha
             logInfo(SECURITY, "Bad ParticipantGenericMessage. message_identity.source_guid is GUID_t::unknown()");
             return;
         }
-        if(message.destination_participant_key() != participant_->getGuid())
+        if(message.destination_participant_key() != participant_.guid())
         {
             logInfo(SECURITY, "Destination of ParticipantGenericMessage is not me");
             return;
@@ -1397,7 +1398,7 @@ void SecurityManager::process_participant_volatile_message_secure(const CacheCha
         // If reader was found and setting of crypto tokens works, then tell core to match reader and writer.
         if(reader_guid != GUID_t::unknown())
         {
-            participant_->pdpsimple()->getEDP()->pairing_remote_writer_with_local_reader_after_crypto(reader_guid,
+            participant_.pdpsimple()->getEDP()->pairing_remote_writer_with_local_reader_after_crypto(reader_guid,
                     writer_data);
         }
     }
@@ -1407,22 +1408,22 @@ void SecurityManager::process_participant_volatile_message_secure(const CacheCha
     }
 }
 
-void SecurityManager::ParticipantStatelessMessageListener::onNewCacheChangeAdded(RTPSReader* reader,
+void SecurityManager::ParticipantStatelessMessageListener::onNewCacheChangeAdded(RTPSReader::impl& reader,
         const CacheChange_t* const change)
 {
     manager_.process_participant_stateless_message(change);
 
-    ReaderHistory *history = reader->getHistory();
+    ReaderHistory *history = reader.getHistory();
     assert(history);
     history->remove_change((CacheChange_t*)change);
 }
 
-void SecurityManager::ParticipantVolatileMessageListener::onNewCacheChangeAdded(RTPSReader* reader,
+void SecurityManager::ParticipantVolatileMessageListener::onNewCacheChangeAdded(RTPSReader::impl& reader,
         const CacheChange_t* const change)
 {
     manager_.process_participant_volatile_message_secure(change);
 
-    ReaderHistory *history = reader->getHistory();
+    ReaderHistory *history = reader.getHistory();
     assert(history);
     history->remove_change((CacheChange_t*)change);
 }
@@ -1684,7 +1685,7 @@ bool SecurityManager::encode_rtps_message(CDRMessage_t& message,
     {
         const GUID_t remote_participant_key(remote_participant, c_EntityId_RTPSParticipant);
 
-        if(remote_participant_key == participant_->getGuid())
+        if(remote_participant_key == participant_.guid())
         {
             receiving_crypto_list.push_back(local_participant_crypto_handle_);
         }
@@ -1747,7 +1748,7 @@ int SecurityManager::decode_rtps_message(CDRMessage_t& message, CDRMessage_t& ou
 
     const GUID_t remote_participant_key(remote_participant, c_EntityId_RTPSParticipant);
 
-    if(remote_participant_key == participant_->getGuid())
+    if(remote_participant_key == participant_.guid())
     {
         remote_participant_crypto_handle = local_participant_crypto_handle_;
     }
@@ -1927,7 +1928,7 @@ bool SecurityManager::discovered_reader(const GUID_t& writer_guid, const GUID_t&
         ParticipantCryptoHandle* remote_participant_crypto_handle = nullptr;
         SharedSecretHandle* shared_secret_handle = &SharedSecretHandle::nil_handle;
 
-        if(remote_participant_key == participant_->getGuid())
+        if(remote_participant_key == participant_.guid())
         {
             remote_participant_crypto_handle = local_participant_crypto_handle_;
         }
@@ -1960,7 +1961,7 @@ bool SecurityManager::discovered_reader(const GUID_t& writer_guid, const GUID_t&
                 if(crypto_plugin_->cryptkeyexchange()->create_local_datawriter_crypto_tokens(local_writer_crypto_tokens,
                             *local_writer->second.writer_handle, *remote_reader_handle, exception))
                 {
-                    if(remote_participant_key == participant_->getGuid())
+                    if(remote_participant_key == participant_.guid())
                     {
                         logInfo(SECURITY, "Process successful discovering local reader " << remote_reader_data.guid());
                         local_writer->second.associated_readers.emplace(remote_reader_data.guid(),
@@ -2098,14 +2099,14 @@ bool SecurityManager::discovered_reader(const GUID_t& writer_guid, const GUID_t&
                 // If reader was found and setting of crypto tokens works, then tell core to match reader and writer.
                 if(local_reader_guid != GUID_t::unknown())
                 {
-                    participant_->pdpsimple()->getEDP()->pairing_remote_writer_with_local_reader_after_crypto(
+                    participant_.pdpsimple()->getEDP()->pairing_remote_writer_with_local_reader_after_crypto(
                             local_reader_guid, writer_data);
                 }
 
                 // If writer was found and setting of crypto tokens works, then tell core to match writer and reader.
                 if(pairing_cause_pending_message)
                 {
-                    participant_->pdpsimple()->getEDP()->pairing_remote_reader_with_local_writer_after_crypto(
+                    participant_.pdpsimple()->getEDP()->pairing_remote_reader_with_local_writer_after_crypto(
                             writer_guid, remote_reader_data);
                 }
             }
@@ -2180,7 +2181,7 @@ bool SecurityManager::discovered_writer(const GUID_t& reader_guid, const GUID_t&
         ParticipantCryptoHandle* remote_participant_crypto_handle = nullptr;
         SharedSecretHandle* shared_secret_handle = &SharedSecretHandle::nil_handle;
 
-        if(remote_participant_key == participant_->getGuid())
+        if(remote_participant_key == participant_.guid())
         {
             remote_participant_crypto_handle = local_participant_crypto_handle_;
         }
@@ -2214,7 +2215,7 @@ bool SecurityManager::discovered_writer(const GUID_t& reader_guid, const GUID_t&
                 if(crypto_plugin_->cryptkeyexchange()->create_local_datareader_crypto_tokens(local_reader_crypto_tokens,
                             *local_reader->second.reader_handle, *remote_writer_handle, exception))
                 {
-                    if(remote_participant_key == participant_->getGuid())
+                    if(remote_participant_key == participant_.guid())
                     {
                         logInfo(SECURITY, "Process successful discovering local writer " << remote_writer_data.guid());
                         local_reader->second.associated_writers.emplace(remote_writer_data.guid(),
@@ -2353,14 +2354,14 @@ bool SecurityManager::discovered_writer(const GUID_t& reader_guid, const GUID_t&
                 // If writer was found and setting of crypto tokens works, then tell core to match writer and reader.
                 if(local_writer_guid != GUID_t::unknown())
                 {
-                    participant_->pdpsimple()->getEDP()->pairing_remote_reader_with_local_writer_after_crypto(
+                    participant_.pdpsimple()->getEDP()->pairing_remote_reader_with_local_writer_after_crypto(
                             local_writer_guid, reader_data);
                 }
 
                 // If reader was found and setting of crypto tokens works, then tell core to match reader and writer.
                 if(pairing_cause_pending_message)
                 {
-                    participant_->pdpsimple()->getEDP()->pairing_remote_writer_with_local_reader_after_crypto(
+                    participant_.pdpsimple()->getEDP()->pairing_remote_writer_with_local_reader_after_crypto(
                             reader_guid, remote_writer_data);
                 }
             }
@@ -2553,7 +2554,7 @@ int SecurityManager::decode_rtps_submessage(CDRMessage_t& message, CDRMessage_t&
     const GUID_t remote_participant_key(sending_participant, c_EntityId_RTPSParticipant);
     ParticipantCryptoHandle* remote_participant_crypto_handle = nullptr;
 
-    if(remote_participant_key == participant_->getGuid())
+    if(remote_participant_key == participant_.guid())
     {
         remote_participant_crypto_handle = local_participant_crypto_handle_;
     }
@@ -2818,28 +2819,28 @@ bool SecurityManager::participant_authorized(const GUID_t& remote_participant_gu
         }
     }
 
-    participant_->pdpsimple()->notifyAboveRemoteEndpoints(remote_participant_guid);
+    participant_.pdpsimple()->notifyAboveRemoteEndpoints(remote_participant_guid);
 
     logInfo(SECURITY, "Participant " << remote_participant_guid << " authenticated");
 
     // Inform user about authenticated remote participant.
-    if(participant_->getListener() != nullptr)
+    if(participant_.listener() != nullptr)
     {
         RTPSParticipantAuthenticationInfo info;
         info.status(AUTHORIZED_RTPSPARTICIPANT);
         info.guid(remote_participant_guid);
-        participant_->getListener()->onRTPSParticipantAuthentication(participant_->getUserRTPSParticipant(), info);
+        participant_.listener()->onRTPSParticipantAuthentication(participant_, info);
     }
 
     for(auto& remote_reader : temp_readers)
     {
-        participant_->pdpsimple()->getEDP()->pairing_reader_proxy_with_local_writer(remote_reader.second,
+        participant_.pdpsimple()->getEDP()->pairing_reader_proxy_with_local_writer(remote_reader.second,
                 remote_participant_guid, remote_reader.first);
     }
 
     for(auto& remote_writer : temp_writers)
     {
-        participant_->pdpsimple()->getEDP()->pairing_writer_proxy_with_local_reader(remote_writer.second,
+        participant_.pdpsimple()->getEDP()->pairing_writer_proxy_with_local_reader(remote_writer.second,
                 remote_participant_guid, remote_writer.first);
     }
 

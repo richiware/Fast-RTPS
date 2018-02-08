@@ -21,7 +21,6 @@
 #define _TEST_BLACKBOX_RTPSWITHREGISTRATIONREADER_HPP_
 
 #include <fastrtps/rtps/rtps_fwd.h>
-#include <fastrtps/rtps/RTPSDomain.h>
 #include <fastrtps/rtps/participant/RTPSParticipant.h>
 #include <fastrtps/rtps/attributes/RTPSParticipantAttributes.h>
 #include <fastrtps/rtps/reader/ReaderListener.h>
@@ -29,7 +28,8 @@
 #include <fastrtps/qos/ReaderQos.h>
 #include <fastrtps/attributes/TopicAttributes.h>
 #include <fastrtps/utils/IPFinder.h>
-#include <fastrtps/rtps/reader/RTPSReader.h>
+#include <fastrtps/rtps/reader/StatefulReader.h>
+#include <fastrtps/rtps/reader/StatelessReader.h>
 #include <fastrtps/rtps/attributes/HistoryAttributes.h>
 #include <fastrtps/rtps/history/ReaderHistory.h>
 
@@ -58,18 +58,21 @@ class RTPSWithRegistrationReader
 
                 ~Listener(){};
 
-                void onNewCacheChangeAdded(eprosima::fastrtps::rtps::RTPSReader* reader, const eprosima::fastrtps::rtps::CacheChange_t* const change)
+                void onNewCacheChangeAdded(eprosima::fastrtps::rtps::RTPSReader& reader,
+                        const eprosima::fastrtps::rtps::CacheChange_t* const change) override
                 {
-                    ASSERT_NE(reader, nullptr);
                     ASSERT_NE(change, nullptr);
 
                     reader_.receive_one(reader, change);
                 }
 
-                void onReaderMatched(eprosima::fastrtps::rtps::RTPSReader* /*reader*/, eprosima::fastrtps::rtps::MatchingInfo& info)
+                void onReaderMatched(eprosima::fastrtps::rtps::RTPSReader&,
+                        const eprosima::fastrtps::rtps::MatchingInfo& info) override
                 {
                     if (info.status == eprosima::fastrtps::rtps::MATCHED_MATCHING)
+                    {
                         reader_.matched();
+                    }
                 }
 
             private:
@@ -98,9 +101,13 @@ class RTPSWithRegistrationReader
         virtual ~RTPSWithRegistrationReader()
         {
             if(participant_ != nullptr)
-                eprosima::fastrtps::rtps::RTPSDomain::removeRTPSParticipant(participant_);
+            {
+                delete participant_;
+            }
             if(history_ != nullptr)
+            {
                 delete(history_);
+            }
         }
 
         void init()
@@ -109,7 +116,8 @@ class RTPSWithRegistrationReader
             pattr.builtin.use_SIMPLE_RTPSParticipantDiscoveryProtocol = true;
             pattr.builtin.use_WriterLivelinessProtocol = true;
             pattr.builtin.domainId = (uint32_t)GET_PID() % 230;
-            participant_ = eprosima::fastrtps::rtps::RTPSDomain::createParticipant(pattr);
+            participant_ = new eprosima::fastrtps::rtps::RTPSParticipant(pattr,
+                    eprosima::fastrtps::rtps::GuidPrefix_t::unknown());
             ASSERT_NE(participant_, nullptr);
 
             //Create readerhistory
@@ -118,10 +126,17 @@ class RTPSWithRegistrationReader
             ASSERT_NE(history_, nullptr);
 
             //Create reader
-            reader_ = eprosima::fastrtps::rtps::RTPSDomain::createRTPSReader(participant_, reader_attr_, history_, &listener_);
+            if(reader_qos_.m_reliability.kind == eprosima::fastrtps::RELIABLE_RELIABILITY_QOS)
+            {
+                reader_ = new eprosima::fastrtps::rtps::StatefulReader(*participant_, reader_attr_, history_, &listener_);
+            }
+            else
+            {
+                reader_ = new eprosima::fastrtps::rtps::StatelessReader(*participant_, reader_attr_, history_, &listener_);
+            }
             ASSERT_NE(reader_, nullptr);
 
-            ASSERT_EQ(participant_->registerReader(reader_, topic_attr_, reader_qos_), true);
+            ASSERT_EQ(participant_->register_reader(*reader_, topic_attr_, reader_qos_), true);
 
             initialized_ = true;
         }
@@ -132,7 +147,7 @@ class RTPSWithRegistrationReader
         {
             if(participant_ != nullptr)
             {
-                eprosima::fastrtps::rtps::RTPSDomain::removeRTPSParticipant(participant_);
+                delete participant_;
                 participant_ = nullptr;
             }
 
@@ -170,7 +185,7 @@ class RTPSWithRegistrationReader
             while(history_->changesBegin() != history_->changesEnd())
             {
                 eprosima::fastrtps::rtps::CacheChange_t* change = *history_->changesBegin();
-                receive_one(reader_, change);
+                receive_one(*reader_, change);
             }
         }
 
@@ -215,19 +230,23 @@ class RTPSWithRegistrationReader
 
         /*** Function to change QoS ***/
         RTPSWithRegistrationReader& memoryMode(const eprosima::fastrtps::rtps::MemoryManagementPolicy_t memoryPolicy)
-	{
-		hattr_.memoryPolicy=memoryPolicy;
-		return *this;
-	}
+        {
+            hattr_.memoryPolicy=memoryPolicy;
+            return *this;
+        }
 
-	RTPSWithRegistrationReader& reliability(const eprosima::fastrtps::rtps::ReliabilityKind_t kind)
+        RTPSWithRegistrationReader& reliability(const eprosima::fastrtps::rtps::ReliabilityKind_t kind)
         {
             reader_attr_.endpoint.reliabilityKind = kind;
 
             if(kind == eprosima::fastrtps::rtps::ReliabilityKind_t::RELIABLE)
+            {
                 reader_qos_.m_reliability.kind = eprosima::fastrtps::RELIABLE_RELIABILITY_QOS;
+            }
             else
+            {
                 reader_qos_.m_reliability.kind = eprosima::fastrtps::BEST_EFFORT_RELIABILITY_QOS;
+            }
 
             return *this;
         }
@@ -244,7 +263,8 @@ class RTPSWithRegistrationReader
 
     private:
 
-        void receive_one(eprosima::fastrtps::rtps::RTPSReader* reader, const eprosima::fastrtps::rtps::CacheChange_t* change)
+        void receive_one(eprosima::fastrtps::rtps::RTPSReader& /*reader*/,
+                const eprosima::fastrtps::rtps::CacheChange_t* change)
         {
             std::unique_lock<std::mutex> lock(mutex_);
 
@@ -271,10 +291,7 @@ class RTPSWithRegistrationReader
                     cv_.notify_one();
                 }
 
-                eprosima::fastrtps::rtps::ReaderHistory *history = reader->getHistory();
-                ASSERT_NE(history, nullptr);
-
-                history->remove_change((eprosima::fastrtps::rtps::CacheChange_t*)change);
+                history_->remove_change((eprosima::fastrtps::rtps::CacheChange_t*)change);
             }
         }
 
@@ -295,7 +312,7 @@ class RTPSWithRegistrationReader
         std::condition_variable cvDiscovery_;
         bool receiving_;
         unsigned int matched_;
-		eprosima::fastrtps::rtps::SequenceNumber_t last_seq_;
+        eprosima::fastrtps::rtps::SequenceNumber_t last_seq_;
         size_t current_received_count_;
         size_t number_samples_expected_;
         type_support type_;

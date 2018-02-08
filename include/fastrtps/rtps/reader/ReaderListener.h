@@ -17,11 +17,13 @@
  *
  */
 
-#ifndef READERLISTENER_H_
-#define READERLISTENER_H_
+#ifndef __RTPS_READER_READERLISTENER_H__
+#define __RTPS_READER_READERLISTENER_H__
 
 #include "../common/MatchingInfo.h"
+
 #include <mutex>
+
 namespace eprosima{
 namespace fastrtps{
 namespace rtps{
@@ -35,31 +37,34 @@ struct CacheChange_t;
 */
 class RTPS_DllAPI ReaderListener
 {
-public:
-	ReaderListener(){};
-	virtual ~ReaderListener(){};
-	
-	/**
-	* This method is invoked when a new reader matches
-	* @param reader Matching reader
-	* @param info Matching information of the reader
-	*/
-	virtual void onReaderMatched(RTPSReader* reader, MatchingInfo& info){(void)reader; (void)info;};
-	
-	/**
-	* This method is called when a new CacheChange_t is added to the ReaderHistory.
-	* @param reader Pointer to the reader.
-	* @param change Pointer to the CacheChange_t. This is a const pointer to const data
-	* to indicate that the user should not dispose of this data himself.
-	* To remove the data call the remove_change method of the ReaderHistory.
-	* reader->getHistory()->remove_change((CacheChange_t*)change).
-	*/
-	virtual void onNewCacheChangeAdded(RTPSReader* reader, const CacheChange_t* const change){(void)reader; (void)change;};
+    public:
+
+        ReaderListener(){};
+
+        virtual ~ReaderListener(){};
+
+        /**
+         * This method is invoked when a new reader matches
+         * @param reader Matching reader
+         * @param info Matching information of the reader
+         */
+        virtual void onReaderMatched(RTPSReader& reader, const MatchingInfo& info)
+        { (void)reader; (void)info; }
+
+        /**
+         * This method is called when a new CacheChange_t is added to the ReaderHistory.
+         * @param reader Pointer to the reader.
+         * @param change Pointer to the CacheChange_t. This is a const pointer to const data
+         * to indicate that the user should not dispose of this data himself.
+         * To remove the data call the remove_change method of the ReaderHistory.
+         * reader->getHistory()->remove_change((CacheChange_t*)change).
+         */
+        virtual void onNewCacheChangeAdded(RTPSReader& reader, const CacheChange_t* const change)
+        { (void)reader; (void)change; }
 };
 
-//Namespace enders
 }
 }
 }
 
-#endif /* READERLISTENER_H_ */
+#endif // __RTPS_READER_READERLISTENER_H__

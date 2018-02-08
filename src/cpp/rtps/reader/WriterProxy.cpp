@@ -18,16 +18,14 @@
  */
 
 #include <fastrtps/rtps/reader/WriterProxy.h>
-#include <fastrtps/rtps/reader/StatefulReader.h>
-
+#include "StatefulReaderImpl.h"
 #include <fastrtps/log/Log.h>
 #include <fastrtps/utils/TimeConversion.h>
-
-#include <mutex>
-
 #include <fastrtps/rtps/reader/timedevent/HeartbeatResponseDelay.h>
 #include <fastrtps/rtps/reader/timedevent/WriterProxyLiveliness.h>
 #include <fastrtps/rtps/reader/timedevent/InitialAckNack.h>
+
+#include <mutex>
 
 using namespace eprosima::fastrtps::rtps;
 
@@ -104,9 +102,8 @@ WriterProxy::~WriterProxy()
     delete(mp_mutex);
 }
 
-WriterProxy::WriterProxy(const RemoteWriterAttributes& watt,
-        StatefulReader* SR) :
-    mp_SFR(SR),
+WriterProxy::WriterProxy(StatefulReader::impl& reader, const RemoteWriterAttributes& watt) :
+    reader_(reader),
     m_att(watt),
     m_lastHeartbeatCount(0),
     mp_heartbeatResponse(nullptr),
@@ -119,12 +116,18 @@ WriterProxy::WriterProxy(const RemoteWriterAttributes& watt,
 {
     m_changesFromW.clear();
     //Create Events
-    mp_writerProxyLiveliness = new WriterProxyLiveliness(this,TimeConv::Time_t2MilliSecondsDouble(m_att.livelinessLeaseDuration)*WRITERPROXY_LIVELINESS_PERIOD_MULTIPLIER);
-    mp_heartbeatResponse = new HeartbeatResponseDelay(this,TimeConv::Time_t2MilliSecondsDouble(mp_SFR->getTimes().heartbeatResponseDelay));
-    mp_initialAcknack = new InitialAckNack(this, TimeConv::Time_t2MilliSecondsDouble(mp_SFR->getTimes().initialAcknackDelay));
+    mp_writerProxyLiveliness = new WriterProxyLiveliness(*this,
+            TimeConv::Time_t2MilliSecondsDouble(m_att.livelinessLeaseDuration)*WRITERPROXY_LIVELINESS_PERIOD_MULTIPLIER);
+    mp_heartbeatResponse = new HeartbeatResponseDelay(*this,
+            TimeConv::Time_t2MilliSecondsDouble(reader_.getTimes().heartbeatResponseDelay));
+    mp_initialAcknack = new InitialAckNack(*this,
+            TimeConv::Time_t2MilliSecondsDouble(reader_.getTimes().initialAcknackDelay));
     if(m_att.livelinessLeaseDuration < c_TimeInfinite)
+    {
         mp_writerProxyLiveliness->restart_timer();
-    logInfo(RTPS_READER,"Writer Proxy created in reader: "<<mp_SFR->getGuid().entityId);
+    }
+
+    logInfo(RTPS_READER,"Writer Proxy created in reader: "<<reader_.getGuid().entityId);
 }
 
 void WriterProxy::missing_changes_update(const SequenceNumber_t& seqNum)

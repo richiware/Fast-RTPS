@@ -16,8 +16,8 @@
  * @file EndpointAttributes.h
  */
 
-#ifndef ENDPOINTATTRIBUTES_H_
-#define ENDPOINTATTRIBUTES_H_
+#ifndef __RTPS_ATTRIBUTES_ENDPOINTATTRIBUTES_H__
+#define __RTPS_ATTRIBUTES_ENDPOINTATTRIBUTES_H__
 
 #include "../common/Types.h"
 #include "../common/Locator.h"
@@ -34,6 +34,7 @@ namespace rtps {
 class EndpointAttributes
 {
     public:
+
         EndpointAttributes() : endpointKind(WRITER),
             topicKind(NO_KEY),
             reliabilityKind(BEST_EFFORT),
@@ -46,6 +47,7 @@ class EndpointAttributes
         virtual ~EndpointAttributes(){};
 
         //!Endpoint kind, default value WRITER
+        //TODO(Ricardo) Review if necessary.
         EndpointKind_t endpointKind;
 
         //!Topic kind, default value NO_KEY
@@ -99,8 +101,9 @@ class EndpointAttributes
         //!Entity ID, if the user want to specify the EntityID of the enpoint, default value -1.
         int16_t m_entityID;
 };
-}
-} /* namespace rtps */
-} /* namespace eprosima */
 
-#endif /*  */
+} // namespace rtps
+} // namespace fastrtps
+} // namespace eprosima
+
+#endif // __RTPS_ATTRIBUTES_ENDPOINTATTRIBUTES_H__

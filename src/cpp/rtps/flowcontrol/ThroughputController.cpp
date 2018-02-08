@@ -14,6 +14,8 @@
 
 #include "ThroughputController.h"
 #include <fastrtps/rtps/resources/AsyncWriterThread.h>
+#include "../participant/RTPSParticipantImpl.h"
+
 #include <asio.hpp>
 #include <asio/steady_timer.hpp>
 #include <cassert>
@@ -23,7 +25,8 @@ namespace eprosima{
 namespace fastrtps{
 namespace rtps{
 
-ThroughputController::ThroughputController(const ThroughputControllerDescriptor& descriptor, const RTPSWriter* associatedWriter):
+ThroughputController::ThroughputController(const ThroughputControllerDescriptor& descriptor,
+        const RTPSWriter::impl* associatedWriter):
     mBytesPerPeriod(descriptor.bytesPerPeriod),
     mAccumulatedPayloadSize(0),
     mPeriodMillisecs(descriptor.periodMillisecs),
@@ -32,7 +35,8 @@ ThroughputController::ThroughputController(const ThroughputControllerDescriptor&
 {
 }
 
-ThroughputController::ThroughputController(const ThroughputControllerDescriptor& descriptor, const RTPSParticipantImpl* associatedParticipant):
+ThroughputController::ThroughputController(const ThroughputControllerDescriptor& descriptor,
+        const RTPSParticipant::impl* associatedParticipant):
     mBytesPerPeriod(descriptor.bytesPerPeriod),
     mAccumulatedPayloadSize(0),
     mPeriodMillisecs(descriptor.periodMillisecs),
@@ -109,10 +113,14 @@ void ThroughputController::ScheduleRefresh(uint32_t sizeToRestore)
                 throwawayTimer->cancel();
                 mAccumulatedPayloadSize = sizeToRestore > mAccumulatedPayloadSize ? 0 : mAccumulatedPayloadSize - sizeToRestore;
 
-                if (mAssociatedWriter)
-                    AsyncWriterThread::wakeUp(mAssociatedWriter);
+                if(mAssociatedWriter)
+                {
+                    AsyncWriterThread::wakeUp(*mAssociatedWriter);
+                }
                 else if (mAssociatedParticipant)
-                    AsyncWriterThread::wakeUp(mAssociatedParticipant);
+                {
+                    AsyncWriterThread::wakeUp(*mAssociatedParticipant);
+                }
             }
         };
 

@@ -17,9 +17,11 @@
  *
  */
 
-#ifndef WRITERPROXYLIVELINESS_H_
-#define WRITERPROXYLIVELINESS_H_
+#ifndef __RTPS_READER_TIMEDEVENT_WRITERPROXYLIVELINESS_H__
+#define __RTPS_READER_TIMEDEVENT_WRITERPROXYLIVELINESS_H__
+
 #ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
+
 #include "../../resources/TimedEvent.h"
 
 namespace eprosima {
@@ -31,26 +33,31 @@ class WriterProxy;
  * Class WriterProxyLiveliness, timed event to check the liveliness of a writer each leaseDuration.
  *  @ingroup READER_MODULE
  */
-class WriterProxyLiveliness: public TimedEvent {
-public:
-	/**
-	* @param wp
-	* @param interval
-	*/
-	WriterProxyLiveliness(WriterProxy* wp,double interval);
-	virtual ~WriterProxyLiveliness();
-	/**
-	* Method invoked when the event occurs
-	*
-	* @param code Code representing the status of the event
-	* @param msg Message associated to the event
-	*/
-	void event(EventCode code, const char* msg= nullptr);
-	//!Pointer to the WriterProxy associated with this specific event.
-	WriterProxy* mp_WP;
+class WriterProxyLiveliness : public TimedEvent
+{
+    public:
+
+        /**
+         * @param wp
+         * @param interval
+         */
+        WriterProxyLiveliness(WriterProxy& writer_proxy, double interval);
+
+        virtual ~WriterProxyLiveliness();
+        /**
+         * Method invoked when the event occurs
+         *
+         * @param code Code representing the status of the event
+         * @param msg Message associated to the event
+         */
+        void event(EventCode code, const char* msg= nullptr);
+        //!Pointer to the WriterProxy associated with this specific event.
+        WriterProxy& writer_proxy_;
 };
-}
-} /* namespace rtps */
-} /* namespace eprosima */
+
+} // namespace rtps
+} // namespace fastrtps
+} // namespace eprosima
+
 #endif
-#endif /* WRITERPROXYLIVELINESS_H_ */
+#endif // __RTPS_READER_TIMEDEVENT_WRITERPROXYLIVELINESS_H__

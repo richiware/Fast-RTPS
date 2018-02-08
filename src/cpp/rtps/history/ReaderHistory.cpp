@@ -18,10 +18,9 @@
  */
 
 #include <fastrtps/rtps/history/ReaderHistory.h>
-
 #include <fastrtps/log/Log.h>
 #include <fastrtps/utils/Semaphore.h>
-#include <fastrtps/rtps/reader/RTPSReader.h>
+#include "../reader/RTPSReaderImpl.h"
 #include <fastrtps/rtps/reader/ReaderListener.h>
 
 #include <mutex>
@@ -42,7 +41,7 @@ inline bool sort_ReaderHistoryCache(CacheChange_t*c1, CacheChange_t*c2)
 
 ReaderHistory::ReaderHistory(const HistoryAttributes& att):
                         History(att),
-                        mp_reader(nullptr),
+                        reader_(nullptr),
                         mp_semaphore(new Semaphore(0))
 {
 }
@@ -61,7 +60,7 @@ bool ReaderHistory::received_change(CacheChange_t* change, size_t)
 bool ReaderHistory::add_change(CacheChange_t* a_change)
 {
 
-    if(mp_reader == nullptr || mp_mutex == nullptr)
+    if(reader_ == nullptr || mp_mutex == nullptr)
     {
         logError(RTPS_HISTORY,"You need to create a Reader with this History before adding any changes");
         return false;
@@ -92,7 +91,7 @@ bool ReaderHistory::add_change(CacheChange_t* a_change)
 bool ReaderHistory::remove_change(CacheChange_t* a_change)
 {
 
-    if(mp_reader == nullptr || mp_mutex == nullptr)
+    if(reader_ == nullptr || mp_mutex == nullptr)
     {
         logError(RTPS_HISTORY,"You need to create a Reader with this History before removing any changes");
         return false;
@@ -111,7 +110,7 @@ bool ReaderHistory::remove_change(CacheChange_t* a_change)
                 (*chit)->writer_guid == a_change->writer_guid)
         {
             logInfo(RTPS_HISTORY,"Removing change "<< a_change->sequence_number);
-            mp_reader->change_removed_by_history(a_change);
+            reader_->change_removed_by_history(a_change);
             m_changePool.release_cache(a_change);
             m_changes.erase(chit);
             sortCacheChanges();
@@ -127,7 +126,7 @@ bool ReaderHistory::remove_changes_with_guid(const GUID_t& a_guid)
 {
     std::vector<CacheChange_t*> changes_to_remove;
 
-    if(mp_reader == nullptr || mp_mutex == nullptr)
+    if(reader_ == nullptr || mp_mutex == nullptr)
     {
         logError(RTPS_HISTORY,"You need to create a Reader with History before removing any changes");
         return false;

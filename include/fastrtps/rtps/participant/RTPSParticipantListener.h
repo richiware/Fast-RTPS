@@ -17,8 +17,8 @@
  *
  */
 
-#ifndef RTPSPARTICIPANTLISTENER_H_
-#define RTPSPARTICIPANTLISTENER_H_
+#ifndef __RTPS_PARTICIPANT_RTPSPARTICIPANTLISTENER_H__
+#define __RTPS_PARTICIPANT_RTPSPARTICIPANTLISTENER_H__
 
 #include "RTPSParticipantDiscoveryInfo.h"
 
@@ -44,16 +44,17 @@ class RTPS_DllAPI RTPSParticipantListener
          * @param part Discovered participant
          * @param info Discovery information of the participant
          */
-        virtual void onRTPSParticipantDiscovery(RTPSParticipant* part, RTPSParticipantDiscoveryInfo info){(void)part; (void)info;}
+        virtual void onRTPSParticipantDiscovery(RTPSParticipant& participant, const RTPSParticipantDiscoveryInfo info)
+        { (void)participant; (void)info;}
 
 #if HAVE_SECURITY
-        virtual void onRTPSParticipantAuthentication(RTPSParticipant* part, const RTPSParticipantAuthenticationInfo& info) {(void)part; (void)info;}
+        virtual void onRTPSParticipantAuthentication(RTPSParticipant& participant,
+                const RTPSParticipantAuthenticationInfo& info) { (void)participant; (void)info; }
 #endif
 };
+
 }
 }
 }
 
-
-
-#endif /* RTPSPARTICIPANTLISTENER_H_ */
+#endif // __RTPS_PARTICIPANT_RTPSPARTICIPANTLISTENER_H__

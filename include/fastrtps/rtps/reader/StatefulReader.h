@@ -16,36 +16,33 @@
  * @file StatefulReader.h
  */
 
-#ifndef STATEFULREADER_H_
-#define STATEFULREADER_H_
+#ifndef __RTPS_READER_STATEFULREADER_H__
+#define __RTPS_READER_STATEFULREADER_H__
 #ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
 
 #include "RTPSReader.h"
-#include <mutex>
 
 namespace eprosima {
 namespace fastrtps{
 namespace rtps {
 
 class WriterProxy;
+struct GUID_t;
 
 /**
  * Class StatefulReader, specialization of RTPSReader than stores the state of the matched writers.
  * @ingroup READER_MODULE
  */
-class StatefulReader:public RTPSReader
+class StatefulReader : public RTPSReader
 {
     public:
 
-        friend class RTPSParticipantImpl;
+        class impl;
 
-        virtual ~StatefulReader();
+        StatefulReader(RTPSParticipant& participant, const ReaderAttributes& att, ReaderHistory* hist,
+                ReaderListener* listener = nullptr);
 
-    private:
-
-        StatefulReader(RTPSParticipantImpl*,GUID_t& guid,
-                ReaderAttributes& att,ReaderHistory* hist,ReaderListener* listen=nullptr);
-    public:
+        virtual ~StatefulReader() = default;
 
         /**
          * Add a matched writer represented by a WriterProxyData object.
@@ -78,57 +75,8 @@ class StatefulReader:public RTPSReader
          * @param WP Pointer to pointer to a WriterProxy.
          * @return True if found.
          */
+        //TODO (Ricardo) Review here in api
         bool matched_writer_lookup(const GUID_t& writerGUID, WriterProxy** WP);
-
-        /**
-         * Processes a new DATA message. Previously the message must have been accepted by function acceptMsgDirectedTo.
-         * @param change Pointer to the CacheChange_t.
-         * @return true if the reader accepts messages.
-         */
-        bool processDataMsg(CacheChange_t *change);
-
-        /**
-         * Processes a new DATA FRAG message. Previously the message must have been accepted by function acceptMsgDirectedTo.
-         * @param change Pointer to the CacheChange_t.
-         * @param sampleSize Size of the complete assembled message.
-         * @param fragmentStartingNum fragment number of this particular fragment.
-         * @return true if the reader accepts messages.
-         */
-        bool processDataFragMsg(CacheChange_t *change, uint32_t sampleSize, uint32_t fragmentStartingNum);
-
-        /**
-         * Processes a new HEARTBEAT message. Previously the message must have been accepted by function acceptMsgDirectedTo.
-         *
-         * @return true if the reader accepts messages.
-         */
-        bool processHeartbeatMsg(GUID_t &writerGUID, uint32_t hbCount, SequenceNumber_t &firstSN,
-                SequenceNumber_t &lastSN, bool finalFlag, bool livelinessFlag);
-
-        bool processGapMsg(GUID_t &writerGUID, SequenceNumber_t &gapStart, SequenceNumberSet_t &gapList);
-
-        /**
-         * Method to indicate the reader that some change has been removed due to HistoryQos requirements.
-         * @param change Pointer to the CacheChange_t.
-         * @param prox Pointer to the WriterProxy.
-         * @return True if correctly removed.
-         */
-        bool change_removed_by_history(CacheChange_t* change ,WriterProxy* prox = nullptr);
-
-        /**
-         * This method is called when a new change is received. This method calls the received_change of the History
-         * and depending on the implementation performs different actions.
-         * @param a_change Pointer of the change to add.
-         * @param prox Pointer to the WriterProxy that adds the Change.
-         * @param lock mutex protecting the StatefulReader.
-         * @return True if added.
-         */
-        bool change_received(CacheChange_t* a_change, WriterProxy* prox);
-
-        /**
-         * Get the RTPS participant
-         * @return Associated RTPS participant
-         */
-        inline RTPSParticipantImpl* getRTPSParticipant() const {return mp_RTPSParticipant;}
 
         /**
          * Read the next unread CacheChange_t from the history
@@ -146,25 +94,6 @@ class StatefulReader:public RTPSReader
          */
         bool nextUntakenCache(CacheChange_t** change,WriterProxy** wpout=nullptr);
 
-
-        /**
-         * Update the times parameters of the Reader.
-         * @param times ReaderTimes reference.
-         * @return True if correctly updated.
-         */
-        bool updateTimes(ReaderTimes& times);
-        /**
-         *
-         * @return Reference to the ReaderTimes.
-         */
-        inline ReaderTimes& getTimes(){return m_times;};
-
-        /**
-         * Get the number of matched writers
-         * @return Number of matched writers
-         */
-        inline size_t getMatchedWritersSize() const { return matched_writers.size(); }
-
         /*!
          * @brief Returns there is a clean state with all Writers.
          * It occurs when the Reader received all samples sent by Writers. In other words,
@@ -173,28 +102,19 @@ class StatefulReader:public RTPSReader
          */
         bool isInCleanState() const;
 
-        //! Acknack Count
-        uint32_t m_acknackCount;
-        //! NACKFRAG Count
-        uint32_t m_nackfragCount;
+
+    protected:
+
+        StatefulReader(std::shared_ptr<RTPSReader::impl>& impl, ReaderListener* listener = nullptr);
 
     private:
 
-        bool acceptMsgFrom(GUID_t &entityGUID ,WriterProxy **wp);
-
-        /*!
-         * @remarks Nn thread-safe.
-         */
-        bool findWriterProxy(const GUID_t& writerGUID, WriterProxy** WP);
-
-        //!ReaderTimes of the StatefulReader.
-        ReaderTimes m_times;
-        //! Vector containing pointers to the matched writers.
-        std::vector<WriterProxy*> matched_writers;
+        friend StatefulReader* create_statefulreader_from_implementation(std::shared_ptr<RTPSReader::impl>&);
 };
 
-}
-} /* namespace rtps */
-} /* namespace eprosima */
+} // namespace rtps
+} // namespace fastrtps
+} // namespace eprosima
+
 #endif
-#endif /* STATEFULREADER_H_ */
+#endif // __RTPS_READER_STATEFULREADER_H__*/

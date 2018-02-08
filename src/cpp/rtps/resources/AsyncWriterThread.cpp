@@ -13,7 +13,7 @@
 // limitations under the License.
 
 #include <fastrtps/rtps/resources/AsyncWriterThread.h>
-#include <fastrtps/rtps/writer/RTPSWriter.h>
+#include "../writer/RTPSWriterImpl.h"
 
 #include <mutex>
 
@@ -26,13 +26,13 @@ using namespace eprosima::fastrtps::rtps;
 std::thread* AsyncWriterThread::thread_;
 std::mutex AsyncWriterThread::data_structure_mutex_;
 std::mutex AsyncWriterThread::condition_variable_mutex_;
-std::list<RTPSWriter*> AsyncWriterThread::async_writers;
+std::list<RTPSWriter::impl*> AsyncWriterThread::async_writers;
 bool AsyncWriterThread::running_;
 bool AsyncWriterThread::run_scheduled_;
 std::condition_variable AsyncWriterThread::cv_;
 AsyncInterestTree AsyncWriterThread::interestTree;
 
-bool AsyncWriterThread::addWriter(RTPSWriter& writer)
+bool AsyncWriterThread::add_writer(RTPSWriter::impl& writer)
 {
     bool returnedValue = false;
 
@@ -58,7 +58,7 @@ bool AsyncWriterThread::addWriter(RTPSWriter& writer)
  * @param writer Asynchronous writer to be removed.
  * @return Result of the operation.
  */
-bool AsyncWriterThread::removeWriter(RTPSWriter& writer)
+bool AsyncWriterThread::remove_writer(RTPSWriter::impl& writer)
 {
     bool returnedValue = false;
 
@@ -89,22 +89,22 @@ bool AsyncWriterThread::removeWriter(RTPSWriter& writer)
     return returnedValue;
 }
 
-void AsyncWriterThread::wakeUp(const RTPSParticipantImpl* interestedParticipant)
+void AsyncWriterThread::wakeUp(const RTPSParticipant::impl& interestedParticipant)
 {
-   interestTree.RegisterInterest(interestedParticipant);
-   { // Lock scope
-      std::unique_lock<std::mutex> cond_guard(condition_variable_mutex_);
-      run_scheduled_ = true;
-   }
-   cv_.notify_all();
+    interestTree.RegisterInterest(interestedParticipant);
+    { // Lock scope
+        std::unique_lock<std::mutex> cond_guard(condition_variable_mutex_);
+        run_scheduled_ = true;
+    }
+    cv_.notify_all();
 }
 
-void AsyncWriterThread::wakeUp(const RTPSWriter* interestedWriter)
+void AsyncWriterThread::wakeUp(const RTPSWriter::impl& interestedWriter)
 {
-   interestTree.RegisterInterest(interestedWriter);
-   std::unique_lock<std::mutex> cond_guard(condition_variable_mutex_);
-   run_scheduled_ = true;
-   cv_.notify_all();
+    interestTree.RegisterInterest(interestedWriter);
+    std::unique_lock<std::mutex> cond_guard(condition_variable_mutex_);
+    run_scheduled_ = true;
+    cv_.notify_all();
 }
 
 void AsyncWriterThread::run()
@@ -112,21 +112,21 @@ void AsyncWriterThread::run()
     std::unique_lock<std::mutex> cond_guard(condition_variable_mutex_);
     while(running_)
     {
-       if(run_scheduled_)
-       {
-          run_scheduled_ = false;
-          cond_guard.unlock();
-          interestTree.Swap();
-          auto interestedWriters = interestTree.GetInterestedWriters();
+        if(run_scheduled_)
+        {
+            run_scheduled_ = false;
+            cond_guard.unlock();
+            interestTree.Swap();
+            auto interestedWriters = interestTree.GetInterestedWriters();
 
-          std::unique_lock<std::mutex> data_guard(data_structure_mutex_);
-          for(auto writer : async_writers)
-             if (interestedWriters.count(writer))
-               writer->send_any_unsent_changes();
+            std::unique_lock<std::mutex> data_guard(data_structure_mutex_);
+            for(auto writer : async_writers)
+                if (interestedWriters.count(writer))
+                    writer->send_any_unsent_changes();
 
-          cond_guard.lock();
-       }
-       else
-           cv_.wait(cond_guard);
+            cond_guard.lock();
+        }
+        else
+            cv_.wait(cond_guard);
     }
 }

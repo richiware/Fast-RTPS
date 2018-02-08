@@ -20,22 +20,16 @@
 #include <fastrtps/rtps/builtin/data/ParticipantProxyData.h>
 #include <fastrtps/rtps/builtin/data/WriterProxyData.h>
 #include <fastrtps/rtps/builtin/data/ReaderProxyData.h>
-
 #include <fastrtps/rtps/builtin/discovery/participant/PDPSimple.h>
-
 #include <fastrtps/rtps/builtin/discovery/participant/timedevent/RemoteParticipantLeaseDuration.h>
 #include <fastrtps/rtps/builtin/BuiltinProtocols.h>
-
-#include <rtps/participant/RTPSParticipantImpl.h>
-
 #include <fastrtps/log/Log.h>
-
 #include <fastrtps/qos/QosPolicies.h>
+#include "../../participant/RTPSParticipantImpl.h"
 
 #include <mutex>
 
 using namespace eprosima::fastrtps;
-
 
 namespace eprosima {
 namespace fastrtps{
@@ -47,9 +41,9 @@ ParticipantProxyData::ParticipantProxyData():
     m_manualLivelinessCount(0),
     isAlive(false),
     mp_leaseDurationTimer(nullptr)
-    {
-        set_VendorId_Unknown(m_VendorId);
-    }
+{
+    set_VendorId_Unknown(m_VendorId);
+}
 
 ParticipantProxyData::ParticipantProxyData(const ParticipantProxyData& pdata) :
     m_protocolVersion(pdata.m_protocolVersion),
@@ -69,10 +63,10 @@ ParticipantProxyData::ParticipantProxyData(const ParticipantProxyData& pdata) :
     m_properties(pdata.m_properties),
     m_userData(pdata.m_userData),
     mp_leaseDurationTimer(nullptr)
-    {
-        m_VendorId[0] = pdata.m_VendorId[0];
-        m_VendorId[1] = pdata.m_VendorId[1];
-    }
+{
+    m_VendorId[0] = pdata.m_VendorId[0];
+    m_VendorId[1] = pdata.m_VendorId[1];
+}
 
 ParticipantProxyData::~ParticipantProxyData()
 {
@@ -91,37 +85,37 @@ ParticipantProxyData::~ParticipantProxyData()
         delete(mp_leaseDurationTimer);
 }
 
-bool ParticipantProxyData::initializeData(RTPSParticipantImpl* part,PDPSimple* pdp)
+bool ParticipantProxyData::initializeData(RTPSParticipant::impl& participant, PDPSimple& pdp)
 {
-    this->m_leaseDuration = part->getAttributes().builtin.leaseDuration;
+    this->m_leaseDuration = participant.getAttributes().builtin.leaseDuration;
     set_VendorId_eProsima(this->m_VendorId);
 
     this->m_availableBuiltinEndpoints |= DISC_BUILTIN_ENDPOINT_PARTICIPANT_ANNOUNCER;
     this->m_availableBuiltinEndpoints |= DISC_BUILTIN_ENDPOINT_PARTICIPANT_DETECTOR;
-    if(part->getAttributes().builtin.use_WriterLivelinessProtocol)
+    if(participant.getAttributes().builtin.use_WriterLivelinessProtocol)
     {
         this->m_availableBuiltinEndpoints |= BUILTIN_ENDPOINT_PARTICIPANT_MESSAGE_DATA_WRITER;
         this->m_availableBuiltinEndpoints |= BUILTIN_ENDPOINT_PARTICIPANT_MESSAGE_DATA_READER;
     }
-    if(part->getAttributes().builtin.use_SIMPLE_EndpointDiscoveryProtocol)
+    if(participant.getAttributes().builtin.use_SIMPLE_EndpointDiscoveryProtocol)
     {
-        if(part->getAttributes().builtin.m_simpleEDP.use_PublicationWriterANDSubscriptionReader)
+        if(participant.getAttributes().builtin.m_simpleEDP.use_PublicationWriterANDSubscriptionReader)
         {
             this->m_availableBuiltinEndpoints |= DISC_BUILTIN_ENDPOINT_PUBLICATION_ANNOUNCER;
             this->m_availableBuiltinEndpoints |= DISC_BUILTIN_ENDPOINT_SUBSCRIPTION_DETECTOR;
         }
-        if(part->getAttributes().builtin.m_simpleEDP.use_PublicationReaderANDSubscriptionWriter)
+        if(participant.getAttributes().builtin.m_simpleEDP.use_PublicationReaderANDSubscriptionWriter)
         {
             this->m_availableBuiltinEndpoints |= DISC_BUILTIN_ENDPOINT_PUBLICATION_DETECTOR;
             this->m_availableBuiltinEndpoints |= DISC_BUILTIN_ENDPOINT_SUBSCRIPTION_ANNOUNCER;
         }
     }
 
-    this->m_defaultUnicastLocatorList = part->getAttributes().defaultUnicastLocatorList;
+    this->m_defaultUnicastLocatorList = participant.getAttributes().defaultUnicastLocatorList;
     // (Ricardo) Removed multicast by default in user endpoints.
-    //this->m_defaultMulticastLocatorList = part->getAttributes().defaultMulticastLocatorList;
+    //this->m_defaultMulticastLocatorList = participant.getAttributes().defaultMulticastLocatorList;
     this->m_expectsInlineQos = false;
-    this->m_guid = part->getGuid();
+    this->m_guid = participant.guid();
     for(uint8_t i = 0; i<16; ++i)
     {
         if(i<12)
@@ -131,12 +125,12 @@ bool ParticipantProxyData::initializeData(RTPSParticipantImpl* part,PDPSimple* p
     }
 
 
-    this->m_metatrafficMulticastLocatorList = pdp->mp_builtin->m_metatrafficMulticastLocatorList;
-    this->m_metatrafficUnicastLocatorList = pdp->mp_builtin->m_metatrafficUnicastLocatorList;
+    this->m_metatrafficMulticastLocatorList = pdp.mp_builtin->m_metatrafficMulticastLocatorList;
+    this->m_metatrafficUnicastLocatorList = pdp.mp_builtin->m_metatrafficUnicastLocatorList;
 
-    this->m_participantName = std::string(part->getAttributes().getName());
+    this->m_participantName = std::string(participant.getAttributes().getName());
 
-    this->m_userData = part->getAttributes().userData;
+    this->m_userData = participant.getAttributes().userData;
 
     return true;
 }
@@ -329,7 +323,7 @@ bool ParticipantProxyData::readFromCDRMessage(CDRMessage_t* msg)
                         this->m_properties = *p;
                         break;
                         //FIXME: STATIC EDP. IN ASSIGN REMOTE ENDPOINTS
-                        //				if(mp_SPDP->m_discovery.use_STATIC_EndpointDiscoveryProtocol)
+                        //				if(mp_Spdp.m_discovery.use_STATIC_EndpointDiscoveryProtocol)
                         //				{
                         //					ParameterPropertyList_t* p = (ParameterPropertyList_t*)(*it);
                         //					uint16_t userId;

@@ -17,12 +17,13 @@
  *
  */
 
-#ifndef READERATTRIBUTES_H_
-#define READERATTRIBUTES_H_
+#ifndef __RTPS_ATTRIBUTES_READERATTRIBUTES_H__
+#define __RTPS_ATTRIBUTES_READERATTRIBUTES_H__
 
 #include "../common/Time_t.h"
 #include "../common/Guid.h"
 #include "EndpointAttributes.h"
+
 namespace eprosima{
 namespace fastrtps{
 namespace rtps{
@@ -35,6 +36,7 @@ namespace rtps{
 class ReaderTimes
 {
     public:
+
         ReaderTimes()
         {
             initialAcknackDelay.fraction = 200*1000*1000;
@@ -59,6 +61,7 @@ class  ReaderAttributes
         {
             endpoint.endpointKind = READER;
             endpoint.durabilityKind = VOLATILE;
+            //TODO(Ricardo) Remove because now is STateless and Stateful created.
             endpoint.reliabilityKind = BEST_EFFORT;
         };
 
@@ -105,9 +108,9 @@ class  RemoteWriterAttributes
         //!Ownership Strength of the associated writer.
         uint16_t ownershipStrength;
 };
+
 }
 }
 }
 
-
-#endif /* WRITERATTRIBUTES_H_ */
+#endif // __RTPS_ATTRIBUTES_READERATTRIBUTES_H__

@@ -16,12 +16,14 @@
  * @file Endpoint.h
  */
 
-#ifndef ENDPOINT_H_
-#define ENDPOINT_H_
+#ifndef __RTPS_ENDPOINT_H__
+#define __RTPS_ENDPOINT_H__
+
 #include "common/Types.h"
 #include "common/Locator.h"
 #include "common/Guid.h"
 #include "attributes/EndpointAttributes.h"
+#include "participant/RTPSParticipant.h"
 
 #include <mutex>
 
@@ -29,9 +31,7 @@ namespace eprosima {
 namespace fastrtps{
 namespace rtps {
 
-class RTPSParticipantImpl;
 class ResourceEvent;
-
 
 /**
  * Class Endpoint, all entities of the RTPS network derive from this class.
@@ -42,11 +42,9 @@ class ResourceEvent;
  */
 class Endpoint
 {
-    friend class RTPSParticipantImpl;
-
     protected:
 
-    Endpoint(RTPSParticipantImpl* pimpl,GUID_t& guid,EndpointAttributes& att);
+    Endpoint(RTPSParticipant::impl& participant, const GUID_t& guid, const EndpointAttributes& att);
 
     virtual ~Endpoint();
 
@@ -56,29 +54,39 @@ class Endpoint
      * Get associated GUID
      * @return Associated GUID
      */
-    RTPS_DllAPI inline const GUID_t& getGuid() const { return m_guid; };
+    RTPS_DllAPI inline const GUID_t& getGuid() const { return guid_; };
 
     /**
      * Get associated attributes
      * @return Endpoint attributes
      */
-    RTPS_DllAPI inline EndpointAttributes* getAttributes() { return &m_att; }
+    RTPS_DllAPI inline EndpointAttributes* getAttributes() { return &att_; }
 
 #if HAVE_SECURITY
     bool supports_rtps_protection() { return supports_rtps_protection_; }
 
+    void supports_rtps_protection(bool value) { supports_rtps_protection_ = value; }
+
     bool is_submessage_protected() { return is_submessage_protected_; }
 
+    void is_submessage_protected(bool value) { is_submessage_protected_ = value; }
+
     bool is_payload_protected() { return is_payload_protected_; }
+
+    void is_payload_protected(bool value) { is_payload_protected_ = value; }
 #endif
 
-    protected:
-    //!Pointer to the RTPSParticipant containing this endpoint.
-    RTPSParticipantImpl* mp_RTPSParticipant;
-    //!Endpoint GUID
-    const GUID_t m_guid;
+    //TODO(Ricardo) hide
     //!Endpoint Attributes
-    EndpointAttributes m_att;
+    EndpointAttributes att_;
+
+    //!Endpoint GUID
+    const GUID_t guid_;
+
+    protected:
+
+    //!Pointer to the RTPSParticipant containing this endpoint.
+    RTPSParticipant::impl& participant_;
 
     private:
 
@@ -94,8 +102,8 @@ class Endpoint
 };
 
 
-}
-} /* namespace rtps */
-} /* namespace eprosima */
+} //namespace rtps
+} //namespace fastrtps
+} //namespace eprosima
 
-#endif /* ENDPOINT_H_ */
+#endif //__RTPS_ENDPOINT_H__

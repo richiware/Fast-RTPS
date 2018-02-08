@@ -13,25 +13,25 @@
 // limitations under the License.
 
 /**
- * @file SubscriberListener.h
- */
+* @file SubscriberListener.h
+*/
 
-#ifndef SUBLISTENER_H_
-#define SUBLISTENER_H_
+#ifndef __SUBSCRIBER_SUBSCRIBERLISTENER_H__
+#define __SUBSCRIBER_SUBSCRIBERLISTENER_H__
 
 namespace eprosima {
 namespace fastrtps {
 namespace rtps {
-    class MatchingInfo;
+class MatchingInfo;
 } /* namespace rtps */
 
 class Subscriber;
 
 /**
- * Class SubscriberListener, it should be used by the end user to implement specific callbacks to certain actions.
- * @ingroup FASTRTPS_MODULE
- * @snippet fastrtps_example.cpp ex_SubscriberListener
- */
+* Class SubscriberListener, it should be used by the end user to implement specific callbacks to certain actions.
+* @ingroup FASTRTPS_MODULE
+* @snippet fastrtps_example.cpp ex_SubscriberListener
+*/
 class RTPS_DllAPI SubscriberListener
 {
     public:
@@ -44,17 +44,18 @@ class RTPS_DllAPI SubscriberListener
          * Virtual function to be implemented by the user containing the actions to be performed when a new  Data Message is received.
          * @param sub Subscriber
          */
-        virtual void onNewDataMessage(Subscriber* /*sub*/){};
+        virtual void onNewDataMessage(Subscriber& subscriber) { (void)subscriber; }
 
         /**
          * Virtual method to be called when the subscriber is matched with a new Writer (or unmatched); i.e., when a writer publishing in the same topic is discovered.
          * @param sub Subscriber
          * @param info Matching information
          */
-        virtual void onSubscriptionMatched(Subscriber* /*sub*/, rtps::MatchingInfo& /*info*/){};
+        virtual void onSubscriptionMatched(Subscriber& subscriber, const rtps::MatchingInfo& info)
+        { (void)subscriber; (void)info; }
 };
 
-} /* namespace fastrtps */
-} /* namespace eprosima */
+} // namespace fastrtps
+} // namespace eprosima
 
-#endif /* LISTENER_H_ */
+#endif // __SUBSCRIBER_SUBSCRIBERLISTENER_H__

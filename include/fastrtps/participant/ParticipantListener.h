@@ -17,8 +17,8 @@
  *
  */
 
-#ifndef PARTICIPANTLISTENER_H_
-#define PARTICIPANTLISTENER_H_
+#ifndef __PARTICIPANT_PARTICIPANTLISTENER_H__
+#define __PARTICIPANT_PARTICIPANTLISTENER_H__
 
 #include "ParticipantDiscoveryInfo.h"
 
@@ -42,14 +42,16 @@ class ParticipantListener
          * @param p Pointer to the Participant
          * @param info DiscoveryInfo.
          */
-        virtual void onParticipantDiscovery(Participant* p, ParticipantDiscoveryInfo info){(void)p, (void)info;}
+        virtual void onParticipantDiscovery(Participant& participant, const ParticipantDiscoveryInfo& info)
+        { (void)participant; (void)info; }
 
 #if HAVE_SECURITY
-        virtual void onParticipantAuthentication(Participant* p, const ParticipantAuthenticationInfo& info){(void)p, (void)info;}
+        virtual void onParticipantAuthentication(Participant& participant, const ParticipantAuthenticationInfo& info)
+        { (void)participant; (void)info; }
 #endif
 };
 
-} /* namespace fastrtps */
-} /* namespace eprosima */
+} // namespace fastrtps
+} // namespace eprosima
 
-#endif /* PARTICIPANTLISTENER_H_ */
+#endif //__PARTICIPANT_PARTICIPANTLISTENER_H__

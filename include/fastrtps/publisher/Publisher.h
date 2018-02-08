@@ -17,8 +17,8 @@
  *
  */
 
-#ifndef PUBLISHER_H_
-#define PUBLISHER_H_
+#ifndef __PUBLISHER_PUBLISHER_H__
+#define __PUBLISHER_PUBLISHER_H__
 
 #include "../fastrtps_dll.h"
 #include "../rtps/common/Guid.h"
@@ -47,85 +47,87 @@ class PublisherListener;
  */
 class RTPS_DllAPI Publisher
 {
+    class ListenerLink;
+
     public:
 
-    class impl;
+        class impl;
 
-    //TODO(Ricardo) Use Participant instead of implementation.
-    Publisher(Participant::impl& p, TopicDataType* ptype,
-            PublisherAttributes& att, PublisherListener* p_listen = nullptr);
+        Publisher(Participant& participant, const PublisherAttributes& att, PublisherListener* listener = nullptr);
 
-    virtual ~Publisher();
+        virtual ~Publisher();
 
-    /**
-     * Write data to the topic.
-     * @param Data Pointer to the data
-     * @return True if correct
-     * @par Calling example:
-     * @snippet fastrtps_example.cpp ex_PublisherWrite
-     */
-    bool write(void*Data);
+        /**
+         * Write data to the topic.
+         * @param Data Pointer to the data
+         * @return True if correct
+         * @par Calling example:
+         * @snippet fastrtps_example.cpp ex_PublisherWrite
+         */
+        bool write(void*Data);
 
-    /**
-     * Write data with params to the topic.
-     * @param Data Pointer to the data
-     * @param wparams Extra write parameters.
-     * @return True if correct
-     * @par Calling example:
-     * @snippet fastrtps_example.cpp ex_PublisherWrite
-     */
-    bool write(void* Data, rtps::WriteParams& wparams);
+        /**
+         * Write data with params to the topic.
+         * @param Data Pointer to the data
+         * @param wparams Extra write parameters.
+         * @return True if correct
+         * @par Calling example:
+         * @snippet fastrtps_example.cpp ex_PublisherWrite
+         */
+        bool write(void* Data, rtps::WriteParams& wparams);
 
-    /**
-     * Dispose of a previously written data.
-     * @param Data Pointer to the data.
-     * @return True if correct.
-     */
-    bool dispose(void* Data);
-    /**
-     * Unregister a previously written data.
-     * @param Data Pointer to the data.
-     * @return True if correct.
-     */
-    bool unregister(void* Data);
-    /**
-     * Dispose and unregister a previously written data.
-     * @param Data Pointer to the data.
-     * @return True if correct.
-     */
-    bool dispose_and_unregister(void* Data);
+        /**
+         * Dispose of a previously written data.
+         * @param Data Pointer to the data.
+         * @return True if correct.
+         */
+        bool dispose(void* Data);
+        /**
+         * Unregister a previously written data.
+         * @param Data Pointer to the data.
+         * @return True if correct.
+         */
+        bool unregister(void* Data);
+        /**
+         * Dispose and unregister a previously written data.
+         * @param Data Pointer to the data.
+         * @return True if correct.
+         */
+        bool dispose_and_unregister(void* Data);
 
-    /**
-     * Remove all the Changes in the associated RTPSWriter.
-     * @param[out] removed Number of elements removed
-     * @return True if all elements were removed.
-     */
-    bool removeAllChange(size_t* removed = nullptr);
+        /**
+         * Remove all the Changes in the associated RTPSWriter.
+         * @param[out] removed Number of elements removed
+         * @return True if all elements were removed.
+         */
+        bool removeAllChange(size_t* removed = nullptr);
 
-    bool wait_for_all_acked(const rtps::Time_t& max_wait);
+        bool wait_for_all_acked(const rtps::Time_t& max_wait);
 
-    /**
-     * Get the GUID_t of the associated RTPSWriter.
-     * @return GUID_t.
-     */
-    const rtps::GUID_t& getGuid();
+        /**
+         * Get the GUID_t of the associated RTPSWriter.
+         * @return GUID_t.
+         */
+        const rtps::GUID_t& getGuid();
 
-    /**
-     * Get the Attributes of the Publisher.
-     * @return Attributes of the publisher
-     */
-    PublisherAttributes getAttributes() const;
+        /**
+         * Get the Attributes of the Publisher.
+         * @return Attributes of the publisher
+         */
+        PublisherAttributes getAttributes() const;
 
     private:
 
-    friend impl& get_implementation(Publisher& publisher);
+        std::unique_ptr<ListenerLink> listener_link_;
 
-    friend const impl& get_implementation(const Publisher& publisher);
+        friend impl& get_implementation(Publisher& publisher);
 
-    std::unique_ptr<impl> impl_;
+        friend const impl& get_implementation(const Publisher& publisher);
+
+        std::shared_ptr<impl> impl_;
 };
 
-} /* namespace fastrtps */
-} /* namespace eprosima */
+} // namespace fastrtps
+} // namespace eprosima
 
-#endif /* PUBLISHER_H_ */
+#endif //__PUBLISHER_PUBLISHER_H__

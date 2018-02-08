@@ -17,15 +17,15 @@
  *
  */
 
-#include <fastrtps/rtps/writer/timedevent/NackSupressionDuration.h>
+#include "NackSupressionDuration.h"
 #include <fastrtps/rtps/resources/ResourceEvent.h>
-#include <fastrtps/rtps/writer/StatefulWriter.h>
+#include "../StatefulWriterImpl.h"
 #include <fastrtps/rtps/writer/ReaderProxy.h>
 #include <fastrtps/rtps/writer/timedevent/PeriodicHeartbeat.h>
 #include "../../participant/RTPSParticipantImpl.h"
-#include <mutex>
-
 #include <fastrtps/log/Log.h>
+
+#include <mutex>
 
 namespace eprosima {
 namespace fastrtps{
@@ -37,12 +37,18 @@ NackSupressionDuration::~NackSupressionDuration()
     destroy();
 }
 
-NackSupressionDuration::NackSupressionDuration(ReaderProxy& remote_reader,double millisec) :
-    TimedEvent(remote_reader.mp_SFW->getRTPSParticipant()->getEventResource().getIOService(),
-            remote_reader.mp_SFW->getRTPSParticipant()->getEventResource().getThread(), millisec),
+NackSupressionDuration::NackSupressionDuration(ReaderProxy& remote_reader, double millisec) :
+    TimedEvent(remote_reader.writer_.participant().getEventResource().getIOService(),
+            remote_reader.writer_.participant().getEventResource().getThread(), millisec),
     remote_reader_(remote_reader)
 {
 
+}
+
+void NackSupressionDuration::restart_timer()
+{
+    remote_reader_.convert_status_on_all_changes(UNDERWAY,UNACKNOWLEDGED);
+    remote_reader_.writer_.periodic_heartbeat_->restart_timer();
 }
 
 void NackSupressionDuration::event(EventCode code, const char* msg)
@@ -57,8 +63,7 @@ void NackSupressionDuration::event(EventCode code, const char* msg)
 
         if(remote_reader_.m_att.endpoint.reliabilityKind == RELIABLE)
         {
-            remote_reader_.convert_status_on_all_changes(UNDERWAY,UNACKNOWLEDGED);
-            remote_reader_.mp_SFW->mp_periodicHB->restart_timer();
+            restart_timer();
         }
     }
     else if(code == EVENT_ABORT)

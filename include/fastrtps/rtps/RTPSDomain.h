@@ -52,8 +52,6 @@ class ReaderListener;
  */
 class RTPSDomain
 {
-    typedef std::pair<RTPSParticipant*,RTPSParticipantImpl*> t_p_RTPSParticipant;
-
     private:
 
     RTPSDomain();
@@ -78,7 +76,7 @@ class RTPSDomain
      * @param plisten Pointer to the ParticipantListener.
      * @return Pointer to the RTPSParticipant.
      */
-    RTPS_DllAPI static RTPSParticipant* createParticipant(RTPSParticipantAttributes& PParam, RTPSParticipantListener* plisten = nullptr);
+    RTPS_DllAPI static RTPSParticipant* create_participant(RTPSParticipantAttributes& PParam, RTPSParticipantListener* plisten = nullptr);
 
     /**
      * Create a RTPSWriter in a participant.
@@ -118,7 +116,7 @@ class RTPSDomain
      * @param[in] p Pointer to the RTPSParticipant;
      * @return True if correct.
      */
-    RTPS_DllAPI static bool removeRTPSParticipant(RTPSParticipant* p);
+    RTPS_DllAPI static bool remove_participant(RTPSParticipant* p);
 
     /**
      * Set the maximum RTPSParticipantID.
@@ -133,7 +131,7 @@ class RTPSDomain
     private:
     static uint32_t m_maxRTPSParticipantID;
 
-    static std::vector<t_p_RTPSParticipant> m_RTPSParticipants;
+    static std::vector<RTPSParticipant*> m_RTPSParticipants;
 
     /**
      * @brief Get Id to create a RTPSParticipant.

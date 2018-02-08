@@ -109,10 +109,7 @@ class  RemoteReaderAttributes
             endpoint.endpointKind = READER;
         }
 
-        virtual ~RemoteReaderAttributes()
-        {
-
-        }
+        virtual ~RemoteReaderAttributes() = default;
 
         //!Attributes of the associated endpoint.
         EndpointAttributes endpoint;
@@ -123,9 +120,9 @@ class  RemoteReaderAttributes
         //!Expects inline QOS.
         bool expectsInlineQos;
 };
-}
-}
-}
 
+}
+}
+}
 
 #endif /* WRITERATTRIBUTES_H_ */

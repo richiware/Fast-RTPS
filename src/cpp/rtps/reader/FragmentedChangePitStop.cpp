@@ -14,7 +14,7 @@
 
 #include "FragmentedChangePitStop.h"
 #include <fastrtps/rtps/common/CacheChange.h>
-#include <fastrtps/rtps/reader/RTPSReader.h>
+#include "RTPSReaderImpl.h"
 
 using namespace eprosima::fastrtps::rtps;
 
@@ -44,12 +44,12 @@ CacheChange_t* FragmentedChangePitStop::process(CacheChange_t* incoming_change, 
     {
         CacheChange_t* original_change = nullptr;
 
-        if(!parent_->reserveCache(&original_change, sampleSize))
+        if(!parent_.reserveCache(&original_change, sampleSize))
             return nullptr;
 
         if(original_change->serialized_payload.max_size < sampleSize)
         {
-            parent_->releaseCache(original_change);
+            parent_.releaseCache(original_change);
             return nullptr;
         }
 
@@ -148,7 +148,7 @@ bool FragmentedChangePitStop::try_to_remove(const SequenceNumber_t& sequence_num
             if(cit->getChange()->writer_guid == writer_guid)
             {
                 // Destroy CacheChange_t.
-                parent_->releaseCache(cit->getChange());
+                parent_.releaseCache(cit->getChange());
                 changes_.erase(cit);
                 returnedValue = true;
                 break;
@@ -170,7 +170,7 @@ bool FragmentedChangePitStop::try_to_remove_until(const SequenceNumber_t& sequen
                 cit->getChange()->writer_guid == writer_guid)
         {
             // Destroy CacheChange_t.
-            parent_->releaseCache(cit->getChange());
+            parent_.releaseCache(cit->getChange());
             cit = changes_.erase(cit);
             returnedValue = true;
         }

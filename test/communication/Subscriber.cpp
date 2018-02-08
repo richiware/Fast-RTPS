@@ -87,14 +87,14 @@ int main(int argc, char** argv)
     ParticipantAttributes participant_attributes;
     participant_attributes.rtps.builtin.leaseDuration.seconds = 3;
     participant_attributes.rtps.builtin.leaseDuration_announcementperiod.seconds = 1;
-    Participant* participant = Domain::createParticipant(participant_attributes);
+    Participant* participant = Domain::create_participant(participant_attributes);
     if(participant==nullptr)
         return 1;
 
     //REGISTER THE TYPE
 
     HelloWorldType type;
-    Domain::registerType(participant, &type);
+    Domain::register_type(*participant, &type);
 
     SubListener listener;
 
@@ -108,7 +108,7 @@ int main(int argc, char** argv)
 
     if(subscriber == nullptr)
     {
-        Domain::removeParticipant(participant);
+        Domain::remove_participant(participant);
         return 1;
     }
 
@@ -122,7 +122,7 @@ int main(int argc, char** argv)
         listener.cv_.wait(lock, [&]{ return listener.number_samples_ >= 4; });
     }
 
-    Domain::removeParticipant(participant);
+    Domain::remove_participant(participant);
 
     return 0;
 }

@@ -20,18 +20,14 @@
 #include <fastrtps/rtps/builtin/discovery/endpoint/EDPStatic.h>
 #include <fastrtps/rtps/builtin/discovery/participant/PDPSimple.h>
 #include <fastrtps/xmlparser/XMLEndpointParser.h>
-
 #include <fastrtps/rtps/builtin/data/WriterProxyData.h>
 #include <fastrtps/rtps/builtin/data/ReaderProxyData.h>
 #include <fastrtps/rtps/builtin/data/ParticipantProxyData.h>
-
-#include <fastrtps/rtps/reader/RTPSReader.h>
-#include <fastrtps/rtps/writer/RTPSWriter.h>
-
+#include "../../../reader/RTPSReaderImpl.h"
+#include "../../../writer/RTPSWriterImpl.h"
 #include <fastrtps/log/Log.h>
 
 #include <mutex>
-
 #include <sstream>
 
 namespace eprosima {
@@ -39,9 +35,8 @@ namespace fastrtps{
 namespace rtps {
 
 
-EDPStatic::EDPStatic(PDPSimple* p,RTPSParticipantImpl* part):
-    EDP(p,part),
-    mp_edpXML(nullptr)
+EDPStatic::EDPStatic(PDPSimple& p, RTPSParticipant::impl& part):
+    EDP(p, part), mp_edpXML(nullptr)
 {
 }
 
@@ -104,62 +99,62 @@ bool EDPStaticProperty::fromProperty(std::pair<std::string,std::string> prop)
 bool EDPStatic::processLocalReaderProxyData(ReaderProxyData* rdata)
 {
     logInfo(RTPS_EDP,rdata->guid().entityId<< " in topic: " <<rdata->topicName());
-    mp_PDP->getMutex()->lock();
+    pdpsimple_.getMutex()->lock();
     //Add the property list entry to our local pdp
-    ParticipantProxyData* localpdata = this->mp_PDP->getLocalParticipantProxyData();
+    ParticipantProxyData* localpdata = this->pdpsimple_.getLocalParticipantProxyData();
     localpdata->m_properties.properties.push_back(EDPStaticProperty::toProperty("Reader","ALIVE", rdata->userDefinedId(), rdata->guid().entityId));
-    mp_PDP->getMutex()->unlock();
-    this->mp_PDP->announceParticipantState(true);
+    pdpsimple_.getMutex()->unlock();
+    this->pdpsimple_.announceParticipantState(true);
     return true;
 }
 
 bool EDPStatic::processLocalWriterProxyData(WriterProxyData* wdata)
 {
     logInfo(RTPS_EDP ,wdata->guid().entityId << " in topic: " << wdata->topicName());
-    mp_PDP->getMutex()->lock();
+    pdpsimple_.getMutex()->lock();
     //Add the property list entry to our local pdp
-    ParticipantProxyData* localpdata = this->mp_PDP->getLocalParticipantProxyData();
+    ParticipantProxyData* localpdata = this->pdpsimple_.getLocalParticipantProxyData();
     localpdata->m_properties.properties.push_back(EDPStaticProperty::toProperty("Writer","ALIVE",
                 wdata->userDefinedId(), wdata->guid().entityId));
-    mp_PDP->getMutex()->unlock();
-    this->mp_PDP->announceParticipantState(true);
+    pdpsimple_.getMutex()->unlock();
+    this->pdpsimple_.announceParticipantState(true);
     return true;
 }
 
-bool EDPStatic::removeLocalReader(RTPSReader* R)
+bool EDPStatic::removeLocalReader(RTPSReader::impl& reader)
 {
-    std::lock_guard<std::recursive_mutex> guard(*mp_PDP->getMutex());
-    ParticipantProxyData* localpdata = this->mp_PDP->getLocalParticipantProxyData();
+    std::lock_guard<std::recursive_mutex> guard(*pdpsimple_.getMutex());
+    ParticipantProxyData* localpdata = this->pdpsimple_.getLocalParticipantProxyData();
     for(std::vector<std::pair<std::string,std::string>>::iterator pit = localpdata->m_properties.properties.begin();
             pit!=localpdata->m_properties.properties.end();++pit)
     {
         EDPStaticProperty staticproperty;
         if(staticproperty.fromProperty(*pit))
         {
-            if(staticproperty.m_entityId == R->getGuid().entityId)
+            if(staticproperty.m_entityId == reader.getGuid().entityId)
             {
-                *pit = EDPStaticProperty::toProperty("Reader","ENDED",R->getAttributes()->getUserDefinedID(),
-                        R->getGuid().entityId);
+                *pit = EDPStaticProperty::toProperty("Reader", "ENDED", reader.getAttributes()->getUserDefinedID(),
+                        reader.getGuid().entityId);
             }
         }
     }
     return false;
 }
 
-bool EDPStatic::removeLocalWriter(RTPSWriter*W)
+bool EDPStatic::removeLocalWriter(RTPSWriter::impl& writer)
 {
-    std::lock_guard<std::recursive_mutex> guard(*mp_PDP->getMutex());
-    ParticipantProxyData* localpdata = this->mp_PDP->getLocalParticipantProxyData();
+    std::lock_guard<std::recursive_mutex> guard(*pdpsimple_.getMutex());
+    ParticipantProxyData* localpdata = this->pdpsimple_.getLocalParticipantProxyData();
     for(std::vector<std::pair<std::string,std::string>>::iterator pit = localpdata->m_properties.properties.begin();
             pit!=localpdata->m_properties.properties.end();++pit)
     {
         EDPStaticProperty staticproperty;
         if(staticproperty.fromProperty(*pit))
         {
-            if(staticproperty.m_entityId == W->getGuid().entityId)
+            if(staticproperty.m_entityId == writer.getGuid().entityId)
             {
-                *pit = EDPStaticProperty::toProperty("Writer","ENDED",W->getAttributes()->getUserDefinedID(),
-                        W->getGuid().entityId);
+                *pit = EDPStaticProperty::toProperty("Writer", "ENDED", writer.getAttributes()->getUserDefinedID(),
+                        writer.getGuid().entityId);
             }
         }
     }
@@ -180,7 +175,7 @@ void EDPStatic::assignRemoteEndpoints(const ParticipantProxyData& pdata)
                 ParticipantProxyData pdata_aux;
                 ReaderProxyData rdata;
                 GUID_t guid(pdata.m_guid.guidPrefix,staticproperty.m_entityId);
-                if(!this->mp_PDP->lookupReaderProxyData(guid ,rdata, pdata_aux))//IF NOT FOUND, we CREATE AND PAIR IT
+                if(!this->pdpsimple_.lookupReaderProxyData(guid ,rdata, pdata_aux))//IF NOT FOUND, we CREATE AND PAIR IT
                 {
                     newRemoteReader(pdata, staticproperty.m_userId,staticproperty.m_entityId);
                 }
@@ -190,7 +185,7 @@ void EDPStatic::assignRemoteEndpoints(const ParticipantProxyData& pdata)
                 ParticipantProxyData pdata_aux;
                 WriterProxyData wdata;
                 GUID_t guid(pdata.m_guid.guidPrefix,staticproperty.m_entityId);
-                if(!this->mp_PDP->lookupWriterProxyData(guid,wdata, pdata_aux))//IF NOT FOUND, we CREATE AND PAIR IT
+                if(!this->pdpsimple_.lookupWriterProxyData(guid,wdata, pdata_aux))//IF NOT FOUND, we CREATE AND PAIR IT
                 {
                     newRemoteWriter(pdata,staticproperty.m_userId,staticproperty.m_entityId);
                 }
@@ -198,12 +193,12 @@ void EDPStatic::assignRemoteEndpoints(const ParticipantProxyData& pdata)
             else if(staticproperty.m_endpointType == "Reader" && staticproperty.m_status == "ENDED")
             {
                 GUID_t guid(pdata.m_guid.guidPrefix,staticproperty.m_entityId);
-                this->mp_PDP->removeReaderProxyData(guid);
+                this->pdpsimple_.removeReaderProxyData(guid);
             }
             else if(staticproperty.m_endpointType == "Writer" && staticproperty.m_status == "ENDED")
             {
                 GUID_t guid(pdata.m_guid.guidPrefix,staticproperty.m_entityId);
-                this->mp_PDP->removeWriterProxyData(guid);
+                this->pdpsimple_.removeWriterProxyData(guid);
             }
             else
             {
@@ -237,7 +232,7 @@ bool EDPStatic::newRemoteReader(const ParticipantProxyData& pdata, uint16_t user
         newRPD.key() = newRPD.guid();
         newRPD.RTPSParticipantKey() = pdata.m_guid;
         ParticipantProxyData pdata_aux;
-        if(this->mp_PDP->addReaderProxyData(&newRPD, pdata_aux))
+        if(this->pdpsimple_.addReaderProxyData(&newRPD, pdata_aux))
         {
             this->pairing_reader_proxy_with_any_local_writer(&pdata_aux, &newRPD);
             return true;
@@ -265,7 +260,7 @@ bool EDPStatic::newRemoteWriter(const ParticipantProxyData& pdata,uint16_t userI
         newWPD.key() = newWPD.guid();
         newWPD.RTPSParticipantKey() = pdata.m_guid;
         ParticipantProxyData pdata_aux;
-        if(this->mp_PDP->addWriterProxyData(&newWPD, pdata_aux))
+        if(this->pdpsimple_.addWriterProxyData(&newWPD, pdata_aux))
         {
             this->pairing_writer_proxy_with_any_local_reader(&pdata_aux, &newWPD);
             return true;

@@ -19,14 +19,15 @@
 #include <fastrtps/rtps/history/WriterHistory.h>
 #include <fastrtps/rtps/resources/ResourceEvent.h>
 #include <fastrtps/log/Log.h>
+#include "../../history/WriterHistoryImpl.h"
 
 using namespace eprosima::fastrtps::rtps;
 using namespace eprosima::fastrtps::rtps::security;
 
 HandshakeMessageTokenResent::HandshakeMessageTokenResent(SecurityManager& security_manager,
         const GUID_t& remote_participant_key, double interval) :
-    TimedEvent(security_manager.participant()->getEventResource().getIOService(),
-            security_manager.participant()->getEventResource().getThread(), interval),
+    TimedEvent(security_manager.participant().getEventResource().getIOService(),
+            security_manager.participant().getEventResource().getThread(), interval),
     security_manager_(security_manager), remote_participant_key_(remote_participant_key)
 {
 }

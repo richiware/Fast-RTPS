@@ -19,14 +19,10 @@
 
 #include <fastrtps/rtps/writer/timedevent/PeriodicHeartbeat.h>
 #include <fastrtps/rtps/resources/ResourceEvent.h>
-
-#include <fastrtps/rtps/writer/StatefulWriter.h>
+#include "../StatefulWriterImpl.h"
 #include <fastrtps/rtps/writer/ReaderProxy.h>
-
 #include "../../participant/RTPSParticipantImpl.h"
-
 #include <fastrtps/rtps/messages/RTPSMessageCreator.h>
-
 #include <fastrtps/log/Log.h>
 
 #include <mutex>
@@ -42,9 +38,9 @@ PeriodicHeartbeat::~PeriodicHeartbeat()
     destroy();
 }
 
-PeriodicHeartbeat::PeriodicHeartbeat(StatefulWriter& writer, double interval):
-    TimedEvent(writer.getRTPSParticipant()->getEventResource().getIOService(),
-            writer.getRTPSParticipant()->getEventResource().getThread(), interval), writer_(writer)
+PeriodicHeartbeat::PeriodicHeartbeat(StatefulWriter::impl& writer, double interval):
+    TimedEvent(writer.participant().getEventResource().getIOService(),
+            writer.participant().getEventResource().getThread(), interval), writer_(writer)
 {
 
 }

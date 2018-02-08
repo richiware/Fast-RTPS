@@ -17,20 +17,17 @@
  */
 
 
-#ifndef STATELESSWRITER_H_
-#define STATELESSWRITER_H_
+#ifndef __RTPS_WRITER_STATELESSWRITER_H__
+#define __RTPS_WRITER_STATELESSWRITER_H__
 #ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
 
 #include "../common/Time_t.h"
 #include "RTPSWriter.h"
 #include "ReaderLocator.h"
 
-#include <list>
-
 namespace eprosima {
 namespace fastrtps{
 namespace rtps {
-
 
 /**
  * Class StatelessWriter, specialization of RTPSWriter that manages writers that don't keep state of the matched readers.
@@ -38,86 +35,53 @@ namespace rtps {
  */
 class StatelessWriter : public RTPSWriter
 {
-    friend class RTPSParticipantImpl;
-
-    StatelessWriter(RTPSParticipantImpl*, GUID_t& guid, WriterAttributes& att, WriterHistory& hist,
-            WriterListener* listen = nullptr);
-
     public:
-    virtual ~StatelessWriter();
-    /**
-     * Add a specific change to all ReaderLocators.
-     * @param p Pointer to the change.
-     */
-    bool unsent_change_added_to_history(const CacheChange_t& change) override;
 
-    /**
-     * Indicate the writer that a change has been removed by the history due to some HistoryQos requirement.
-     * @param a_change Pointer to the change that is going to be removed.
-     * @return True if removed correctly.
-     */
-    bool change_removed_by_history(const SequenceNumber_t& sequence_number, const InstanceHandle_t& handle) override;
-    /**
-     * Add a matched reader.
-     * @param ratt Attributes of the reader to add.
-     * @return True if added.
-     */
-    bool matched_reader_add(const RemoteReaderAttributes& ratt);
-    /**
-     * Remove a matched reader.
-     * @param ratt Attributes of the reader to remove.
-     * @return True if removed.
-     */
-    bool matched_reader_remove(const RemoteReaderAttributes& ratt);
-    /**
-     * Tells us if a specific Reader is matched against this writer
-     * @param ratt Attributes of the reader to check.
-     * @return True if it was matched.
-     */
-    bool matched_reader_is_matched(const RemoteReaderAttributes& ratt);
-    /**
-     * Method to indicate that there are changes not sent in some of all ReaderProxy.
-     */
-    void send_any_unsent_changes();
+        class impl;
 
-    /**
-     * Update the Attributes of the Writer.
-     * @param att New attributes
-     */
-    void updateAttributes(WriterAttributes& att){
-        (void)att;
-        //FOR NOW THERE IS NOTHING TO UPDATE.
-    };
+        StatelessWriter(RTPSParticipant& participant, const WriterAttributes& att, WriterHistory& hist,
+                WriterListener* listen = nullptr);
 
-    bool add_locator(Locator_t& loc);
+        virtual ~StatelessWriter() = default;
 
-    void update_unsent_changes(ReaderLocator& reader_locator,
-            const SequenceNumber_t& seqNum, const FragmentNumber_t fragNum);
+        /**
+         * Add a matched reader.
+         * @param ratt Attributes of the reader to add.
+         * @return True if added.
+         */
+        bool matched_reader_add(const RemoteReaderAttributes& ratt);
+        /**
+         * Remove a matched reader.
+         * @param ratt Attributes of the reader to remove.
+         * @return True if removed.
+         */
+        bool matched_reader_remove(const RemoteReaderAttributes& ratt);
+        /**
+         * Tells us if a specific Reader is matched against this writer
+         * @param ratt Attributes of the reader to check.
+         * @return True if it was matched.
+         */
+        bool matched_reader_is_matched(const RemoteReaderAttributes& ratt);
 
-    //!Reset the unsent changes.
-    void resent_changes();
+        /**
+         * Update the Attributes of the Writer.
+         * @param att New attributes
+         */
+        void updateAttributes(WriterAttributes& att){
+            (void)att;
+            //FOR NOW THERE IS NOTHING TO UPDATE.
+        };
 
-    /**
-     * Get the number of matched readers
-     * @return Number of matched readers
-     */
-    inline size_t getMatchedReadersSize() const {return m_matched_readers.size();};
-
-    void add_flow_controller(std::unique_ptr<FlowController> controller);
+        bool add_locator(Locator_t& loc);
 
     private:
 
-    std::vector<GUID_t> get_builtin_guid();
-
-    void update_locators_nts_(const GUID_t& optionalGuid);
-
-    std::vector<ReaderLocator> reader_locators, fixed_locators;
-    std::vector<RemoteReaderAttributes> m_matched_readers;
-    std::vector<std::unique_ptr<FlowController> > m_controllers;
+        StatelessWriter& operator=(const StatelessWriter&) = delete;
 };
-}
-} /* namespace rtps */
-} /* namespace eprosima */
+
+} //namespace rtps
+} //namespace fastrtps
+} //namespace eprosima
 
 #endif
-#endif /* STATELESSWRITER_H_ */
+#endif //__RTPS_WRITER_STATELESSWRITER_H__

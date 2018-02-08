@@ -17,8 +17,8 @@
  *
 */
 
-#ifndef RTPSPARTICIPANTLEASEDURATION_H_
-#define RTPSPARTICIPANTLEASEDURATION_H_
+#ifndef __RTPS_BUILTIN_DISCOVERY_PARTICIPANT_TIMEDEVENT_PARTICIPANTLEASEDURATION_H__
+#define __RTPS_BUILTIN_DISCOVERY_PARTICIPANT_TIMEDEVENT_PARTICIPANTLEASEDURATION_H__
 #ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
 #include "fastrtps/rtps/resources/TimedEvent.h"
 
@@ -38,33 +38,35 @@ class ParticipantProxyData;
  */
 class RemoteParticipantLeaseDuration:public TimedEvent
 {
-public:
-	/**
-	 * Constructor
-	 * @param p_SPDP Pointer to the PDPSimple object.
-	 * @param pdata Pointer to the ParticipantProxyData associated with this TimedEvent.
-	 * @param interval Interval in ms.
-	 */
-	RemoteParticipantLeaseDuration(PDPSimple* p_SPDP,
-			ParticipantProxyData* pdata,
-			double interval);
-	virtual ~RemoteParticipantLeaseDuration();
+    public:
 
- 	/**
-	*  Temporal event that check if the RTPSParticipant is alive, and removes it if not.
-	* @param code Code representing the status of the event
-	* @param msg Message associated to the event
-	*/
-	void event(EventCode code, const char* msg= nullptr);
-	//!Pointer to the PDPSimple object.
-	PDPSimple* mp_PDP;
-	//!Pointer to the RTPSParticipantProxyData object that contains this temporal event.
-	ParticipantProxyData* mp_participantProxyData;
+        /**
+         * Constructor
+         * @param p_SPDP Pointer to the PDPSimple object.
+         * @param pdata Pointer to the ParticipantProxyData associated with this TimedEvent.
+         * @param interval Interval in ms.
+         */
+        RemoteParticipantLeaseDuration(PDPSimple& pdpsimple, ParticipantProxyData* pdata, double interval);
+
+        virtual ~RemoteParticipantLeaseDuration();
+
+        /**
+         *  Temporal event that check if the RTPSParticipant is alive, and removes it if not.
+         * @param code Code representing the status of the event
+         * @param msg Message associated to the event
+         */
+        void event(EventCode code, const char* msg= nullptr);
+
+        //!Pointer to the PDPSimple object.
+        PDPSimple& pdpsimple_;
+
+        //!Pointer to the RTPSParticipantProxyData object that contains this temporal event.
+        ParticipantProxyData* mp_participantProxyData;
 
 };
 
-}
-} /* namespace rtps */
-} /* namespace eprosima */
+} // namespace rtps
+} // namespace fastrtps
+} // namespace eprosima
 #endif
-#endif /* RTPSPARTICIPANTLEASEDURATION_H_ */
+#endif // __RTPS_BUILTIN_DISCOVERY_PARTICIPANT_TIMEDEVENT_PARTICIPANTLEASEDURATION_H__

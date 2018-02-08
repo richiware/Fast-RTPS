@@ -17,8 +17,8 @@
  *
  */
 
-#ifndef RESENDDATAPERIOD_H_
-#define RESENDDATAPERIOD_H_
+#ifndef __RTPS_BUILTIN_DISCOVERY_PARTICIPANT_TIMEDEVENT_RESENDPARTICIPANTPROXYDATAPERIOD_H__
+#define __RTPS_BUILTIN_DISCOVERY_PARTICIPANT_TIMEDEVENT_RESENDPARTICIPANTPROXYDATAPERIOD_H__
 #ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
 
 #include "fastrtps/rtps/resources/TimedEvent.h"
@@ -34,33 +34,36 @@ class PDPSimple;
  * Class ResendParticipantProxyDataPeriod, TimedEvent used to periodically send the RTPSParticipantDiscovery Data.
  *@ingroup DISCOVERY_MODULE
  */
-class ResendParticipantProxyDataPeriod: public TimedEvent {
-public:
+class ResendParticipantProxyDataPeriod : public TimedEvent
+{
+    public:
 
-	/**
-	 * Constructor.
-	 * @param p_SPDP Pointer to the PDPSimple.
-	 * @param interval Interval in ms.
-	 */
-	ResendParticipantProxyDataPeriod(PDPSimple* p_SPDP,
-			double interval);
-	virtual ~ResendParticipantProxyDataPeriod();
-	
-	/**
-	* Method invoked when the event occurs.
-	* This temporal event resends the RTPSParticipantProxyData to all remote RTPSParticipants.
-	* @param code Code representing the status of the event
-	* @param msg Message associated to the event
-	*/
-	void event(EventCode code, const char* msg= nullptr);
-	
-	//!Auxiliar data message.
-	CDRMessage_t m_data_msg;
-	//!Pointer to the PDPSimple object.
-	PDPSimple* mp_PDP;
+        /**
+         * Constructor.
+         * @param p_SPDP Pointer to the PDPSimple.
+         * @param interval Interval in ms.
+         */
+        ResendParticipantProxyDataPeriod(PDPSimple& pdpsimple, double interval);
+
+        virtual ~ResendParticipantProxyDataPeriod();
+
+        /**
+         * Method invoked when the event occurs.
+         * This temporal event resends the RTPSParticipantProxyData to all remote RTPSParticipants.
+         * @param code Code representing the status of the event
+         * @param msg Message associated to the event
+         */
+        void event(EventCode code, const char* msg= nullptr);
+
+        //!Auxiliar data message.
+        CDRMessage_t m_data_msg;
+        //!Pointer to the PDPSimple object.
+        PDPSimple& pdpsimple_;
 };
-}
-} /* namespace rtps */
-} /* namespace eprosima */
+
+} // namespace rtps
+} // namespace fastrtps
+} // namespace eprosima
+
 #endif
-#endif /* RESENDDATAPERIOD_H_ */
+#endif // __RTPS_BUILTIN_DISCOVERY_PARTICIPANT_TIMEDEVENT_RESENDPARTICIPANTPROXYDATAPERIOD_H__

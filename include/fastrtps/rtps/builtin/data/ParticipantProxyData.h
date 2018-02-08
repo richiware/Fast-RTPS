@@ -17,16 +17,17 @@
  *
  */
 
-#ifndef PARTICIPANTPROXYDATA_H_
-#define PARTICIPANTPROXYDATA_H_
+#ifndef __RTPS_BUILTIN_DATA_PARTICIPANTPROXYDATA_H__
+#define __RTPS_BUILTIN_DATA_PARTICIPANTPROXYDATA_H__
 #ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
-#include <mutex>
 #include "../../../qos/QosList.h"
 #include "../../../qos/ParameterList.h"
-
 #include "../../attributes/WriterAttributes.h"
 #include "../../attributes/ReaderAttributes.h"
 #include "../../common/Token.h"
+#include "../../participant/RTPSParticipant.h"
+
+#include <mutex>
 
 #define DISCOVERY_PARTICIPANT_DATA_MAX_SIZE 5000
 #define DISCOVERY_TOPIC_DATA_MAX_SIZE 500
@@ -54,7 +55,6 @@ namespace rtps {
 struct CDRMessage_t;
 class PDPSimple;
 class RemoteParticipantLeaseDuration;
-class RTPSParticipantImpl;
 class ReaderProxyData;
 class WriterProxyData;
 
@@ -119,7 +119,7 @@ class ParticipantProxyData
          * @param pdp Pointer to the PDPSimple object.
          * @return True if correctly initialized.
          */
-        bool initializeData(RTPSParticipantImpl* part, PDPSimple* pdp);
+        bool initializeData(RTPSParticipant::impl& part, PDPSimple& pdp);
         /**
          * Update the data.
          * @param pdata Object to copy the data from
@@ -146,9 +146,9 @@ class ParticipantProxyData
         void copy(ParticipantProxyData& pdata);
 };
 
-}
-} /* namespace rtps */
-} /* namespace eprosima */
+} // namespace rtps
+} // namespace fastrtps
+} // namespace eprosima
 
 #endif
-#endif /* RTPSParticipantPROXYDATA_H_ */
+#endif // __RTPS_BUILTIN_DATA_PARTICIPANTPROXYDATA_H__

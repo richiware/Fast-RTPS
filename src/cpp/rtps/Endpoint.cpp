@@ -18,6 +18,7 @@
  */
 
 #include <fastrtps/rtps/Endpoint.h>
+#include "participant/RTPSParticipantImpl.h"
 #include "fastrtps/rtps/attributes/WriterAttributes.h"
 
 #include <mutex>
@@ -26,17 +27,17 @@ namespace eprosima {
 namespace fastrtps{
 namespace rtps {
 
-Endpoint::Endpoint(RTPSParticipantImpl* pimpl,GUID_t& guid,EndpointAttributes& att):
-    mp_RTPSParticipant(pimpl),
-    m_guid(guid),
-    m_att(att)
+Endpoint::Endpoint(RTPSParticipant::impl& participant, const GUID_t& guid, const EndpointAttributes& att):
+    participant_(participant),
+    guid_(guid),
+    att_(att)
 #if HAVE_SECURITY
     ,supports_rtps_protection_(true),
     is_submessage_protected_(false),
     is_payload_protected_(false)
 #endif
-    {
-    }
+{
+}
 
 Endpoint::~Endpoint()
 {

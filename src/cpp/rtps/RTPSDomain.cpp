@@ -18,19 +18,13 @@
  */
 
 #include <fastrtps/rtps/RTPSDomain.h>
-
-#include <fastrtps/rtps/participant/RTPSParticipant.h>
 #include "participant/RTPSParticipantImpl.h"
-
 #include <fastrtps/log/Log.h>
-
 #include <fastrtps/transport/UDPv4Transport.h>
 #include <fastrtps/transport/UDPv6Transport.h>
 #include <fastrtps/transport/test_UDPv4Transport.h>
-
 #include <fastrtps/utils/IPFinder.h>
 #include <fastrtps/utils/eClock.h>
-
 #include <fastrtps/rtps/writer/RTPSWriter.h>
 #include "history/WriterHistoryImpl.h"
 #include <fastrtps/rtps/reader/RTPSReader.h>
@@ -40,7 +34,7 @@ namespace fastrtps{
 namespace rtps {
 
 uint32_t RTPSDomain::m_maxRTPSParticipantID = 0;
-std::vector<RTPSDomain::t_p_RTPSParticipant> RTPSDomain::m_RTPSParticipants;
+std::vector<RTPSParticipant*> RTPSDomain::m_RTPSParticipants;
 std::set<uint32_t> RTPSDomain::m_RTPSParticipantIDs;
 
 RTPSDomain::RTPSDomain()
@@ -57,15 +51,16 @@ void RTPSDomain::stopAll()
 {
     logInfo(RTPS_PARTICIPANT,"DELETING ALL ENDPOINTS IN THIS DOMAIN");
 
-    while(m_RTPSParticipants.size()>0)
+    while(!m_RTPSParticipants.empty())
     {
-        RTPSDomain::removeRTPSParticipant(m_RTPSParticipants.begin()->first);
+        RTPSDomain::remove_participant(*m_RTPSParticipants.begin());
     }
+
     logInfo(RTPS_PARTICIPANT,"RTPSParticipants deleted correctly ");
     eClock::my_sleep(100);
 }
 
-RTPSParticipant* RTPSDomain::createParticipant(RTPSParticipantAttributes& PParam,
+RTPSParticipant* RTPSDomain::create_participant(RTPSParticipantAttributes& PParam,
         RTPSParticipantListener* listen)
 {
     logInfo(RTPS_PARTICIPANT,"");
@@ -80,22 +75,6 @@ RTPSParticipant* RTPSDomain::createParticipant(RTPSParticipantAttributes& PParam
         logError(RTPS_PARTICIPANT,"Use IP4 OR User IP6 to send must be set to true");
         return nullptr;
     }
-    uint32_t ID;
-    if(PParam.participantID < 0)
-    {
-        ID = getNewId();
-        while(m_RTPSParticipantIDs.insert(ID).second == false)
-            ID = getNewId();
-    }
-    else
-    {
-        ID = PParam.participantID;
-        if(m_RTPSParticipantIDs.insert(ID).second == false)
-        {
-            logError(RTPS_PARTICIPANT,"RTPSParticipant with the same ID already exists");
-            return nullptr;
-        }
-    }
     if(!PParam.defaultUnicastLocatorList.isValid())
     {
         logError(RTPS_PARTICIPANT,"Default Unicast Locator List contains invalid Locator");
@@ -107,88 +86,57 @@ RTPSParticipant* RTPSDomain::createParticipant(RTPSParticipantAttributes& PParam
         return nullptr;
     }
 
-    PParam.participantID = ID;
-    int pid;
-#if defined(__cplusplus_winrt)
-    pid = (int)GetCurrentProcessId();
-#elif defined(_WIN32)
-    pid = (int)_getpid();
-#else
-    pid = (int)getpid();
-#endif
-    GuidPrefix_t guidP;
-    LocatorList_t loc;
-    IPFinder::getIP4Address(&loc);
-    if(loc.size()>0)
-    {
-        guidP.value[0] = c_VendorId_eProsima[0];
-        guidP.value[1] = c_VendorId_eProsima[1];
-        guidP.value[2] = loc.begin()->address[14];
-        guidP.value[3] = loc.begin()->address[15];
-    }
-    else
-    {
-        guidP.value[0] = c_VendorId_eProsima[0];
-        guidP.value[1] = c_VendorId_eProsima[1];
-        guidP.value[2] = 127;
-        guidP.value[3] = 1;
-    }
-    guidP.value[4] = ((octet*)&pid)[0];
-    guidP.value[5] = ((octet*)&pid)[1];
-    guidP.value[6] = ((octet*)&pid)[2];
-    guidP.value[7] = ((octet*)&pid)[3];
-    guidP.value[8] = ((octet*)&ID)[0];
-    guidP.value[9] = ((octet*)&ID)[1];
-    guidP.value[10] = ((octet*)&ID)[2];
-    guidP.value[11] = ((octet*)&ID)[3];
 
-    RTPSParticipant* p = new RTPSParticipant(nullptr);
-    RTPSParticipantImpl* pimpl = new RTPSParticipantImpl(PParam,guidP,p,listen);
+    RTPSParticipant* participant = new RTPSParticipant(PParam, GuidPrefix_t::unknown(), listen);
 
-    // Check there is at least one transport registered.
-    if(!pimpl->networkFactoryHasRegisteredTransports())
+    if(participant != nullptr)
     {
-        logError(RTPS_PARTICIPANT,"Cannot create participant, because there is any transport");
-        delete pimpl;
-        return nullptr;
+        // Check there is at least one transport registered.
+        if(!get_implementation(*participant).networkFactoryHasRegisteredTransports())
+        {
+            logError(RTPS_PARTICIPANT,"Cannot create participant, because there is any transport");
+            return nullptr;
+        }
+
+        m_RTPSParticipants.push_back(participant);
+        return participant;
     }
 
-    m_RTPSParticipants.push_back(t_p_RTPSParticipant(p,pimpl));
-    return p;
+    return nullptr;
 }
 
-bool RTPSDomain::removeRTPSParticipant(RTPSParticipant* p)
+bool RTPSDomain::remove_participant(RTPSParticipant* participant)
 {
-    if(p!=nullptr)
+    if(participant != nullptr)
     {
-        for(auto it = m_RTPSParticipants.begin();it!= m_RTPSParticipants.end();++it)
+        for(auto it = m_RTPSParticipants.begin(); it != m_RTPSParticipants.end(); ++it)
         {
-            if(it->second->getGuid().guidPrefix == p->getGuid().guidPrefix)
+            if((*it)->guid().guidPrefix == participant->guid().guidPrefix)
             {
-                m_RTPSParticipantIDs.erase(m_RTPSParticipantIDs.find(it->second->getRTPSParticipantID()));
-                delete(it->second);
+                m_RTPSParticipantIDs.erase(m_RTPSParticipantIDs.find((*it)->getRTPSParticipantID()));
+                delete *it;
                 m_RTPSParticipants.erase(it);
                 return true;
             }
         }
     }
+
     logError(RTPS_PARTICIPANT,"RTPSParticipant not valid or not recognized");
     return false;
 }
 
-RTPSWriter* RTPSDomain::createRTPSWriter(RTPSParticipant* p, WriterAttributes& watt, WriterHistory& hist,
+RTPSWriter* RTPSDomain::createRTPSWriter(RTPSParticipant* participant, WriterAttributes& watt, WriterHistory& hist,
         WriterListener* listen)
 {
     for(auto it= m_RTPSParticipants.begin();it!=m_RTPSParticipants.end();++it)
     {
-        if(it->first->getGuid().guidPrefix == p->getGuid().guidPrefix)
+        if((*it)->guid().guidPrefix == participant->guid().guidPrefix)
         {
-            RTPSWriter* writ;
-            if(it->second->createWriter(&writ, watt, hist,listen))
-                return writ;
+            //TODO(Ricardo) Remove
             return nullptr;
         }
     }
+
     return nullptr;
 }
 
@@ -198,28 +146,29 @@ bool RTPSDomain::removeRTPSWriter(RTPSWriter* writer)
     {
         for(auto it= m_RTPSParticipants.begin();it!=m_RTPSParticipants.end();++it)
         {
-            if(it->first->getGuid().guidPrefix == writer->getGuid().guidPrefix)
+            //if((*it)->guid().guidPrefix == writer->guid().guidPrefix)
             {
-                return it->second->deleteUserEndpoint((Endpoint*)writer);
+                //TODO(Ricardo) Remove
+                //return (*it)->deleteUserEndpoint((Endpoint*)writer);
+                return false;
             }
         }
     }
+
     return false;
 }
 
-RTPSReader* RTPSDomain::createRTPSReader(RTPSParticipant* p, ReaderAttributes& ratt,
+RTPSReader* RTPSDomain::createRTPSReader(RTPSParticipant* participant, ReaderAttributes& ratt,
         ReaderHistory* rhist, ReaderListener* rlisten)
 {
     for(auto it= m_RTPSParticipants.begin();it!=m_RTPSParticipants.end();++it)
     {
-        if(it->first->getGuid().guidPrefix == p->getGuid().guidPrefix)
+        //if((*it)->guid().guidPrefix == participant->getGuid().guidPrefix)
         {
-            RTPSReader* reader;
-            if(it->second->createReader(&reader,ratt,rhist,rlisten))
-                return reader;
             return nullptr;
         }
     }
+
     return nullptr;
 }
 
@@ -229,12 +178,13 @@ bool RTPSDomain::removeRTPSReader(RTPSReader* reader)
     {
         for(auto it= m_RTPSParticipants.begin();it!=m_RTPSParticipants.end();++it)
         {
-            if(it->first->getGuid().guidPrefix == reader->getGuid().guidPrefix)
+            //if((*it)->guid().guidPrefix == reader->getGuid().guidPrefix)
             {
-                return it->second->deleteUserEndpoint((Endpoint*)reader);
+                //return (*it)->deleteUserEndpoint((Endpoint*)reader);
             }
         }
     }
+
     return false;
 }
 

@@ -50,8 +50,10 @@ class ReqRepHelloWorldRequester
         public:
             ReplyListener(ReqRepHelloWorldRequester &requester) : requester_(requester) {};
             ~ReplyListener(){};
-            void onNewDataMessage(eprosima::fastrtps::Subscriber *sub);
-            void onSubscriptionMatched(eprosima::fastrtps::Subscriber* /*sub*/, eprosima::fastrtps::rtps::MatchingInfo& info)
+            void onNewDataMessage(eprosima::fastrtps::Subscriber& subscriber) override;
+
+            void onSubscriptionMatched(eprosima::fastrtps::Subscriber& /*sub*/,
+                    const eprosima::fastrtps::rtps::MatchingInfo& info) override
             {
                 if (info.status == eprosima::fastrtps::rtps::MATCHED_MATCHING)
                     requester_.matched();
@@ -69,8 +71,11 @@ class ReqRepHelloWorldRequester
         public:
 
             RequestListener(ReqRepHelloWorldRequester &requester) : requester_(requester){};
+
             ~RequestListener(){};
-            void onPublicationMatched(eprosima::fastrtps::Publisher* /*pub*/, eprosima::fastrtps::rtps::MatchingInfo &info)
+
+            void onPublicationMatched(eprosima::fastrtps::Publisher& /*pub*/,
+                    const eprosima::fastrtps::rtps::MatchingInfo &info) override
             {
                 if (info.status == eprosima::fastrtps::rtps::MATCHED_MATCHING)
                     requester_.matched();
@@ -115,7 +120,7 @@ class ReqRepHelloWorldRequester
         std::condition_variable cvDiscovery_;
         unsigned int matched_;
         HelloWorldType type_;
-		eprosima::fastrtps::rtps::SampleIdentity related_sample_identity_;
+        eprosima::fastrtps::rtps::SampleIdentity related_sample_identity_;
 };
 
 #endif // _TEST_BLACKBOX_REQREPHELLOWORLDREQUESTER_HPP_

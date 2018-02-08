@@ -17,7 +17,7 @@
  *
  */
 
-#include <fastrtps/rtps/reader/StatefulReader.h>
+#include "StatefulReaderImpl.h"
 #include <fastrtps/rtps/reader/WriterProxy.h>
 #include <fastrtps/rtps/reader/ReaderListener.h>
 #include <fastrtps/rtps/history/ReaderHistory.h>
@@ -31,7 +31,6 @@
 
 #include <mutex>
 #include <thread>
-
 #include <cassert>
 
 #define IDSTRING "(ID:"<< std::this_thread::get_id() <<") "<<
@@ -39,31 +38,53 @@
 using namespace eprosima::fastrtps::rtps;
 
 
-
-StatefulReader::~StatefulReader()
+StatefulReader::StatefulReader(RTPSParticipant& participant, const ReaderAttributes& att,
+        ReaderHistory* hist, ReaderListener* listen):
+    RTPSReader(participant, att, hist, listen)
 {
-    logInfo(RTPS_READER,"StatefulReader destructor.";);
-    for(std::vector<WriterProxy*>::iterator it = matched_writers.begin();
-            it!=matched_writers.end();++it)
-    {
-        delete(*it);
-    }
 }
 
+StatefulReader::StatefulReader(std::shared_ptr<RTPSReader::impl>& impl, ReaderListener* listener) :
+    RTPSReader(impl, listener)
+{
+}
 
-
-StatefulReader::StatefulReader(RTPSParticipantImpl* pimpl,GUID_t& guid,
-        ReaderAttributes& att,ReaderHistory* hist,ReaderListener* listen):
-    RTPSReader(pimpl,guid,att,hist, listen),
+StatefulReader::impl::impl(RTPSParticipant::impl& participant, const GUID_t& guid,
+        const ReaderAttributes& att, ReaderHistory* hist, RTPSReader::impl::Listener* listener) :
+    RTPSReader::impl(participant, guid, att, hist, listener),
     m_acknackCount(0),
     m_nackfragCount(0),
     m_times(att.times)
 {
-
 }
 
+StatefulReader::impl::~impl()
+{
+    deinit_();
+}
+
+void StatefulReader::impl::deinit()
+{
+    deinit_();
+}
+
+void StatefulReader::impl::deinit_()
+{
+    for(std::vector<WriterProxy*>::iterator it = matched_writers.begin();
+            it!=matched_writers.end(); ++it)
+    {
+        delete(*it);
+    }
+    matched_writers.clear();
+    RTPSReader::impl::deinit_();
+}
 
 bool StatefulReader::matched_writer_add(const RemoteWriterAttributes& wdata)
+{
+    return impl_->matched_writer_add(wdata);
+}
+
+bool StatefulReader::impl::matched_writer_add(const RemoteWriterAttributes& wdata)
 {
     std::lock_guard<std::recursive_mutex> guard(*mp_mutex);
     for(std::vector<WriterProxy*>::iterator it=matched_writers.begin();
@@ -75,16 +96,21 @@ bool StatefulReader::matched_writer_add(const RemoteWriterAttributes& wdata)
             return false;
         }
     }
-    WriterProxy* wp = new WriterProxy(wdata, this);
+    WriterProxy* wp = new WriterProxy(*this, wdata);
 
     wp->mp_initialAcknack->restart_timer();
 
     matched_writers.push_back(wp);
-    logInfo(RTPS_READER,"Writer Proxy " <<wp->m_att.guid <<" added to " <<m_guid.entityId);
+    logInfo(RTPS_READER,"Writer Proxy " <<wp->m_att.guid <<" added to " << guid_.entityId);
     return true;
 }
 
 bool StatefulReader::matched_writer_remove(const RemoteWriterAttributes& wdata)
+{
+    return impl_->matched_writer_remove(wdata);
+}
+
+bool StatefulReader::impl::matched_writer_remove(const RemoteWriterAttributes& wdata)
 {
     WriterProxy *wproxy = nullptr;
     std::unique_lock<std::recursive_mutex> lock(*mp_mutex);
@@ -117,6 +143,11 @@ bool StatefulReader::matched_writer_remove(const RemoteWriterAttributes& wdata)
 
 bool StatefulReader::matched_writer_remove(const RemoteWriterAttributes& wdata, bool deleteWP)
 {
+    return static_cast<StatefulReader::impl*>(impl_.get())->matched_writer_remove(wdata, deleteWP);
+}
+
+bool StatefulReader::impl::matched_writer_remove(const RemoteWriterAttributes& wdata, bool deleteWP)
+{
     WriterProxy *wproxy = nullptr;
     std::unique_lock<std::recursive_mutex> lock(*mp_mutex);
 
@@ -148,6 +179,11 @@ bool StatefulReader::matched_writer_remove(const RemoteWriterAttributes& wdata, 
 
 bool StatefulReader::matched_writer_is_matched(const RemoteWriterAttributes& wdata)
 {
+    return impl_->matched_writer_is_matched(wdata);
+}
+
+bool StatefulReader::impl::matched_writer_is_matched(const RemoteWriterAttributes& wdata)
+{
     std::lock_guard<std::recursive_mutex> guard(*mp_mutex);
     for(std::vector<WriterProxy*>::iterator it=matched_writers.begin();it!=matched_writers.end();++it)
     {
@@ -159,8 +195,12 @@ bool StatefulReader::matched_writer_is_matched(const RemoteWriterAttributes& wda
     return false;
 }
 
-
 bool StatefulReader::matched_writer_lookup(const GUID_t& writerGUID, WriterProxy** WP)
+{
+    return static_cast<StatefulReader::impl*>(impl_.get())->matched_writer_lookup(writerGUID, WP);
+}
+
+bool StatefulReader::impl::matched_writer_lookup(const GUID_t& writerGUID, WriterProxy** WP)
 {
     assert(WP);
 
@@ -180,7 +220,7 @@ bool StatefulReader::matched_writer_lookup(const GUID_t& writerGUID, WriterProxy
     return returnedValue;
 }
 
-bool StatefulReader::findWriterProxy(const GUID_t& writerGUID, WriterProxy** WP)
+bool StatefulReader::impl::findWriterProxy(const GUID_t& writerGUID, WriterProxy** WP)
 {
     assert(WP);
 
@@ -195,7 +235,7 @@ bool StatefulReader::findWriterProxy(const GUID_t& writerGUID, WriterProxy** WP)
     return false;
 }
 
-bool StatefulReader::processDataMsg(CacheChange_t *change)
+bool StatefulReader::impl::processDataMsg(CacheChange_t *change)
 {
     WriterProxy *pWP = nullptr;
 
@@ -218,8 +258,8 @@ bool StatefulReader::processDataMsg(CacheChange_t *change)
                 if(is_payload_protected())
                 {
                     change_to_add->copy_not_memcpy(*change);
-                    if(!getRTPSParticipant()->security_manager().decode_serialized_payload(change->serialized_payload,
-                                change_to_add->serialized_payload, m_guid, change->writer_guid))
+                    if(!participant().security_manager().decode_serialized_payload(change->serialized_payload,
+                                change_to_add->serialized_payload, guid_, change->writer_guid))
                     {
                         releaseCache(change_to_add);
                         logWarning(RTPS_MSG_IN, "Cannont decode serialized payload");
@@ -260,7 +300,7 @@ bool StatefulReader::processDataMsg(CacheChange_t *change)
 
                 if(pWP == nullptr && getGuid().entityId == c_EntityId_SPDPReader)
                 {
-                    mp_RTPSParticipant->assertRemoteRTPSParticipantLiveliness(change->writer_guid.guidPrefix);
+                    participant().assertRemoteRTPSParticipantLiveliness(change->writer_guid.guidPrefix);
                 }
             }
         }
@@ -269,7 +309,7 @@ bool StatefulReader::processDataMsg(CacheChange_t *change)
     return true;
 }
 
-bool StatefulReader::processDataFragMsg(CacheChange_t *incomingChange, uint32_t sampleSize, uint32_t fragmentStartingNum)
+bool StatefulReader::impl::processDataFragMsg(CacheChange_t *incomingChange, uint32_t sampleSize, uint32_t fragmentStartingNum)
 {
     WriterProxy *pWP = nullptr;
 
@@ -292,8 +332,8 @@ bool StatefulReader::processDataFragMsg(CacheChange_t *incomingChange, uint32_t 
                 if(reserveCache(&change_to_add, incomingChange->serialized_payload.length)) //Reserve a new cache from the corresponding cache pool
                 {
                     change_to_add->copy_not_memcpy(*incomingChange);
-                    if(!getRTPSParticipant()->security_manager().decode_serialized_payload(incomingChange->serialized_payload,
-                                change_to_add->serialized_payload, m_guid, incomingChange->writer_guid))
+                    if(!participant().security_manager().decode_serialized_payload(incomingChange->serialized_payload,
+                                change_to_add->serialized_payload, guid_, incomingChange->writer_guid))
                     {
                         releaseCache(change_to_add);
                         logWarning(RTPS_MSG_IN, "Cannont decode serialized payload");
@@ -328,7 +368,7 @@ bool StatefulReader::processDataFragMsg(CacheChange_t *incomingChange, uint32_t 
                     // Assert liveliness because it is a participant discovery info.
                     if(pWP == nullptr && getGuid().entityId == c_EntityId_SPDPReader)
                     {
-                        mp_RTPSParticipant->assertRemoteRTPSParticipantLiveliness(incomingChange->writer_guid.guidPrefix);
+                        participant().assertRemoteRTPSParticipantLiveliness(incomingChange->writer_guid.guidPrefix);
                     }
 
                     releaseCache(change_completed);
@@ -340,7 +380,7 @@ bool StatefulReader::processDataFragMsg(CacheChange_t *incomingChange, uint32_t 
     return true;
 }
 
-bool StatefulReader::processHeartbeatMsg(GUID_t &writerGUID, uint32_t hbCount, SequenceNumber_t &firstSN,
+bool StatefulReader::impl::processHeartbeatMsg(GUID_t &writerGUID, uint32_t hbCount, SequenceNumber_t &firstSN,
             SequenceNumber_t &lastSN, bool finalFlag, bool livelinessFlag)
 {
     WriterProxy *pWP = nullptr;
@@ -393,7 +433,7 @@ bool StatefulReader::processHeartbeatMsg(GUID_t &writerGUID, uint32_t hbCount, S
                         if(!ch_to_give->is_read)
                         {
                             lock.unlock();
-                            getListener()->onNewCacheChangeAdded((RTPSReader*)this,ch_to_give);
+                            getListener()->onNewCacheChangeAdded(*this, ch_to_give);
                             lock.lock();
                         }
                     }
@@ -411,7 +451,7 @@ bool StatefulReader::processHeartbeatMsg(GUID_t &writerGUID, uint32_t hbCount, S
     return true;
 }
 
-bool StatefulReader::processGapMsg(GUID_t &writerGUID, SequenceNumber_t &gapStart, SequenceNumberSet_t &gapList)
+bool StatefulReader::impl::processGapMsg(GUID_t &writerGUID, SequenceNumber_t &gapStart, SequenceNumberSet_t &gapList)
 {
     WriterProxy *pWP = nullptr;
 
@@ -438,7 +478,7 @@ bool StatefulReader::processGapMsg(GUID_t &writerGUID, SequenceNumber_t &gapStar
     return true;
 }
 
-bool StatefulReader::acceptMsgFrom(GUID_t &writerId, WriterProxy **wp)
+bool StatefulReader::impl::acceptMsgFrom(GUID_t &writerId, WriterProxy **wp)
 {
     assert(wp != nullptr);
 
@@ -455,7 +495,7 @@ bool StatefulReader::acceptMsgFrom(GUID_t &writerId, WriterProxy **wp)
     return false;
 }
 
-bool StatefulReader::change_removed_by_history(CacheChange_t* a_change, WriterProxy* wp)
+bool StatefulReader::impl::change_removed_by_history(CacheChange_t* a_change, WriterProxy* wp)
 {
     std::lock_guard<std::recursive_mutex> guard(*mp_mutex);
 
@@ -471,14 +511,14 @@ bool StatefulReader::change_removed_by_history(CacheChange_t* a_change, WriterPr
     return false;
 }
 
-bool StatefulReader::change_received(CacheChange_t* a_change, WriterProxy* prox)
+bool StatefulReader::impl::change_received(CacheChange_t* a_change, WriterProxy* prox)
 {
     //First look for WriterProxy in case is not provided
     if(prox == nullptr)
     {
         if(!findWriterProxy(a_change->writer_guid, &prox))
         {
-            logInfo(RTPS_READER, "Writer Proxy " << a_change->writer_guid <<" not matched to this Reader "<< m_guid.entityId);
+            logInfo(RTPS_READER, "Writer Proxy " << a_change->writer_guid <<" not matched to this Reader "<< guid_.entityId);
             return false;
         }
     }
@@ -517,7 +557,7 @@ bool StatefulReader::change_received(CacheChange_t* a_change, WriterProxy* prox)
                 {
                     if(!ch_to_give->is_read)
                     {
-                        getListener()->onNewCacheChangeAdded((RTPSReader*)this,ch_to_give);
+                        getListener()->onNewCacheChangeAdded(*this, ch_to_give);
                     }
                 }
 
@@ -536,6 +576,11 @@ bool StatefulReader::change_received(CacheChange_t* a_change, WriterProxy* prox)
 }
 
 bool StatefulReader::nextUntakenCache(CacheChange_t** change,WriterProxy** wpout)
+{
+    return impl_->nextUntakenCache(change, wpout);
+}
+
+bool StatefulReader::impl::nextUntakenCache(CacheChange_t** change,WriterProxy** wpout)
 {
     std::lock_guard<std::recursive_mutex> guard(*mp_mutex);
     std::vector<CacheChange_t*> toremove;
@@ -592,8 +637,13 @@ bool StatefulReader::nextUntakenCache(CacheChange_t** change,WriterProxy** wpout
     return takeok;
 }
 
-// TODO Porque elimina aqui y no cuando hay unpairing
 bool StatefulReader::nextUnreadCache(CacheChange_t** change,WriterProxy** wpout)
+{
+    return impl_->nextUnreadCache(change, wpout);
+}
+
+// TODO Porque elimina aqui y no cuando hay unpairing
+bool StatefulReader::impl::nextUnreadCache(CacheChange_t** change,WriterProxy** wpout)
 {
     std::lock_guard<std::recursive_mutex> guard(*mp_mutex);
     std::vector<CacheChange_t*> toremove;
@@ -652,7 +702,7 @@ bool StatefulReader::nextUnreadCache(CacheChange_t** change,WriterProxy** wpout)
     return readok;
 }
 
-bool StatefulReader::updateTimes(ReaderTimes& ti)
+bool StatefulReader::impl::updateTimes(ReaderTimes& ti)
 {
     std::lock_guard<std::recursive_mutex> guard(*mp_mutex);
     if(m_times.heartbeatResponseDelay != ti.heartbeatResponseDelay)
@@ -668,6 +718,11 @@ bool StatefulReader::updateTimes(ReaderTimes& ti)
 }
 
 bool StatefulReader::isInCleanState() const
+{
+    return impl_->isInCleanState();
+}
+
+bool StatefulReader::impl::isInCleanState() const
 {
     bool cleanState = true;
     std::unique_lock<std::recursive_mutex> lock(*mp_mutex);

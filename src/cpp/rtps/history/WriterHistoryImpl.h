@@ -77,13 +77,19 @@ class WriterHistory::impl
 
     void call_after_adding_change(std::function<bool(const CacheChange_t&)>&& callback)
     {
-        call_after_adding_change_ = std::move(callback);
+        if(!call_after_adding_change_)
+        {
+            call_after_adding_change_ = std::move(callback);
+        }
     }
 
     void call_after_deleting_change(
             std::function<bool(const SequenceNumber_t&, const InstanceHandle_t&)>&& callback)
     {
-        call_after_deleting_change_ = std::move(callback);
+        if(!call_after_deleting_change_)
+        {
+            call_after_deleting_change_ = std::move(callback);
+        }
     }
 
     private:

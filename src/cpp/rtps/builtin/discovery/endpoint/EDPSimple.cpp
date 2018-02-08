@@ -19,29 +19,18 @@
 
 #include <fastrtps/rtps/builtin/discovery/endpoint/EDPSimple.h>
 #include "EDPSimpleListeners.h"
-
-
 #include <fastrtps/rtps/builtin/discovery/participant/PDPSimple.h>
-
 #include "../../../participant/RTPSParticipantImpl.h"
-
-#include <fastrtps/rtps/writer/StatefulWriter.h>
-#include <fastrtps/rtps/reader/StatefulReader.h>
-
+#include "../../../writer/StatefulWriterImpl.h"
+#include "../../../reader/StatefulReaderImpl.h"
 #include <fastrtps/rtps/attributes/HistoryAttributes.h>
 #include <fastrtps/rtps/attributes/WriterAttributes.h>
 #include <fastrtps/rtps/attributes/ReaderAttributes.h>
-
-
 #include <fastrtps/rtps/history/ReaderHistory.h>
 #include "../../../history/WriterHistoryImpl.h"
-
-
 #include <fastrtps/rtps/builtin/data/WriterProxyData.h>
 #include <fastrtps/rtps/builtin/data/ReaderProxyData.h>
 #include <fastrtps/rtps/builtin/data/ParticipantProxyData.h>
-
-
 #include <fastrtps/log/Log.h>
 
 #include <mutex>
@@ -50,9 +39,37 @@ namespace eprosima {
 namespace fastrtps{
 namespace rtps {
 
+EDPSimple::EDPStatefulReader::EDPStatefulReader(std::shared_ptr<RTPSReader::impl>& impl,
+        EDPSimpleListener* listener) : StatefulReader(impl, listener), user_listener_(listener)
+{
+}
 
-EDPSimple::EDPSimple(PDPSimple* p,RTPSParticipantImpl* part):
-    EDP(p,part),
+//TODO(Ricardo) This about getListener. necessary? better return copy than pointer.
+ReaderListener* EDPSimple::EDPStatefulReader::getListener()
+{
+    assert(user_listener_);
+    return nullptr;
+}
+
+/**
+ * Switch the ReaderListener kind for the Reader.
+ * If the RTPSReader does not belong to the built-in protocols it switches out the old one.
+ * If it belongs to the built-in protocols, it sets the new ReaderListener callbacks to be called after the 
+ * built-in ReaderListener ones.
+ * @param target Pointed to ReaderLister to attach
+ * @return True is correctly set.
+ */
+//TODO(Ricardo) better make copy than store  copy than store pointer. Change all
+bool EDPSimple::EDPStatefulReader::setListener(ReaderListener* listener)
+{
+    assert(user_listener_);
+    user_listener_->set_internal_listener(listener);
+    return true;
+}
+
+
+EDPSimple::EDPSimple(PDPSimple& pdpsimple, RTPSParticipant::impl& participant):
+    EDP(pdpsimple, participant),
     mp_pubListen(nullptr),
     mp_subListen(nullptr)
 
@@ -63,24 +80,24 @@ EDPSimple::EDPSimple(PDPSimple* p,RTPSParticipantImpl* part):
 
 EDPSimple::~EDPSimple()
 {
-    if(this->mp_PubReader.first !=nullptr)
+    if(this->mp_PubReader.first != nullptr)
     {
-        this->mp_RTPSParticipant->deleteUserEndpoint(mp_PubReader.first);
+        delete mp_PubReader.first;
         delete(mp_PubReader.second);
     }
     if(this->mp_SubReader.first !=nullptr)
     {
-        this->mp_RTPSParticipant->deleteUserEndpoint(mp_SubReader.first);
+        delete mp_SubReader.first;
         delete(mp_SubReader.second);
     }
     if(this->mp_PubWriter.first !=nullptr)
     {
-        this->mp_RTPSParticipant->deleteUserEndpoint(mp_PubWriter.first);
+        participant_.remove_writer(mp_PubWriter.first);
         delete(mp_PubWriter.second);
     }
     if(this->mp_SubWriter.first !=nullptr)
     {
-        this->mp_RTPSParticipant->deleteUserEndpoint(mp_SubWriter.first);
+        participant_.remove_writer(mp_SubWriter.first);
         delete(mp_SubWriter.second);
     }
     if(mp_pubListen!=nullptr)
@@ -111,39 +128,40 @@ bool EDPSimple::createSEDPEndpoints()
     ReaderAttributes ratt;
     HistoryAttributes hatt;
     bool created = true;
-    RTPSReader* raux = nullptr;
-    RTPSWriter* waux = nullptr;
     if(m_discovery.m_simpleEDP.use_PublicationWriterANDSubscriptionReader)
     {
         hatt.initialReservedCaches = 100;
         hatt.maximumReservedCaches = 5000;
         hatt.payloadMaxSize = DISCOVERY_PUBLICATION_DATA_MAX_SIZE;
-        mp_PubWriter.second = new WriterHistory(hatt);
+        mp_PubWriter.second = new WriterHistory::impl(hatt);
         //Wparam.pushMode = true;
         watt.endpoint.reliabilityKind = RELIABLE;
         watt.endpoint.topicKind = WITH_KEY;
-        watt.endpoint.unicastLocatorList = this->mp_PDP->getLocalParticipantProxyData()->m_metatrafficUnicastLocatorList;
-        watt.endpoint.multicastLocatorList = this->mp_PDP->getLocalParticipantProxyData()->m_metatrafficMulticastLocatorList;
+        watt.endpoint.unicastLocatorList = pdpsimple_.getLocalParticipantProxyData()->m_metatrafficUnicastLocatorList;
+        watt.endpoint.multicastLocatorList = pdpsimple_.getLocalParticipantProxyData()->m_metatrafficMulticastLocatorList;
         watt.endpoint.durabilityKind = TRANSIENT_LOCAL;
         watt.times.nackResponseDelay.seconds = 0;
         watt.times.nackResponseDelay.fraction = 0;
         watt.times.initialHeartbeatDelay.seconds = 0;
         watt.times.initialHeartbeatDelay.fraction = 0;
-        if(mp_RTPSParticipant->getRTPSParticipantAttributes().throughputController.bytesPerPeriod != UINT32_MAX &&
-                mp_RTPSParticipant->getRTPSParticipantAttributes().throughputController.periodMillisecs != 0)
+        if(participant_.getRTPSParticipantAttributes().throughputController.bytesPerPeriod != UINT32_MAX &&
+                participant_.getRTPSParticipantAttributes().throughputController.periodMillisecs != 0)
             watt.mode = ASYNCHRONOUS_WRITER;
-        created &=this->mp_RTPSParticipant->createWriter(&waux, watt, *mp_PubWriter.second, nullptr,
+
+        mp_PubWriter.first = participant_.create_writer(watt, *mp_PubWriter.second, nullptr,
                 c_EntityId_SEDPPubWriter, true);
-        if(created)
+
+        if(mp_PubWriter.first)
         {
-            mp_PubWriter.first = dynamic_cast<StatefulWriter*>(waux);
             logInfo(RTPS_EDP,"SEDP Publication Writer created");
         }
         else
         {
             delete(mp_PubWriter.second);
             mp_PubWriter.second = nullptr;
+            //TODO(Ricardo) Return?
         }
+
         hatt.initialReservedCaches = 100;
         hatt.maximumReservedCaches = 1000000;
         hatt.payloadMaxSize = DISCOVERY_SUBSCRIPTION_DATA_MAX_SIZE;
@@ -152,27 +170,29 @@ bool EDPSimple::createSEDPEndpoints()
         ratt.expectsInlineQos = false;
         ratt.endpoint.reliabilityKind = RELIABLE;
         ratt.endpoint.topicKind = WITH_KEY;
-        ratt.endpoint.unicastLocatorList = this->mp_PDP->getLocalParticipantProxyData()->m_metatrafficUnicastLocatorList;
-        ratt.endpoint.multicastLocatorList = this->mp_PDP->getLocalParticipantProxyData()->m_metatrafficMulticastLocatorList;
+        ratt.endpoint.unicastLocatorList = pdpsimple_.getLocalParticipantProxyData()->m_metatrafficUnicastLocatorList;
+        ratt.endpoint.multicastLocatorList = pdpsimple_.getLocalParticipantProxyData()->m_metatrafficMulticastLocatorList;
         ratt.endpoint.durabilityKind = TRANSIENT_LOCAL;
         ratt.times.heartbeatResponseDelay.seconds = 0;
         ratt.times.heartbeatResponseDelay.fraction = 0;
         ratt.times.initialAcknackDelay.seconds = 0;
         ratt.times.initialAcknackDelay.fraction = 0;
-        this->mp_subListen = new EDPSimpleSUBListener(this);
-        created &=this->mp_RTPSParticipant->createReader(&raux,ratt,mp_SubReader.second,mp_subListen,c_EntityId_SEDPSubReader,true);
-        if(created)
+
+        std::shared_ptr<RTPSReader::impl> sub_reader = participant_.create_reader(ratt, mp_SubReader.second,
+                nullptr, c_EntityId_SEDPSubReader, true);
+
+        if(sub_reader)
         {
-            mp_SubReader.first = dynamic_cast<StatefulReader*>(raux);
             logInfo(RTPS_EDP,"SEDP Subscription Reader created");
         }
         else
         {
             delete(mp_SubReader.second);
             mp_SubReader.second = nullptr;
-            delete(mp_subListen);
-            mp_subListen = nullptr;
         }
+
+        mp_subListen = new EDPSimpleSUBListener(*this);
+        mp_SubReader.first = new EDPStatefulReader(sub_reader, mp_subListen);
     }
     if(m_discovery.m_simpleEDP.use_PublicationReaderANDSubscriptionWriter)
     {
@@ -184,52 +204,54 @@ bool EDPSimple::createSEDPEndpoints()
         ratt.expectsInlineQos = false;
         ratt.endpoint.reliabilityKind = RELIABLE;
         ratt.endpoint.topicKind = WITH_KEY;
-        ratt.endpoint.unicastLocatorList = this->mp_PDP->getLocalParticipantProxyData()->m_metatrafficUnicastLocatorList;
-        ratt.endpoint.multicastLocatorList = this->mp_PDP->getLocalParticipantProxyData()->m_metatrafficMulticastLocatorList;
+        ratt.endpoint.unicastLocatorList = pdpsimple_.getLocalParticipantProxyData()->m_metatrafficUnicastLocatorList;
+        ratt.endpoint.multicastLocatorList = pdpsimple_.getLocalParticipantProxyData()->m_metatrafficMulticastLocatorList;
         ratt.endpoint.durabilityKind = TRANSIENT_LOCAL;
         ratt.times.heartbeatResponseDelay.seconds = 0;
         ratt.times.heartbeatResponseDelay.fraction = 0;
         ratt.times.initialAcknackDelay.seconds = 0;
         ratt.times.initialAcknackDelay.fraction = 0;
-        this->mp_pubListen = new EDPSimplePUBListener(this);
-        created &=this->mp_RTPSParticipant->createReader(&raux,ratt,mp_PubReader.second,mp_pubListen,c_EntityId_SEDPPubReader,true);
-        if(created)
-        {
-            mp_PubReader.first = dynamic_cast<StatefulReader*>(raux);
-            logInfo(RTPS_EDP,"SEDP Publication Reader created");
 
+        std::shared_ptr<RTPSReader::impl> pub_reader = participant_.create_reader(ratt, mp_PubReader.second,
+                nullptr, c_EntityId_SEDPPubReader, true);
+
+        if(pub_reader)
+        {
+            logInfo(RTPS_EDP,"SEDP Publication Reader created");
         }
         else
         {
             delete(mp_PubReader.second);
             mp_PubReader.second = nullptr;
-            delete(mp_pubListen);
-            mp_pubListen = nullptr;
         }
+
+        mp_pubListen = new EDPSimplePUBListener(*this);
+        mp_PubReader.first = new EDPStatefulReader(pub_reader, mp_pubListen);
+
         hatt.initialReservedCaches = 100;
         hatt.maximumReservedCaches = 5000;
         hatt.payloadMaxSize = DISCOVERY_SUBSCRIPTION_DATA_MAX_SIZE;
-        mp_SubWriter.second = new WriterHistory(hatt);
+        mp_SubWriter.second = new WriterHistory::impl(hatt);
         //Wparam.pushMode = true;
         watt.endpoint.reliabilityKind = RELIABLE;
         watt.endpoint.topicKind = WITH_KEY;
-        watt.endpoint.unicastLocatorList = this->mp_PDP->getLocalParticipantProxyData()->m_metatrafficUnicastLocatorList;
-        watt.endpoint.multicastLocatorList = this->mp_PDP->getLocalParticipantProxyData()->m_metatrafficMulticastLocatorList;
+        watt.endpoint.unicastLocatorList = pdpsimple_.getLocalParticipantProxyData()->m_metatrafficUnicastLocatorList;
+        watt.endpoint.multicastLocatorList = pdpsimple_.getLocalParticipantProxyData()->m_metatrafficMulticastLocatorList;
         watt.endpoint.durabilityKind = TRANSIENT_LOCAL;
         watt.times.nackResponseDelay.seconds = 0;
         watt.times.nackResponseDelay.fraction = 0;
         watt.times.initialHeartbeatDelay.seconds = 0;
         watt.times.initialHeartbeatDelay.fraction = 0;
-        if(mp_RTPSParticipant->getRTPSParticipantAttributes().throughputController.bytesPerPeriod != UINT32_MAX &&
-                mp_RTPSParticipant->getRTPSParticipantAttributes().throughputController.periodMillisecs != 0)
+        if(participant_.getRTPSParticipantAttributes().throughputController.bytesPerPeriod != UINT32_MAX &&
+                participant_.getRTPSParticipantAttributes().throughputController.periodMillisecs != 0)
             watt.mode = ASYNCHRONOUS_WRITER;
-        created &=this->mp_RTPSParticipant->createWriter(&waux, watt, *mp_SubWriter.second, nullptr,
-                c_EntityId_SEDPSubWriter, true);
-        if(created)
-        {
-            mp_SubWriter.first = dynamic_cast<StatefulWriter*>(waux);
-            logInfo(RTPS_EDP,"SEDP Subscription Writer created");
 
+        mp_SubWriter.first = participant_.create_writer(watt, *mp_SubWriter.second, nullptr,
+                c_EntityId_SEDPSubWriter, true);
+
+        if(mp_SubWriter.first)
+        {
+            logInfo(RTPS_EDP,"SEDP Subscription Writer created");
         }
         else
         {
@@ -273,22 +295,23 @@ bool EDPSimple::processLocalReaderProxyData(ReaderProxyData* rdata)
             change->serialized_payload.length = (uint16_t)aux_msg.length;
 
             {
-                WriterHistory::impl& history = get_implementation(*mp_SubWriter.second);
-                auto lock = history.lock_for_transaction();
-                for(auto ch = history.begin_nts(); ch != history.end_nts(); ++ch)
+                auto lock = mp_SubWriter.second->lock_for_transaction();
+                for(auto ch = mp_SubWriter.second->begin_nts(); ch != mp_SubWriter.second->end_nts(); ++ch)
                 {
                     if(ch->second->instance_handle == change->instance_handle)
                     {
-                        history.remove_change_nts(ch->second->sequence_number);
+                        mp_SubWriter.second->remove_change_nts(ch->second->sequence_number);
                         break;
                     }
                 }
             }
 
-            if(this->mp_subListen->getAttachedListener() != nullptr)
+            //TODO (Ricardo) Can change in next get_internal_listener. Change.
+            if(mp_subListen->get_internal_listener() != nullptr)
             {
-                this->mp_subListen->getAttachedListener()->onNewCacheChangeAdded(mp_SubReader.first,
-                        &*change);
+                //TODO(Ricardo) Review this Api.
+                //TODO(Ricardo) If change to take method, problem here.
+                mp_subListen->get_internal_listener()->onNewCacheChangeAdded(*mp_SubReader.first, &*change);
             }
 
             mp_SubWriter.second->add_change(change);
@@ -329,22 +352,21 @@ bool EDPSimple::processLocalWriterProxyData(WriterProxyData* wdata)
             change->serialized_payload.length = (uint16_t)aux_msg.length;
 
             {
-                WriterHistory::impl& history = get_implementation(*mp_PubWriter.second);
-                auto lock = history.lock_for_transaction();
-                for(auto ch = history.begin_nts(); ch != history.end_nts(); ++ch)
+                auto lock = mp_PubWriter.second->lock_for_transaction();
+                for(auto ch = mp_PubWriter.second->begin_nts(); ch != mp_PubWriter.second->end_nts(); ++ch)
                 {
                     if(ch->second->instance_handle == change->instance_handle)
                     {
-                        history.remove_change_nts(ch->second->sequence_number);
+                        mp_PubWriter.second->remove_change_nts(ch->second->sequence_number);
                         break;
                     }
                 }
             }
 
-            if(this->mp_pubListen->getAttachedListener() != nullptr)
+            if(mp_pubListen->get_internal_listener() != nullptr)
             {
-                this->mp_pubListen->getAttachedListener()->onNewCacheChangeAdded(mp_PubReader.first,
-                        &*change);
+                //TODO(Ricardo) Review this Api.
+                mp_pubListen->get_internal_listener()->onNewCacheChangeAdded(*mp_PubReader.first, &*change);
             }
 
             mp_PubWriter.second->add_change(change);
@@ -356,78 +378,83 @@ bool EDPSimple::processLocalWriterProxyData(WriterProxyData* wdata)
     return true;
 }
 
-bool EDPSimple::removeLocalWriter(RTPSWriter* W)
+bool EDPSimple::removeLocalWriter(RTPSWriter::impl& writer)
 {
-    logInfo(RTPS_EDP,W->getGuid().entityId);
-    if(mp_PubWriter.first!=nullptr)
+    logInfo(RTPS_EDP, writer.getGuid().entityId);
+
+    if(mp_PubWriter.first != nullptr)
     {
         InstanceHandle_t iH;
-        iH = W->getGuid();
+        iH = writer.getGuid();
+
         CacheChange_ptr change = mp_PubWriter.first->new_change([]() ->
                 uint32_t {return DISCOVERY_PUBLICATION_DATA_MAX_SIZE;}, NOT_ALIVE_DISPOSED_UNREGISTERED,iH);
 
         if(change)
         {
             {
-                WriterHistory::impl& history = get_implementation(*mp_PubWriter.second);
-                auto lock = history.lock_for_transaction();
-                for(auto ch = history.begin_nts(); ch != history.end_nts(); ++ch)
+                auto lock = mp_PubWriter.second->lock_for_transaction();
+                for(auto ch = mp_PubWriter.second->begin_nts(); ch != mp_PubWriter.second->end_nts(); ++ch)
                 {
                     if(ch->second->instance_handle == change->instance_handle)
                     {
-                        history.remove_change_nts(ch->second->sequence_number);
+                        mp_PubWriter.second->remove_change_nts(ch->second->sequence_number);
                         break;
                     }
                 }
 
             }
 
-            if(this->mp_pubListen->getAttachedListener() != nullptr)
+            if(mp_pubListen->get_internal_listener() != nullptr)
             {
-                this->mp_pubListen->getAttachedListener()->onNewCacheChangeAdded(mp_PubReader.first,
-                        &*change);
+                //TODO(Ricardo) Review this Api.
+                mp_pubListen->get_internal_listener()->onNewCacheChangeAdded(*mp_PubReader.first, &*change);
             }
 
             mp_PubWriter.second->add_change(change);
         }
     }
-    return mp_PDP->removeWriterProxyData(W->getGuid());
+
+    return pdpsimple_.removeWriterProxyData(writer.getGuid());
 }
 
-bool EDPSimple::removeLocalReader(RTPSReader* R)
+bool EDPSimple::removeLocalReader(RTPSReader::impl& reader)
 {
-    logInfo(RTPS_EDP,R->getGuid().entityId);
+    logInfo(RTPS_EDP, reader.getGuid().entityId);
+
     if(mp_SubWriter.first != nullptr)
     {
         InstanceHandle_t iH;
-        iH = (R->getGuid());
+        iH = (reader.getGuid());
         CacheChange_ptr change = mp_SubWriter.first->new_change([]() ->
                 uint32_t {return DISCOVERY_SUBSCRIPTION_DATA_MAX_SIZE;}, NOT_ALIVE_DISPOSED_UNREGISTERED,iH);
 
         if(change)
         {
             {
-                WriterHistory::impl& history = get_implementation(*mp_SubWriter.second);
-                auto lock = history.lock_for_transaction();
+                auto lock = mp_SubWriter.second->lock_for_transaction();
                 // TODO inset logic in WriterHistory.
-                for(auto ch = history.begin_nts(); ch != history.end_nts(); ++ch)
+                for(auto ch = mp_SubWriter.second->begin_nts(); ch != mp_SubWriter.second->end_nts(); ++ch)
                 {
                     if(ch->second->instance_handle == change->instance_handle)
                     {
-                        history.remove_change_nts(ch->second->sequence_number);
+                        mp_SubWriter.second->remove_change_nts(ch->second->sequence_number);
                         break;
                     }
                 }
             }
 
-            if(this->mp_subListen->getAttachedListener() != nullptr)
-                this->mp_subListen->getAttachedListener()->onNewCacheChangeAdded(mp_SubReader.first,
-                        &*change);
+            if(mp_subListen->get_internal_listener() != nullptr)
+            {
+                //TODO(Ricardo) Review this Api.
+                mp_subListen->get_internal_listener()->onNewCacheChangeAdded(*mp_SubReader.first, &*change);
+            }
 
             mp_SubWriter.second->add_change(change);
         }
     }
-    return mp_PDP->removeReaderProxyData(R->getGuid());
+
+    return pdpsimple_.removeReaderProxyData(reader.getGuid());
 }
 
 

@@ -17,12 +17,15 @@
  *
  */
 
-#ifndef EDP_H_
-#define EDP_H_
+#ifndef __RTPS_BUILTIN_DISCOVERY_ENDPOINT_EDP_H__
+#define __RTPS_BUILTIN_DISCOVERY_ENDPOINT_EDP_H__
 #ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
 
 #include "../../../attributes/RTPSParticipantAttributes.h"
 #include "../../../common/Guid.h"
+#include "../../../participant/RTPSParticipant.h"
+#include "../../../writer/RTPSWriter.h"
+#include "../../../reader/RTPSReader.h"
 
 namespace eprosima {
 namespace fastrtps{
@@ -35,11 +38,8 @@ namespace rtps {
 
 class PDPSimple;
 class ParticipantProxyData;
-class RTPSWriter;
-class RTPSReader;
 class ReaderProxyData;
 class WriterProxyData;
-class RTPSParticipantImpl;
 
 /**
  * Class EDP, base class for Endpoint Discovery Protocols. It contains generic methods used by the two EDP implemented (EDPSimple and EDPStatic), as well as abstract methods
@@ -54,7 +54,7 @@ class EDP
          * @param p Pointer to the PDPSimple
          * @param part Pointer to the RTPSParticipantImpl
          */
-        EDP(PDPSimple* p,RTPSParticipantImpl* part);
+        EDP(PDPSimple& pdpsimple, RTPSParticipant::impl& participant);
         virtual ~EDP();
 
         /**
@@ -79,13 +79,13 @@ class EDP
          * @param R Pointer to the Reader to remove.
          * @return True if correctly removed.
          */
-        virtual bool removeLocalReader(RTPSReader* R) = 0;
+        virtual bool removeLocalReader(RTPSReader::impl& reader) = 0;
         /**
          * Abstract method that removes a local Writer from the discovery method
          * @param W Pointer to the Writer to remove.
          * @return True if correctly removed.
          */
-        virtual bool removeLocalWriter(RTPSWriter*W) = 0;
+        virtual bool removeLocalWriter(RTPSWriter::impl& writer) = 0;
 
         /**
          * After a new local ReaderProxyData has been created some processing is needed (depends on the implementation).
@@ -107,7 +107,7 @@ class EDP
          * @param qos QoS policies dictated by the subscriber
          * @return True if correct.
          */
-        bool newLocalReaderProxyData(RTPSReader* R,TopicAttributes& att, ReaderQos& qos);
+        bool newLocalReaderProxyData(RTPSReader::impl& reader, TopicAttributes& att, ReaderQos& qos);
         /**
          * Create a new ReaderPD for a local Writer.
          * @param W Pointer to the RTPSWriter.
@@ -115,21 +115,21 @@ class EDP
          * @param qos QoS policies dictated by the publisher
          * @return True if correct.
          */
-        bool newLocalWriterProxyData(RTPSWriter* W,TopicAttributes& att, WriterQos& qos);
+        bool newLocalWriterProxyData(RTPSWriter::impl& writer, TopicAttributes& att, WriterQos& qos);
         /**
          * A previously created Reader has been updated
          * @param R Pointer to the reader;
          * @param qos QoS policies dictated by the subscriber
          * @return True if correctly updated
          */
-        bool updatedLocalReader(RTPSReader* R,ReaderQos& qos);
+        bool updatedLocalReader(RTPSReader::impl& reader, ReaderQos& qos);
         /**
          * A previously created Writer has been updated
          * @param W Pointer to the Writer
          * @param qos QoS policies dictated by the publisher
          * @return True if correctly updated
          */
-        bool updatedLocalWriter(RTPSWriter* W,WriterQos& qos);
+        bool updatedLocalWriter(RTPSWriter::impl& writer, WriterQos& qos);
         /**
          * Check the validity of a matching between a RTPSWriter and a ReaderProxyData object.
          * @param wdata Pointer to the WriterProxyData object.
@@ -193,9 +193,9 @@ class EDP
 #endif
 
         //! Pointer to the PDPSimple object that contains the endpoint discovery protocol.
-        PDPSimple* mp_PDP;
+        PDPSimple& pdpsimple_;
         //! Pointer to the RTPSParticipant.
-        RTPSParticipantImpl* mp_RTPSParticipant;
+        RTPSParticipant::impl& participant_;
 
     private:
 
@@ -204,17 +204,17 @@ class EDP
          * @param R Pointer to the Reader
          * @return True
          */
-        bool pairingReader(RTPSReader* R, const ParticipantProxyData& pdata, const ReaderProxyData& rdata);
+        bool pairingReader(RTPSReader::impl& reader, const ParticipantProxyData& pdata, const ReaderProxyData& rdata);
         /**l
          * Try to pair/unpair a local Writer against all possible readerProxy Data.
          * @param W Pointer to the Writer
          * @return True
          */
-        bool pairingWriter(RTPSWriter* W, const ParticipantProxyData& pdata, const WriterProxyData& wdata);
+        bool pairingWriter(RTPSWriter::impl& writer, const ParticipantProxyData& pdata, const WriterProxyData& wdata);
 };
 
-}
-} /* namespace rtps */
-} /* namespace eprosima */
+} // namespace rtps
+} // namespace fastrtps
+} // namespace eprosima
 #endif
-#endif /* EDP_H_ */
+#endif // __RTPS_BUILTIN_DISCOVERY_ENDPOINT_EDP_H__

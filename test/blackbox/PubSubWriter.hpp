@@ -21,7 +21,6 @@
 #define _TEST_BLACKBOX_PUBSUBWRITER_HPP_
 
 #include <fastrtps/fastrtps_fwd.h>
-#include <fastrtps/Domain.h>
 #include <fastrtps/participant/Participant.h>
 #include <fastrtps/participant/ParticipantListener.h>
 #include <fastrtps/attributes/ParticipantAttributes.h>
@@ -49,7 +48,8 @@ class PubSubWriter
 
             ~ParticipantListener() {}
 
-            void onParticipantDiscovery(eprosima::fastrtps::Participant*, eprosima::fastrtps::ParticipantDiscoveryInfo info)
+            void onParticipantDiscovery(eprosima::fastrtps::Participant&,
+                    const eprosima::fastrtps::ParticipantDiscoveryInfo& info) override
             {
                 if(writer_.onDiscovery_!=nullptr)
                 {
@@ -68,12 +68,17 @@ class PubSubWriter
             }
 
 #if HAVE_SECURITY
-            void onParticipantAuthentication(eprosima::fastrtps::Participant*, const eprosima::fastrtps::ParticipantAuthenticationInfo& info)
+            void onParticipantAuthentication(eprosima::fastrtps::Participant&,
+                    const eprosima::fastrtps::ParticipantAuthenticationInfo& info) override
             {
                 if(info.rtps.status() == eprosima::fastrtps::rtps::AUTHORIZED_RTPSPARTICIPANT)
+                {
                     writer_.authorized();
+                }
                 else if(info.rtps.status() == eprosima::fastrtps::rtps::UNAUTHORIZED_RTPSPARTICIPANT)
+                {
                     writer_.unauthorized();
+                }
             }
 #endif
 
@@ -92,12 +97,17 @@ class PubSubWriter
 
             ~Listener(){};
 
-            void onPublicationMatched(eprosima::fastrtps::Publisher* /*pub*/, eprosima::fastrtps::rtps::MatchingInfo &info)
+            void onPublicationMatched(eprosima::fastrtps::Publisher&,
+                    const eprosima::fastrtps::rtps::MatchingInfo &info) override
             {
                 if (info.status == eprosima::fastrtps::rtps::MATCHED_MATCHING)
+                {
                     writer_.matched();
+                }
                 else
+                {
                     writer_.unmatched();
+                }
             }
 
         private:
@@ -116,7 +126,8 @@ class PubSubWriter
 
             ~EDPTakeReaderInfo(){};
 
-            void onNewCacheChangeAdded(eprosima::fastrtps::rtps::RTPSReader* /*reader*/, const eprosima::fastrtps::rtps::CacheChange_t* const change_in)
+            void onNewCacheChangeAdded(eprosima::fastrtps::rtps::RTPSReader&,
+                    const eprosima::fastrtps::rtps::CacheChange_t* const change_in) override
             {
                 eprosima::fastrtps::rtps::ReaderProxyData readerInfo;
 
@@ -171,7 +182,8 @@ class PubSubWriter
 
             ~EDPTakeWriterInfo(){};
 
-            void onNewCacheChangeAdded(eprosima::fastrtps::rtps::RTPSReader* /*reader*/, const eprosima::fastrtps::rtps::CacheChange_t* const change_in)
+            void onNewCacheChangeAdded(eprosima::fastrtps::rtps::RTPSReader&,
+                    const eprosima::fastrtps::rtps::CacheChange_t* const change_in) override
             {
                 eprosima::fastrtps::rtps::WriterProxyData writerInfo;
 
@@ -258,15 +270,22 @@ class PubSubWriter
 
     ~PubSubWriter()
     {
+        if(publisher_ != nullptr)
+        {
+            delete publisher_;
+        }
+
         if(participant_ != nullptr)
-            eprosima::fastrtps::Domain::removeParticipant(participant_);
+        {
+            delete participant_;
+        }
     }
 
     void init()
     {
         //Create participant
         participant_attr_.rtps.builtin.domainId = (uint32_t)GET_PID() % 230;
-        participant_ = eprosima::fastrtps::Domain::createParticipant(participant_attr_, &participant_listener_);
+        participant_ = new eprosima::fastrtps::Participant(participant_attr_, &participant_listener_);
 
         if(participant_ != nullptr)
         {
@@ -278,10 +297,10 @@ class PubSubWriter
             }
 
             // Register type
-            eprosima::fastrtps::Domain::registerType(participant_, &type_);
+            participant_->register_type(&type_);
 
             //Create publisher
-            publisher_ = eprosima::fastrtps::Domain::createPublisher(participant_, publisher_attr_, &listener_);
+            publisher_ = new eprosima::fastrtps::Publisher(*participant_, publisher_attr_, &listener_);
 
             if(publisher_ != nullptr)
             {
@@ -289,22 +308,28 @@ class PubSubWriter
                 return;
             }
 
-            eprosima::fastrtps::Domain::removeParticipant(participant_);
+            delete participant_;
         }
     }
 
     bool isInitialized() const { return initialized_; }
 
-    eprosima::fastrtps::Participant* getParticipant()
+    eprosima::fastrtps::Participant* participant()
     {
         return participant_;
     }
 
     void destroy()
     {
+        if(publisher_ != nullptr)
+        {
+            delete publisher_;
+            publisher_ = nullptr;
+        }
+
         if(participant_ != nullptr)
         {
-            eprosima::fastrtps::Domain::removeParticipant(participant_);
+            delete participant_;
             participant_ = nullptr;
         }
     }

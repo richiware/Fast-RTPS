@@ -18,98 +18,131 @@
  */
 
 #include "SubscriberImpl.h"
-#include <fastrtps/subscriber/Subscriber.h>
+#include "../participant/ParticipantImpl.h"
 #include <fastrtps/TopicDataType.h>
-#include <fastrtps/subscriber/SubscriberListener.h>
-#include <fastrtps/rtps/reader/RTPSReader.h>
-#include <fastrtps/rtps/reader/StatefulReader.h>
-
-#include <fastrtps/rtps/RTPSDomain.h>
-#include <fastrtps/rtps/participant/RTPSParticipant.h>
-
+#include "../rtps/reader/RTPSReaderImpl.h"
+#include "../rtps/reader/StatefulReaderImpl.h"
 #include <fastrtps/log/Log.h>
 
-using namespace eprosima::fastrtps::rtps;
+using namespace eprosima::fastrtps;
+using namespace ::rtps;
 
-
-namespace eprosima {
-namespace fastrtps {
-
-
-SubscriberImpl::SubscriberImpl(Participant::impl& participant,TopicDataType* ptype,
-        SubscriberAttributes& att,SubscriberListener* listen):
+Subscriber::impl::impl(Participant::impl& participant, TopicDataType* type,
+        const SubscriberAttributes& att, Subscriber::impl::Listener* listener):
     participant_(participant),
-    mp_reader(nullptr),
-    mp_type(ptype),
-    m_att(att),
+    reader_(nullptr),
+    type_(type),
+    att_(att),
 #pragma warning (disable : 4355 )
-    m_history(this,ptype->m_typeSize  + 3/*Possible alignment*/, att.topic.historyQos, att.topic.resourceLimitsQos,att.historyMemoryPolicy),
-    mp_listener(listen),
-    m_readerListener(this),
-    mp_userSubscriber(nullptr),
-    mp_rtpsParticipant(nullptr)
-    {
-
-    }
-
-
-SubscriberImpl::~SubscriberImpl()
+    history_(*this, type->m_typeSize  + 3/*Possible alignment*/, att.topic.historyQos, att.topic.resourceLimitsQos,att.historyMemoryPolicy),
+    listener_(listener),
+    m_readerListener(*this)
 {
-    if(mp_reader != nullptr)
+}
+
+bool Subscriber::impl::init()
+{
+    ReaderAttributes ratt;
+    ratt.endpoint.durabilityKind = att_.qos.m_durability.kind == VOLATILE_DURABILITY_QOS ? VOLATILE : TRANSIENT_LOCAL;
+    ratt.endpoint.endpointKind = READER;
+    ratt.endpoint.multicastLocatorList = att_.multicastLocatorList;
+    ratt.endpoint.reliabilityKind = att_.qos.m_reliability.kind == RELIABLE_RELIABILITY_QOS ? RELIABLE : BEST_EFFORT;
+    ratt.endpoint.topicKind = att_.topic.topicKind;
+    ratt.endpoint.unicastLocatorList = att_.unicastLocatorList;
+    ratt.endpoint.outLocatorList = att_.outLocatorList;
+    ratt.expectsInlineQos = att_.expectsInlineQos;
+    ratt.endpoint.properties = att_.properties;
+    if(att_.getEntityID() > 0)
     {
-        logInfo(SUBSCRIBER,this->getGuid().entityId << " in topic: "<<this->m_att.topic.topicName);
+        ratt.endpoint.setEntityID((uint8_t)att_.getEntityID());
+    }
+    if(att_.getUserDefinedID() > 0)
+    {
+        ratt.endpoint.setUserDefinedID((uint8_t)att_.getUserDefinedID());
+    }
+    ratt.times = att_.times;
+
+    reader_ = participant_.rtps_participant().create_reader(ratt, &history_,
+            &m_readerListener);
+
+    if(reader_)
+    {
+        //REGISTER THE READER
+        if(participant_.rtps_participant().register_reader(*reader_,
+                    att_.topic, att_.qos))
+        {
+            return true;
+        }
+        else
+        {
+            logError(PUBLISHER,"Failed registering associated reader");
+        }
+        //TODO (Ricardo) Remove reader
+    }
+    else
+    {
+        logError(PUBLISHER,"Problem creating associated reader");
     }
 
-    RTPSDomain::removeRTPSReader(mp_reader);
-    delete(this->mp_userSubscriber);
+    return false;
+}
+
+Subscriber::impl::~impl()
+{
+    deinit();
+}
+
+void Subscriber::impl::deinit()
+{
+    if(reader_ != nullptr)
+    {
+        logInfo(SUBSCRIBER,this->getGuid().entityId << " in topic: "<<this->att_.topic.topicName);
+        participant_.rtps_participant().remove_reader(reader_);
+    }
 }
 
 
-void SubscriberImpl::waitForUnreadMessage()
+void Subscriber::impl::waitForUnreadMessage()
 {
-    if(m_history.getUnreadCount()==0)
+    if(history_.getUnreadCount()==0)
     {
         do
         {
-            m_history.waitSemaphore();
+            history_.waitSemaphore();
         }
-        while(m_history.getUnreadCount() == 0);
+        while(history_.getUnreadCount() == 0);
     }
 }
 
 
 
-bool SubscriberImpl::readNextData(void* data,SampleInfo_t* info)
+bool Subscriber::impl::readNextData(void* data,SampleInfo_t* info)
 {
-    return this->m_history.readNextData(data,info);
+    return this->history_.readNextData(data,info);
 }
 
-bool SubscriberImpl::takeNextData(void* data,SampleInfo_t* info) {
-    return this->m_history.takeNextData(data,info);
+bool Subscriber::impl::takeNextData(void* data,SampleInfo_t* info) {
+    return this->history_.takeNextData(data,info);
 }
 
-
-
-const GUID_t& SubscriberImpl::getGuid(){
-    return mp_reader->getGuid();
+const GUID_t& Subscriber::impl::getGuid(){
+    return reader_->getGuid();
 }
 
-
-
-bool SubscriberImpl::updateAttributes(SubscriberAttributes& att)
+bool Subscriber::impl::updateAttributes(SubscriberAttributes& att)
 {
     bool updated = true;
     bool missing = false;
-    if(att.unicastLocatorList.size() != this->m_att.unicastLocatorList.size() ||
-            att.multicastLocatorList.size() != this->m_att.multicastLocatorList.size())
+    if(att.unicastLocatorList.size() != this->att_.unicastLocatorList.size() ||
+            att.multicastLocatorList.size() != this->att_.multicastLocatorList.size())
     {
         logWarning(RTPS_READER,"Locator Lists cannot be changed or updated in this version");
         updated &= false;
     }
     else
     {
-        for(LocatorListIterator lit1 = this->m_att.unicastLocatorList.begin();
-                lit1!=this->m_att.unicastLocatorList.end();++lit1)
+        for(LocatorListIterator lit1 = this->att_.unicastLocatorList.begin();
+                lit1!=this->att_.unicastLocatorList.end();++lit1)
         {
             missing = true;
             for(LocatorListIterator lit2 = att.unicastLocatorList.begin();
@@ -127,8 +160,8 @@ bool SubscriberImpl::updateAttributes(SubscriberAttributes& att)
                 logWarning(RTPS_READER,"Locator Lists cannot be changed or updated in this version");
             }
         }
-        for(LocatorListIterator lit1 = this->m_att.multicastLocatorList.begin();
-                lit1!=this->m_att.multicastLocatorList.end();++lit1)
+        for(LocatorListIterator lit1 = this->att_.multicastLocatorList.begin();
+                lit1!=this->att_.multicastLocatorList.end();++lit1)
         {
             missing = true;
             for(LocatorListIterator lit2 = att.multicastLocatorList.begin();
@@ -149,47 +182,52 @@ bool SubscriberImpl::updateAttributes(SubscriberAttributes& att)
     }
 
     //TOPIC ATTRIBUTES
-    if(this->m_att.topic != att.topic)
+    if(this->att_.topic != att.topic)
     {
         logWarning(RTPS_READER,"Topic Attributes cannot be updated");
         updated &= false;
     }
     //QOS:
     //CHECK IF THE QOS CAN BE SET
-    if(!this->m_att.qos.canQosBeUpdated(att.qos))
+    if(!this->att_.qos.canQosBeUpdated(att.qos))
     {
         updated &=false;
     }
     if(updated)
     {
-        this->m_att.expectsInlineQos = att.expectsInlineQos;
-        if(this->m_att.qos.m_reliability.kind == RELIABLE_RELIABILITY_QOS)
+        this->att_.expectsInlineQos = att.expectsInlineQos;
+        if(this->att_.qos.m_reliability.kind == RELIABLE_RELIABILITY_QOS)
         {
             //UPDATE TIMES:
-            StatefulReader* sfr = (StatefulReader*)mp_reader;
+            StatefulReader::impl* sfr = dynamic_cast<StatefulReader::impl*>(reader_.get());
             sfr->updateTimes(att.times);
         }
-        this->m_att.qos.setQos(att.qos,false);
+        this->att_.qos.setQos(att.qos,false);
         //NOTIFY THE BUILTIN PROTOCOLS THAT THE READER HAS CHANGED
-        mp_rtpsParticipant->updateReader(this->mp_reader,m_att.qos);
+        participant_.rtps_participant().update_local_reader(*reader_, att_.qos);
     }
     return updated;
 }
 
-void SubscriberImpl::SubscriberReaderListener::onNewCacheChangeAdded(RTPSReader* /*reader*/, const CacheChange_t* const /*change*/)
+void Subscriber::impl::SubscriberReaderListener::onNewCacheChangeAdded(RTPSReader::impl& reader, const CacheChange_t* const /*change*/)
 {
-    if(mp_subscriberImpl->mp_listener != nullptr)
+    (void)reader;
+    assert(subscriber_.reader_.get() == &reader);
+
+    if(subscriber_.listener_ != nullptr)
     {
-        //cout << "FIRST BYTE: "<< (int)change->serializedPayload.data[0] << endl;
-        mp_subscriberImpl->mp_listener->onNewDataMessage(mp_subscriberImpl->mp_userSubscriber);
+        subscriber_.listener_->onNewDataMessage(subscriber_);
     }
 }
 
-void SubscriberImpl::SubscriberReaderListener::onReaderMatched(RTPSReader* /*reader*/, MatchingInfo& info)
+void Subscriber::impl::SubscriberReaderListener::onReaderMatched(RTPSReader::impl& reader, const MatchingInfo& info)
 {
-    if (this->mp_subscriberImpl->mp_listener != nullptr)
+    (void)reader;
+    assert(subscriber_.reader_.get() == &reader);
+
+    if (subscriber_.listener_ != nullptr)
     {
-        mp_subscriberImpl->mp_listener->onSubscriptionMatched(mp_subscriberImpl->mp_userSubscriber,info);
+        subscriber_.listener_->onSubscriptionMatched(subscriber_, info);
     }
 }
 
@@ -199,10 +237,7 @@ void SubscriberImpl::SubscriberReaderListener::onReaderMatched(RTPSReader* /*rea
  * its WriterProxies are up to date.
  * @return There is a clean state with all Publishers.
  */
-bool SubscriberImpl::isInCleanState() const
+bool Subscriber::impl::isInCleanState() const
 {
-    return mp_reader->isInCleanState();
+    return reader_->isInCleanState();
 }
-
-} /* namespace fastrtps */
-} /* namespace eprosima */

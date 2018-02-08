@@ -23,16 +23,15 @@
 #ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
 #include "../common/all_common.h"
 #include "../../qos/ParameterList.h"
-#include <fastrtps/rtps/writer/StatelessWriter.h>
-#include <fastrtps/rtps/writer/StatefulWriter.h>
+#include "../writer/RTPSWriter.h"
+#include "../reader/RTPSReader.h"
+#include "../participant/RTPSParticipant.h"
 
 
 namespace eprosima {
 namespace fastrtps{
 namespace rtps {
 
-class RTPSWriter;
-class RTPSReader;
 struct SubmessageHeader_t;
 
 /**
@@ -45,8 +44,8 @@ class MessageReceiver
         /**
          * @param rec_buffer_size
          */
-        MessageReceiver(RTPSParticipantImpl* participant, uint32_t rec_buffer_size);
-        MessageReceiver(RTPSParticipantImpl* participant);
+        MessageReceiver(RTPSParticipant::impl& participant, uint32_t rec_buffer_size);
+        MessageReceiver(RTPSParticipant::impl& participant);
         virtual ~MessageReceiver();
         //!Reset the MessageReceiver to process a new message.
         void reset();
@@ -74,13 +73,16 @@ class MessageReceiver
 #endif
         //!PArameter list
         ParameterList_t m_ParamList;
+
         // Functions to associate/remove associatedendpoints
-        void associateEndpoint(Endpoint *to_add);
-        void removeEndpoint(Endpoint *to_remove);
+        void associate_writer(RTPSWriter::impl* to_add);
+        void associate_reader(RTPSReader::impl* to_add);
+        void remove_writer(RTPSWriter::impl *to_remove);
+        void remove_reader(RTPSReader::impl *to_remove);
 
     private:
-        std::vector<RTPSWriter *> AssociatedWriters;
-        std::vector<RTPSReader *> AssociatedReaders;
+        std::vector<RTPSWriter::impl*> AssociatedWriters;
+        std::vector<RTPSReader::impl*> AssociatedReaders;
         std::mutex mtx;
         //!Protocol version of the message
         ProtocolVersion_t sourceVersion;
@@ -151,7 +153,7 @@ class MessageReceiver
         bool proc_Submsg_SecureMessage(CDRMessage_t*msg, SubmessageHeader_t* smh,bool*last);
         bool proc_Submsg_SecureSubMessage(CDRMessage_t*msg, SubmessageHeader_t* smh,bool*last);
 
-        RTPSParticipantImpl* participant_;
+        RTPSParticipant::impl& participant_;
 };
 }
 } /* namespace rtps */

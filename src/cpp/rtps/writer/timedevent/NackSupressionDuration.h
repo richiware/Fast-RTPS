@@ -21,7 +21,7 @@
 #define __RTPS_WRITER_TIMEDEVENT_NACKSUPRESSIONDURATION_H__
 #ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
 
-#include "../../resources/TimedEvent.h"
+#include <fastrtps/rtps/resources/TimedEvent.h>
 
 namespace eprosima {
 namespace fastrtps{
@@ -37,13 +37,16 @@ class ReaderProxy;
 class NackSupressionDuration : public TimedEvent
 {
     public:
+
         virtual ~NackSupressionDuration();
         /**
          *
          * @param p_RP
          * @param intervalmillisec
          */
-        NackSupressionDuration(ReaderProxy& remote_reader,double intervalmillisec);
+        NackSupressionDuration(ReaderProxy& remote_reader, double intervalmillisec);
+
+        void restart_timer();
 
         /**
          * Method invoked when the event occurs
@@ -51,7 +54,7 @@ class NackSupressionDuration : public TimedEvent
          * @param code Code representing the status of the event
          * @param msg Message associated to the event
          */
-        void event(EventCode code, const char* msg= nullptr);
+        void event(EventCode code, const char* msg = nullptr);
 
         //!Reader proxy
         ReaderProxy& remote_reader_;

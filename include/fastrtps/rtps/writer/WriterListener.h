@@ -17,8 +17,8 @@
  *
  */
 
-#ifndef WRITERLISTENER_H_
-#define WRITERLISTENER_H_
+#ifndef __RTPS_WRITER_WRITERLISTENER_H__
+#define __RTPS_WRITER_WRITERLISTENER_H__
 
 #include "../common/MatchingInfo.h"
 
@@ -34,21 +34,23 @@ class RTPSWriter;
 */
 class RTPS_DllAPI WriterListener
 {
-public:
-	WriterListener(){};
-	virtual ~WriterListener(){};
-	
-	/**
-	* This method is called when a new Reader is matched with this Writer by hte builtin protocols
-	* @param writer Pointer to the RTPSWriter.
-	* @param info Matching Information.
-	*/
-	virtual void onWriterMatched(RTPSWriter* writer,MatchingInfo& info){(void)writer; (void)info;};
+    public:
+
+        WriterListener(){};
+
+        virtual ~WriterListener(){};
+
+        /**
+         * This method is called when a new Reader is matched with this Writer by hte builtin protocols
+         * @param writer Pointer to the RTPSWriter.
+         * @param info Matching Information.
+         */
+        virtual void onWriterMatched(RTPSWriter& writer, const MatchingInfo& info)
+        { (void)writer; (void)info; }
 };
+
 }
 }
 }
 
-
-
-#endif /* WRITERLISTENER_H_ */
+#endif // __RTPS_WRITER_WRITERLISTENER_H__

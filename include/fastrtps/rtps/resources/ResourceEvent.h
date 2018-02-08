@@ -17,9 +17,12 @@
  *
  */
 
-#ifndef RESOURCEEVENT_H_
-#define RESOURCEEVENT_H_
+#ifndef __RTPS_RESOURCES_RESOURCEEVENT_H__
+#define __RTPS_RESOURCES_RESOURCEEVENT_H__
+
 #ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
+
+#include <fastrtps/rtps/participant/RTPSParticipant.h>
 
 #include <thread>
 #include <asio.hpp>
@@ -28,53 +31,56 @@ namespace eprosima {
 namespace fastrtps{
 namespace rtps {
 
-class RTPSParticipantImpl;
-
 /**
  * Class ResourceEvent used to manage the temporal events.
  *@ingroup MANAGEMENT_MODULE
  */
-class ResourceEvent {
-public:
-	ResourceEvent();
-	virtual ~ResourceEvent();
+class ResourceEvent
+{
+    public:
 
-    /**
-    * Method to initialize the thread.
-    * @param p
-    */
-    void init_thread(RTPSParticipantImpl*p);
+        ResourceEvent(RTPSParticipant::impl& participant);
 
-	/**
-	* Get the associated IO service
-	* @return Associated IO service
-	*/
-	asio::io_service& getIOService() { return *mp_io_service; }
+        virtual ~ResourceEvent();
 
-    std::thread& getThread() { return *mp_b_thread; }
+        /**
+         * Method to initialize the thread.
+         * @param p
+         */
+        void init_thread();
 
-private:
+        /**
+         * Get the associated IO service
+         * @return Associated IO service
+         */
+        asio::io_service& getIOService() { return *mp_io_service; }
 
-	//!Thread
-	std::thread* mp_b_thread;
-	//!IO service
-	asio::io_service* mp_io_service;
-	//!
-	void * mp_work;
+        std::thread& getThread() { return *mp_b_thread; }
 
-	/**
-	 * Task to announce the correctness of the thread.
-	 */
-	void announce_thread();
+    private:
 
-	//!Method to run the tasks
-	void run_io_service();
+        //!Thread
+        std::thread* mp_b_thread;
+        //!IO service
+        asio::io_service* mp_io_service;
+        //!
+        void * mp_work;
 
-	//!Pointer to the RTPSParticipantImpl.
-	RTPSParticipantImpl* mp_RTPSParticipantImpl;
+        /**
+         * Task to announce the correctness of the thread.
+         */
+        void announce_thread();
+
+        //!Method to run the tasks
+        void run_io_service();
+
+        //!Pointer to the RTPSParticipantImpl.
+        RTPSParticipant::impl& participant_;
 };
+
 }
 }
-} /* namespace eprosima */
+}
+
 #endif
-#endif /* RESOURCEEVENT_H_ */
+#endif // __RTPS_RESOURCES_RESOURCEEVENT_H__

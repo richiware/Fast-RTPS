@@ -19,24 +19,24 @@
 
 
 #include <fastrtps/rtps/writer/ReaderProxy.h>
-#include <fastrtps/rtps/writer/StatefulWriter.h>
+#include "StatefulWriterImpl.h"
 #include <fastrtps/utils/TimeConversion.h>
 #include <fastrtps/rtps/writer/timedevent/NackResponseDelay.h>
-#include <fastrtps/rtps/writer/timedevent/NackSupressionDuration.h>
+#include "timedevent/NackSupressionDuration.h"
 #include <fastrtps/rtps/writer/timedevent/InitialHeartbeat.h>
 #include <fastrtps/log/Log.h>
 #include <fastrtps/rtps/resources/AsyncWriterThread.h>
 #include <fastrtps/rtps/history/WriterHistory.h>
 
 #include <mutex>
-
 #include <cassert>
 
 using namespace eprosima::fastrtps::rtps;
 
 
-ReaderProxy::ReaderProxy(const RemoteReaderAttributes& rdata,const WriterTimes& times,StatefulWriter* SW) :
-    m_att(rdata), mp_SFW(SW),
+ReaderProxy::ReaderProxy(StatefulWriter::impl& writer, const RemoteReaderAttributes& rdata,
+        const WriterTimes& times) :
+    m_att(rdata), writer_(writer),
     mp_nackResponse(nullptr), mp_nackSupression(nullptr), mp_initialHeartbeat(nullptr), m_lastAcknackCount(0),
     mp_mutex(new std::recursive_mutex()), last_nackfrag_count_(0)
 {
@@ -98,7 +98,7 @@ void ReaderProxy::add_change(const ChangeForReader_t& change)
     //TODO (Ricardo) Remove this functionality from here. It is not his place.
     if (change.get_status() == UNSENT)
     {
-        AsyncWriterThread::wakeUp(mp_SFW);
+        AsyncWriterThread::wakeUp(writer_);
     }
 }
 
@@ -115,7 +115,7 @@ void ReaderProxy::back_to_live_change(const ChangeForReader_t& change)
 
         if (change.get_status() == UNSENT)
         {
-            AsyncWriterThread::wakeUp(mp_SFW);
+            AsyncWriterThread::wakeUp(writer_);
         }
     }
 }
@@ -259,7 +259,7 @@ void ReaderProxy::set_change_to_status(const SequenceNumber_t& seq_num, ChangeFo
     }
 
     if (mustWakeUpAsyncThread)
-        AsyncWriterThread::wakeUp(mp_SFW);
+        AsyncWriterThread::wakeUp(writer_);
 }
 
 bool ReaderProxy::mark_fragment_as_sent_for_change(const SequenceNumber_t& sequence_number, FragmentNumber_t fragment)
@@ -288,7 +288,7 @@ bool ReaderProxy::mark_fragment_as_sent_for_change(const SequenceNumber_t& seque
     }
 
     if (mustWakeUpAsyncThread)
-        AsyncWriterThread::wakeUp(mp_SFW);
+        AsyncWriterThread::wakeUp(writer_);
 
     return allFragmentsSent;
 }
@@ -325,7 +325,7 @@ void ReaderProxy::convert_status_on_all_changes(ChangeForReaderStatus_t previous
     }
 
     if (mustWakeUpAsyncThread)
-        AsyncWriterThread::wakeUp(mp_SFW);
+        AsyncWriterThread::wakeUp(writer_);
 }
 
 void ReaderProxy::setNotValid(const SequenceNumber_t& sequence_number)

@@ -17,16 +17,15 @@
  */
 
 
-#ifndef RTPSParticipant_H_
-#define RTPSParticipant_H_
+#ifndef __RTPS_PARTICIPANT_RTPSPARTICIPANT__
+#define __RTPS_PARTICIPANT_RTPSPARTICIPANT__
 
 #include <cstdlib>
 #include <memory>
 #include "../../fastrtps_dll.h"
 #include "../common/Guid.h"
-#include <fastrtps/rtps/reader/StatefulReader.h>
-
 #include <fastrtps/rtps/attributes/RTPSParticipantAttributes.h>
+
 namespace eprosima {
 namespace fastrtps{
 
@@ -36,9 +35,10 @@ class ReaderQos;
 
 namespace rtps {
 
-class RTPSParticipantImpl;
+class RTPSParticipantListener;
 class RTPSWriter;
 class RTPSReader;
+class StatefulReader;
 class WriterProxyData;
 class ReaderProxyData;
 
@@ -49,24 +49,32 @@ class ReaderProxyData;
  */
 class RTPS_DllAPI RTPSParticipant
 {
-    friend class RTPSParticipantImpl;
-    friend class RTPSDomain;
-    private:
+    class ListenerLink;
+
+    public:
+
+    class impl;
+
     /**
      * Constructor. Requires a pointer to the implementation.
      * @param pimpl Implementation.
      */
-    RTPSParticipant(RTPSParticipantImpl* pimpl);
-    virtual ~ RTPSParticipant();
-    public:
+    RTPSParticipant(const RTPSParticipantAttributes &param, const GuidPrefix_t& guid,
+                RTPSParticipantListener* listener = nullptr);
+
+    virtual ~RTPSParticipant();
+
     //!Get the GUID_t of the RTPSParticipant.
-    const GUID_t& getGuid() const ;
+    const GUID_t& guid() const;
+
     //!Force the announcement of the RTPSParticipant state.
     void announceRTPSParticipantState();
+
     //	//!Method to loose the next change (ONLY FOR TEST). //TODO remove this method because is only for testing
     //	void loose_next_change();
     //!Stop the RTPSParticipant announcement period. //TODO remove this method because is only for testing
     void stopRTPSParticipantAnnouncement();
+
     //!Reset the RTPSParticipant announcement period. //TODO remove this method because is only for testing
     void resetRTPSParticipantAnnouncement();
     /**
@@ -99,7 +107,7 @@ class RTPS_DllAPI RTPSParticipant
      * @param wqos WriterQos.
      * @return True if correctly registered.
      */
-    bool registerWriter(RTPSWriter* Writer,TopicAttributes& topicAtt,WriterQos& wqos);
+    bool register_writer(RTPSWriter& writer, TopicAttributes& topicAtt, WriterQos& wqos);
     /**
      * Register a RTPSReader in the builtin Protocols.
      * @param Reader Pointer to the RTPSReader.
@@ -107,27 +115,27 @@ class RTPS_DllAPI RTPSParticipant
      * @param rqos ReaderQos.
      * @return True if correctly registered.
      */
-    bool registerReader(RTPSReader* Reader,TopicAttributes& topicAtt,ReaderQos& rqos);
+    bool register_reader(RTPSReader& reader, TopicAttributes& topicAtt, ReaderQos& rqos);
     /**
      * Update writer QOS
      * @param Writer to update
      * @param wqos New writer QoS
      * @return true on success
      */
-    bool updateWriter(RTPSWriter* Writer,WriterQos& wqos);
+    bool update_writer(RTPSWriter& writer, WriterQos& wqos);
     /**
      * Update reader QOS
      * @param Reader to update
      * @param rqos New reader QoS
      * @return true on success
      */
-    bool updateReader(RTPSReader* Reader,ReaderQos& rqos);
+    bool update_reader(RTPSReader& reader, ReaderQos& rqos);
 
     /**
      * Get a pointer to the built-in to the RTPSReaders of the Endpoint Discovery Protocol.
      * @return std::pair of pointers to StatefulReader. First is for Subscribers  and Second is for Publishers.
      */
-    std::pair<StatefulReader*,StatefulReader*> getEDPReaders();
+    std::pair<StatefulReader*, StatefulReader*> getEDPReaders();
 
     std::vector<std::string> getParticipantNames() const;
 
@@ -137,27 +145,21 @@ class RTPS_DllAPI RTPSParticipant
      */
     RTPSParticipantAttributes getRTPSParticipantAttributes() const;
 
-    uint32_t getMaxMessageSize() const;
-
-    uint32_t getMaxDataSize() const;
-
     bool get_remote_writer_info(const GUID_t& writerGuid, WriterProxyData& returnedInfo);
 
     bool get_remote_reader_info(const GUID_t& readerGuid, ReaderProxyData& returnedInfo);
 
     private:
 
-    //!Pointer to the implementation.
-    RTPSParticipantImpl* mp_impl;
+    std::unique_ptr<ListenerLink> listener_link_;
+
+    friend impl& get_implementation(RTPSParticipant& participant);
+
+    std::unique_ptr<impl> impl_;
 };
 
-}
-} /* namespace rtps */
-} /* namespace eprosima */
+} //namespace rtps
+} //namespace fastrtps
+} //namespace eprosima
 
-#endif /* RTPSParticipant_H_ */
-
-
-
-
-
+#endif //__RTPS_PARTICIPANT_RTPSPARTICIPANT__

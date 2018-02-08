@@ -18,69 +18,132 @@
  */
 
 #include "PublisherImpl.h"
-
+#include "../participant/ParticipantImpl.h"
+#include <fastrtps/publisher/PublisherListener.h>
+#include <fastrtps/rtps/exceptions/Error.h>
 #include <fastrtps/log/Log.h>
+
+namespace eprosima {
+namespace fastrtps {
+
+    //TODO(Ricardo) Review mutex for set listener
+    class Publisher::ListenerLink : public Publisher::impl::Listener
+    {
+        public:
+
+            ListenerLink(Publisher& publisher, PublisherListener* listener) :
+                publisher_(publisher), listener_(listener)
+            {
+            }
+
+            Publisher::impl::Listener* impl_listener()
+            {
+                if(listener_)
+                {
+                    return this;
+                }
+
+                return nullptr;
+            }
+
+            PublisherListener* listener()
+            {
+                return listener_;
+            }
+
+            void listener(PublisherListener* listener)
+            {
+                listener_ = listener;
+            }
+
+            virtual void onPublicationMatched(Publisher::impl& publisher,
+                    const rtps::MatchingInfo& info) override
+            {
+                assert(listener_);
+                assert(publisher_.impl_.get() == &publisher);
+                listener_->onPublicationMatched(publisher_, info);
+            }
+
+        private:
+
+            Publisher& publisher_;
+
+            PublisherListener* listener_;
+    };
+}
+}
 
 using namespace eprosima::fastrtps;
 using namespace eprosima::fastrtps::rtps;
 
-Publisher::Publisher(Participant::impl& participant, TopicDataType* ptype,
-            PublisherAttributes& att, PublisherListener* p_listen) :
-    impl_(new impl(participant, *this, ptype, att, p_listen))
+Publisher::Publisher(Participant& participant, const PublisherAttributes& att,
+        PublisherListener* listener) :
+    listener_link_(new ListenerLink(*this, listener)),
+    impl_(get_implementation(participant).create_publisher(att, listener_link_->impl_listener()))
 {
+    if(!impl_)
+    {
+        throw Error("Error creating publisher");
+    }
 }
 
 Publisher::~Publisher()
 {
+    if(impl_ && !impl_.unique())
+    {
+        impl_->participant().remove_publisher(impl_);
+    }
 }
 
-bool Publisher::write(void* Data) {
+bool Publisher::write(void* Data)
+{
     logInfo(PUBLISHER,"Writing new data");
-    return get_implementation(*this).create_new_change(ALIVE,Data);
+    return impl_->create_new_change(ALIVE,Data);
 }
 
-bool Publisher::write(void* Data, WriteParams &wparams) {
+bool Publisher::write(void* Data, WriteParams &wparams)
+{
     logInfo(PUBLISHER,"Writing new data with WriteParams");
-    return get_implementation(*this).create_new_change_with_params(ALIVE, Data, wparams);
+    return impl_->create_new_change_with_params(ALIVE, Data, wparams);
 }
 
 bool Publisher::dispose(void* Data)
 {
     logInfo(PUBLISHER,"Disposing of Data");
-    return get_implementation(*this).create_new_change(NOT_ALIVE_DISPOSED,Data);
+    return impl_->create_new_change(NOT_ALIVE_DISPOSED,Data);
 }
 
 
 bool Publisher::unregister(void* Data) {
     //Convert data to serialized Payload
     logInfo(PUBLISHER,"Unregistering of Data");
-    return get_implementation(*this).create_new_change(NOT_ALIVE_UNREGISTERED,Data);
+    return impl_->create_new_change(NOT_ALIVE_UNREGISTERED,Data);
 }
 
 bool Publisher::dispose_and_unregister(void* Data) {
     //Convert data to serialized Payload
     logInfo(PUBLISHER,"Disposing and Unregistering Data");
-    return get_implementation(*this).create_new_change(NOT_ALIVE_DISPOSED_UNREGISTERED,Data);
+    return impl_->create_new_change(NOT_ALIVE_DISPOSED_UNREGISTERED,Data);
 }
 
 bool Publisher::removeAllChange(size_t* removed )
 {
     logInfo(PUBLISHER,"Removing all data from history");
-    return get_implementation(*this).removeAllChange(removed);
+    return impl_->removeAllChange(removed);
 }
 
 bool Publisher::wait_for_all_acked(const Time_t& max_wait)
 {
     logInfo(PUBLISHER,"Waiting for all samples acknowledged");
-    return get_implementation(*this).wait_for_all_acked(max_wait);
+    return impl_->wait_for_all_acked(max_wait);
 }
 
 const GUID_t& Publisher::getGuid()
 {
-    return get_implementation(*this).getGuid();
+    return impl_->getGuid();
 }
 
 PublisherAttributes Publisher::getAttributes() const
 {
-    return get_implementation(*this).getAttributes();
+    return impl_->getAttributes();
 }

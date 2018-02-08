@@ -17,7 +17,7 @@
  *
  */
 
-#include <fastrtps/rtps/writer/StatelessWriter.h>
+#include "StatelessWriterImpl.h"
 #include "../history/WriterHistoryImpl.h"
 #include <fastrtps/rtps/resources/AsyncWriterThread.h>
 #include "../participant/RTPSParticipantImpl.h"
@@ -34,37 +34,52 @@ namespace eprosima {
 namespace fastrtps{
 namespace rtps {
 
+StatelessWriter::StatelessWriter(RTPSParticipant& participant,
+        const WriterAttributes& att, WriterHistory& history, WriterListener* listener) :
+    RTPSWriter(participant, att, history, listener)
+{
+}
 
-StatelessWriter::StatelessWriter(RTPSParticipantImpl* pimpl,GUID_t& guid,
-        WriterAttributes& att, WriterHistory& hist,WriterListener* listen):
-    RTPSWriter(pimpl,guid,att,hist,listen)
+StatelessWriter::impl::impl(RTPSParticipant::impl& participant, const GUID_t& guid,
+        const WriterAttributes& att, WriterHistory::impl& history, RTPSWriter::impl::Listener* listener) :
+    RTPSWriter::impl(participant, guid, att, history, listener)
 {
     mAllRemoteReaders = get_builtin_guid();
 }
 
-StatelessWriter::~StatelessWriter()
+StatelessWriter::impl::~impl()
 {
-    AsyncWriterThread::removeWriter(*this);
-    logInfo(RTPS_WRITER,"StatelessWriter destructor";);
+    deinit_();
 }
 
-std::vector<GUID_t> StatelessWriter::get_builtin_guid()
+void StatelessWriter::impl::deinit()
 {
-    if(this->m_guid.entityId == ENTITYID_SPDP_BUILTIN_RTPSParticipant_WRITER)
+    deinit_();
+}
+
+void StatelessWriter::impl::deinit_()
+{
+    RTPSWriter::impl::deinit_();
+}
+
+std::vector<GUID_t> StatelessWriter::impl::get_builtin_guid()
+{
+    if(this->guid_.entityId == ENTITYID_SPDP_BUILTIN_RTPSParticipant_WRITER)
+    {
         return {{GuidPrefix_t(), c_EntityId_SPDPReader}};
+    }
 #if HAVE_SECURITY
-    else if(this->m_guid.entityId == ENTITYID_P2P_BUILTIN_PARTICIPANT_STATELESS_WRITER)
+    else if(this->guid_.entityId == ENTITYID_P2P_BUILTIN_PARTICIPANT_STATELESS_WRITER)
+    {
         return {{GuidPrefix_t(), participant_stateless_message_reader_entity_id}};
+    }
 #endif
 
     return {};
 }
 
-/*
- *	CHANGE-RELATED METHODS
- */
 
-bool StatelessWriter::unsent_change_added_to_history(const CacheChange_t& change)
+bool StatelessWriter::impl::unsent_change_added_to_history(const CacheChange_t& change)
 {
 #if defined(__DEBUG)
     assert(history_.get_mutex_owner() == history_.get_thread_id());
@@ -76,7 +91,7 @@ bool StatelessWriter::unsent_change_added_to_history(const CacheChange_t& change
     {
         this->setLivelinessAsserted(true);
 
-        RTPSMessageGroup group(mp_RTPSParticipant, this, RTPSMessageGroup::WRITER, m_cdrmessages);
+        RTPSMessageGroup group(participant_, this, RTPSMessageGroup::WRITER, m_cdrmessages);
 
         if(!group.add_data(change, mAllRemoteReaders, mAllShrinkedLocatorList, false))
         {
@@ -87,13 +102,13 @@ bool StatelessWriter::unsent_change_added_to_history(const CacheChange_t& change
     {
         for(auto& reader_locator : reader_locators)
             reader_locator.unsent_changes.push_back(ChangeForReader_t(change));
-        AsyncWriterThread::wakeUp(this);
+        AsyncWriterThread::wakeUp(*this);
     }
 
     return true;
 }
 
-bool StatelessWriter::change_removed_by_history(const SequenceNumber_t& sequence_number,
+bool StatelessWriter::impl::change_removed_by_history(const SequenceNumber_t& sequence_number,
         const InstanceHandle_t&)
 {
 #if defined(__DEBUG)
@@ -117,7 +132,7 @@ bool StatelessWriter::change_removed_by_history(const SequenceNumber_t& sequence
     return true;
 }
 
-void StatelessWriter::update_unsent_changes(ReaderLocator& reader_locator,
+void StatelessWriter::impl::update_unsent_changes(ReaderLocator& reader_locator,
         const SequenceNumber_t& sequence_number, const FragmentNumber_t fragment_number)
 {
     auto it = std::find_if(reader_locator.unsent_changes.begin(),
@@ -141,7 +156,7 @@ void StatelessWriter::update_unsent_changes(ReaderLocator& reader_locator,
     }
 }
 
-void StatelessWriter::send_any_unsent_changes()
+void StatelessWriter::impl::send_any_unsent_changes()
 {
     std::unique_lock<std::mutex>
         history_lock(history_.lock_for_transaction());
@@ -166,10 +181,10 @@ void StatelessWriter::send_any_unsent_changes()
         (*controller)(changesToSend);
 
     // Clear through parent controllers
-    for (auto& controller : mp_RTPSParticipant->getFlowControllers())
+    for (auto& controller : participant_.getFlowControllers())
         (*controller)(changesToSend);
 
-    RTPSMessageGroup group(mp_RTPSParticipant, this,  RTPSMessageGroup::WRITER, m_cdrmessages);
+    RTPSMessageGroup group(participant_, this,  RTPSMessageGroup::WRITER, m_cdrmessages);
 
     while(!changesToSend.empty())
     {
@@ -220,11 +235,12 @@ void StatelessWriter::send_any_unsent_changes()
 }
 
 
-/*
- *	MATCHED_READER-RELATED METHODS
- */
-
 bool StatelessWriter::matched_reader_add(const RemoteReaderAttributes& rdata)
+{
+    return impl_->matched_reader_add(rdata);
+}
+
+bool StatelessWriter::impl::matched_reader_add(const RemoteReaderAttributes& rdata)
 {
     std::unique_lock<std::mutex>
         history_lock(history_.lock_for_transaction());
@@ -263,11 +279,11 @@ bool StatelessWriter::matched_reader_add(const RemoteReaderAttributes& rdata)
 
     update_locators_nts_(rdata.endpoint.durabilityKind >= TRANSIENT_LOCAL ? rdata.guid : c_Guid_Unknown);
 
-    logInfo(RTPS_READER,"Reader " << rdata.guid << " added to "<<m_guid.entityId);
+    logInfo(RTPS_READER,"Reader " << rdata.guid << " added to " << guid_.entityId);
     return true;
 }
 
-bool StatelessWriter::add_locator(Locator_t& loc)
+bool StatelessWriter::impl::add_locator(Locator_t& loc)
 {
 #if HAVE_SECURITY
     if(!is_submessage_protected() && !is_payload_protected())
@@ -304,7 +320,7 @@ bool StatelessWriter::add_locator(Locator_t& loc)
 #endif
 }
 
-void StatelessWriter::update_locators_nts_(const GUID_t& optionalGuid)
+void StatelessWriter::impl::update_locators_nts_(const GUID_t& optionalGuid)
 {
     std::vector<ReaderLocator> backup(std::move(reader_locators));
 
@@ -348,8 +364,8 @@ void StatelessWriter::update_locators_nts_(const GUID_t& optionalGuid)
             for(auto loc = remoteReader->endpoint.unicastLocatorList.begin(); loc != remoteReader->endpoint.unicastLocatorList.end(); ++loc)
             {
                 if(*loc == reader_locators.back().locator ||
-                        (mp_RTPSParticipant->network_factory().is_local_locator(*loc) &&
-                         mp_RTPSParticipant->network_factory().is_local_locator(reader_locators.back().locator)))
+                        (participant_.network_factory().is_local_locator(*loc) &&
+                         participant_.network_factory().is_local_locator(reader_locators.back().locator)))
                 {
                     found = true;
                     break;
@@ -375,7 +391,7 @@ void StatelessWriter::update_locators_nts_(const GUID_t& optionalGuid)
                     {
                         reader_locators.back().unsent_changes.push_back(*history_it->second);
                     }
-                    AsyncWriterThread::wakeUp(this);
+                    AsyncWriterThread::wakeUp(*this);
                 }
             }
         }
@@ -384,8 +400,12 @@ void StatelessWriter::update_locators_nts_(const GUID_t& optionalGuid)
 
 bool StatelessWriter::matched_reader_remove(const RemoteReaderAttributes& rdata)
 {
-    std::unique_lock<std::mutex>
-        history_lock(history_.lock_for_transaction());
+    return impl_->matched_reader_remove(rdata);
+}
+
+bool StatelessWriter::impl::matched_reader_remove(const RemoteReaderAttributes& rdata)
+{
+    std::unique_lock<std::mutex> history_lock(history_.lock_for_transaction());
 
     std::lock_guard<std::mutex> guard(mutex_);
 
@@ -420,6 +440,11 @@ bool StatelessWriter::matched_reader_remove(const RemoteReaderAttributes& rdata)
 
 bool StatelessWriter::matched_reader_is_matched(const RemoteReaderAttributes& rdata)
 {
+    return impl_->matched_reader_is_matched(rdata);
+}
+
+bool StatelessWriter::impl::matched_reader_is_matched(const RemoteReaderAttributes& rdata)
+{
     std::lock_guard<std::mutex> guard(mutex_);
     for(auto rit = m_matched_readers.begin();
             rit!=m_matched_readers.end();++rit)
@@ -432,7 +457,7 @@ bool StatelessWriter::matched_reader_is_matched(const RemoteReaderAttributes& rd
     return false;
 }
 
-void StatelessWriter::resent_changes()
+void StatelessWriter::impl::resent_changes()
 {
     std::unique_lock<std::mutex> history_lock(history_.lock_for_transaction());
 
@@ -447,10 +472,10 @@ void StatelessWriter::resent_changes()
         }
     }
 
-    AsyncWriterThread::wakeUp(this);
+    AsyncWriterThread::wakeUp(*this);
 }
 
-void StatelessWriter::add_flow_controller(std::unique_ptr<FlowController> controller)
+void StatelessWriter::impl::add_flow_controller(std::unique_ptr<FlowController> controller)
 {
     m_controllers.push_back(std::move(controller));
 }

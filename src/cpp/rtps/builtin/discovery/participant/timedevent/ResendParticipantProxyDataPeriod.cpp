@@ -31,11 +31,10 @@ namespace fastrtps{
 namespace rtps {
 
 
-ResendParticipantProxyDataPeriod::ResendParticipantProxyDataPeriod(PDPSimple* p_SPDP,
-        double interval):
-    TimedEvent(p_SPDP->getRTPSParticipant()->getEventResource().getIOService(),
-            p_SPDP->getRTPSParticipant()->getEventResource().getThread(), interval),
-    mp_PDP(p_SPDP)
+ResendParticipantProxyDataPeriod::ResendParticipantProxyDataPeriod(PDPSimple& pdpsimple, double interval) :
+    TimedEvent(pdpsimple.participant().getEventResource().getIOService(),
+            pdpsimple.participant().getEventResource().getThread(), interval),
+    pdpsimple_(pdpsimple)
     {
 
 
@@ -56,10 +55,10 @@ void ResendParticipantProxyDataPeriod::event(EventCode code, const char* msg)
     {
         logInfo(RTPS_PDP,"ResendDiscoveryData Period");
         //FIXME: Change for liveliness protocol
-        mp_PDP->getMutex()->lock();
-        mp_PDP->getLocalParticipantProxyData()->m_manualLivelinessCount++;
-        mp_PDP->getMutex()->unlock();
-        mp_PDP->announceParticipantState(false);
+        pdpsimple_.getMutex()->lock();
+        pdpsimple_.getLocalParticipantProxyData()->m_manualLivelinessCount++;
+        pdpsimple_.getMutex()->unlock();
+        pdpsimple_.announceParticipantState(false);
 
         this->restart_timer();
     }

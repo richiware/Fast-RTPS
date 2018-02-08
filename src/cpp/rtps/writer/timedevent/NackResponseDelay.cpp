@@ -18,18 +18,11 @@
  */
 
 #include <fastrtps/rtps/writer/timedevent/NackResponseDelay.h>
-#include <fastrtps/rtps/writer/timedevent/NackSupressionDuration.h>
-#include <fastrtps/rtps/writer/timedevent/PeriodicHeartbeat.h>
 #include <fastrtps/rtps/resources/ResourceEvent.h>
-#include <fastrtps/rtps/resources/AsyncWriterThread.h>
-
-#include <fastrtps/rtps/writer/StatefulWriter.h>
+#include "../StatefulWriterImpl.h"
 #include <fastrtps/rtps/writer/ReaderProxy.h>
 #include "../../participant/RTPSParticipantImpl.h"
-
 #include <fastrtps/log/Log.h>
-
-#include <fastrtps/rtps/messages/RTPSMessageCreator.h>
 
 #include <mutex>
 
@@ -40,9 +33,9 @@ NackResponseDelay::~NackResponseDelay()
     destroy();
 }
 
-NackResponseDelay::NackResponseDelay(ReaderProxy& remote_reader,double millisec):
-    TimedEvent(remote_reader.mp_SFW->getRTPSParticipant()->getEventResource().getIOService(),
-            remote_reader.mp_SFW->getRTPSParticipant()->getEventResource().getThread(), millisec),
+NackResponseDelay::NackResponseDelay(ReaderProxy& remote_reader, double millisec):
+    TimedEvent(remote_reader.writer_.participant().getEventResource().getIOService(),
+            remote_reader.writer_.participant().getEventResource().getThread(), millisec),
     remote_reader_(remote_reader)
 {
 }

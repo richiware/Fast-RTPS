@@ -17,7 +17,7 @@
  *
  */
 
-#include <fastrtps/rtps/builtin/liveliness/WLPListener.h>
+#include "WLPListener.h"
 #include <fastrtps/rtps/builtin/liveliness/WLP.h>
 
 #include <fastrtps/rtps/history/ReaderHistory.h>
@@ -38,23 +38,22 @@ namespace fastrtps{
 namespace rtps {
 
 
-WLPListener::WLPListener(WLP* plwp):
-																		mp_WLP(plwp)
+WLPListener::WLPListener(WLP& wlp) : wlp_(wlp)
 {
-	free(aux_msg.buffer);
+    free(aux_msg.buffer);
 }
 
 WLPListener::~WLPListener()
 {
-	aux_msg.buffer = nullptr;
+    aux_msg.buffer = nullptr;
 }
 
 
 typedef std::vector<WriterProxy*>::iterator WPIT;
 
-void WLPListener::onNewCacheChangeAdded(RTPSReader* reader,const CacheChange_t* const changeIN)
+void WLPListener::onNewCacheChangeAdded(RTPSReader::impl& reader, const CacheChange_t* const changeIN)
 {
-    std::lock_guard<std::recursive_mutex> guard2(*mp_WLP->getBuiltinProtocols()->mp_PDP->getMutex());
+    std::lock_guard<std::recursive_mutex> guard2(*wlp_.pdpsimple_->getMutex());
     logInfo(RTPS_LIVELINESS,"");
     GuidPrefix_t guidP;
     LivelinessQosPolicyKind livelinessKind;
@@ -65,13 +64,13 @@ void WLPListener::onNewCacheChangeAdded(RTPSReader* reader,const CacheChange_t* 
         return;
     }
     //Check the serializedPayload:
-    for(auto ch = this->mp_WLP->mp_builtinReaderHistory->changesBegin();
-            ch!=mp_WLP->mp_builtinReaderHistory->changesEnd();++ch)
+    for(auto ch = wlp_.mp_builtinReaderHistory->changesBegin();
+            ch != wlp_.mp_builtinReaderHistory->changesEnd(); ++ch)
     {
         if((*ch)->instance_handle == change->instance_handle &&
                 (*ch)->sequence_number < change->sequence_number)
         {
-            mp_WLP->mp_builtinReaderHistory->remove_change(*ch);
+            wlp_.mp_builtinReaderHistory->remove_change(*ch);
             break;
         }
     }
@@ -92,13 +91,13 @@ void WLPListener::onNewCacheChangeAdded(RTPSReader* reader,const CacheChange_t* 
     logInfo(RTPS_LIVELINESS,"RTPSParticipant "<<guidP<< " assert liveliness of "
             <<((livelinessKind == 0x00)?"AUTOMATIC":"")
             <<((livelinessKind==0x01)?"MANUAL_BY_RTPSParticipant":"")<< " writers");
-    if(guidP == reader->getGuid().guidPrefix)
+    if(guidP == reader.getGuid().guidPrefix)
     {
         logInfo(RTPS_LIVELINESS,"Message from own RTPSParticipant, ignoring");
-        this->mp_WLP->mp_builtinReaderHistory->remove_change(change);
+        wlp_.mp_builtinReaderHistory->remove_change(change);
         return;
     }
-    this->mp_WLP->getBuiltinProtocols()->mp_PDP->assertRemoteWritersLiveliness(guidP,livelinessKind);
+    wlp_.pdpsimple_->assertRemoteWritersLiveliness(guidP,livelinessKind);
 
     return;
 }

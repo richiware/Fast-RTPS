@@ -21,30 +21,27 @@
 #define __PARTICIPANT_PARTICIPANTIMPL_H__
 
 #ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
+
 #include <fastrtps/participant/Participant.h>
-#include <fastrtps/rtps/common/Guid.h>
-#include <fastrtps/rtps/participant/RTPSParticipantListener.h>
 #include <fastrtps/attributes/ParticipantAttributes.h>
-#include <fastrtps/rtps/reader/StatefulReader.h>
+#include "../publisher/PublisherImpl.h"
+#include "../subscriber/SubscriberImpl.h"
+#include <fastrtps/rtps/common/Guid.h>
+#include "../rtps/participant/RTPSParticipantImpl.h"
+#include <fastrtps/rtps/participant/RTPSParticipantListener.h>
 
-namespace eprosima{
-namespace fastrtps{
+namespace eprosima {
+namespace fastrtps {
 
-namespace rtps{
-class RTPSParticipant;
+namespace rtps {
 class WriterProxyData;
 class ReaderProxyData;
+class StatefulReader;
 }
 
-class ParticipantListener;
 class TopicDataType;
-class Publisher;
 class PublisherAttributes;
-class PublisherListener;
-class Subscriber;
-class SubscriberImpl;
 class SubscriberAttributes;
-class SubscriberListener;
 
 
 /**
@@ -53,146 +50,156 @@ class SubscriberListener;
  */
 class Participant::impl
 {
-    typedef std::pair<Subscriber*,SubscriberImpl*> t_p_SubscriberPair;
-    typedef std::vector<Publisher*> v_publishers;
-    typedef std::vector<t_p_SubscriberPair> t_v_SubscriberPairs;
+    typedef std::vector<std::shared_ptr<Publisher::impl>> v_publishers;
+    typedef std::vector<std::shared_ptr<Subscriber::impl>> v_subscribers;
 
-    class MyRTPSParticipantListener : public rtps::RTPSParticipantListener
+    class MyRTPSParticipantListener : public rtps::RTPSParticipant::impl::Listener
     {
         public:
 
-            MyRTPSParticipantListener(Participant& participant): participant_(participant) {};
+            MyRTPSParticipantListener(Participant::impl& participant): participant_(participant) {};
 
             virtual ~MyRTPSParticipantListener(){};
 
-            void onRTPSParticipantDiscovery(rtps::RTPSParticipant* part, rtps::RTPSParticipantDiscoveryInfo info);
+            void onRTPSParticipantDiscovery(rtps::RTPSParticipant::impl& participant,
+                    const rtps::RTPSParticipantDiscoveryInfo& info) override;
 
 #if HAVE_SECURITY
-            void onRTPSParticipantAuthentication(rtps::RTPSParticipant* part, const rtps::RTPSParticipantAuthenticationInfo& info);
+            void onRTPSParticipantAuthentication(rtps::RTPSParticipant::impl& participant,
+                    const rtps::RTPSParticipantAuthenticationInfo& info) override;
 #endif
 
-            Participant& participant_;
+            Participant::impl& participant_;
 
     } rtps_listener_;
 
 
     public:
 
-    impl(Participant& participant, const ParticipantAttributes& attr,
-            ParticipantListener* listen = nullptr);
+        class Listener
+        {
+            public:
 
-    virtual ~impl();
+                Listener() = default;
 
-    /**
-     * Register a type in this participant.
-     * @param type Pointer to the TopicDatType.
-     * @return True if registered.
-     */
-    bool registerType(TopicDataType* type);
+                virtual ~Listener() = default;
 
-    /**
-     * Unregister a type in this participant.
-     * @param typeName Name of the type
-     * @return True if unregistered.
-     */
-    bool unregisterType(const char* typeName);
+                virtual void onParticipantDiscovery(Participant::impl&, const ParticipantDiscoveryInfo&) {}
 
-    /**
-     * Create a Publisher in this Participant.
-     * @param att Attributes of the Publisher.
-     * @param listen Pointer to the listener.
-     * @return Pointer to the created Publisher.
-     */
-    Publisher* createPublisher(PublisherAttributes& att, PublisherListener* listen=nullptr);
+#if HAVE_SECURITY
+                virtual void onParticipantAuthentication(Participant::impl&, const ParticipantAuthenticationInfo&) {}
+#endif
+        };
 
-    /**
-     * Create a Subscriber in this Participant.
-     * @param att Attributes of the Subscriber
-     * @param listen Pointer to the listener.
-     * @return Pointer to the created Subscriber.
-     */
-    Subscriber* createSubscriber(SubscriberAttributes& att, SubscriberListener* listen=nullptr);
+        impl(const ParticipantAttributes& attr, Listener* listen = nullptr);
 
-    /**
-     * Remove a Publisher from this participant.
-     * @param pub Pointer to the Publisher.
-     * @return True if correctly removed.
-     */
-    bool removePublisher(Publisher* pub);
+        virtual ~impl();
 
-    /**
-     * Remove a Subscriber from this participant.
-     * @param sub Pointer to the Subscriber.
-     * @return True if correctly removed.
-     */
-    bool removeSubscriber(Subscriber* sub);
+        /**
+         * Register a type in this participant.
+         * @param type Pointer to the TopicDatType.
+         * @return True if registered.
+         */
+        bool register_type(TopicDataType* type);
 
-    /**
-     * Get the GUID_t of the associated RTPSParticipant.
-     * @return GUID_t.
-     */
-    const rtps::GUID_t& getGuid() const;
+        /**
+         * Unregister a type in this participant.
+         * @param typeName Name of the type
+         * @return True if unregistered.
+         */
+        bool unregisterType(const char* typeName);
 
-    /**
-     * Get the participant attributes
-     * @return Participant attributes
-     */
-    inline const ParticipantAttributes& getAttributes() const {return m_att;};
+        /**
+         * Create a Publisher in this Participant.
+         * @param att Attributes of the Publisher.
+         * @param listen Pointer to the listener.
+         * @return Pointer to the created Publisher.
+         */
+        std::shared_ptr<Publisher::impl> create_publisher(const PublisherAttributes& att,
+                Publisher::impl::Listener* listen = nullptr);
 
-    std::pair<rtps::StatefulReader*,rtps::StatefulReader*> getEDPReaders();
+        /**
+         * Create a Subscriber in this Participant.
+         * @param att Attributes of the Subscriber
+         * @param listen Pointer to the listener.
+         * @return Pointer to the created Subscriber.
+         */
+        std::shared_ptr<Subscriber::impl> create_subscriber(const SubscriberAttributes& att,
+                Subscriber::impl::Listener* listener = nullptr);
 
-    std::vector<std::string> getParticipantNames() const;
+        /**
+         * Remove a Publisher from this participant.
+         * @param pub Pointer to the Publisher.
+         * @return True if correctly removed.
+         */
+        bool remove_publisher(std::shared_ptr<Publisher::impl>& publisher);
 
-    /**
-     * This method can be used when using a StaticEndpointDiscovery mechanism differnet that the one
-     * included in FastRTPS, for example when communicating with other implementations.
-     * It indicates the Participant that an Endpoint from the XML has been discovered and
-     * should be activated.
-     * @param partguid Participant GUID_t.
-     * @param userId User defined ID as shown in the XML file.
-     * @param kind EndpointKind (WRITER or READER)
-     * @return True if correctly found and activated.
-     */
-    bool newRemoteEndpointDiscovered(const rtps::GUID_t& partguid, uint16_t userId,
-            rtps::EndpointKind_t kind);
+        /**
+         * Remove a Subscriber from this participant.
+         * @param sub Pointer to the Subscriber.
+         * @return True if correctly removed.
+         */
+        bool remove_subscriber(std::shared_ptr<Subscriber::impl>& subscriber);
 
-    bool get_remote_writer_info(const rtps::GUID_t& writerGuid, rtps::WriterProxyData& returnedInfo);
+        /**
+         * Get the GUID_t of the associated RTPSParticipant.
+         * @return GUID_t.
+         */
+        const rtps::GUID_t& getGuid() const;
 
-    bool get_remote_reader_info(const rtps::GUID_t& readerGuid, rtps::ReaderProxyData& returnedInfo);
+        /**
+         * Get the participant attributes
+         * @return Participant attributes
+         */
+        inline const ParticipantAttributes& getAttributes() const {return m_att;};
 
-    MyRTPSParticipantListener* rtps_listener() { return &rtps_listener_; }
+        std::pair<rtps::StatefulReader*,rtps::StatefulReader*> getEDPReaders();
 
-    void rtps_participant(rtps::RTPSParticipant* rtps_participant)
-    {
-        mp_rtpsParticipant = rtps_participant;
-    }
+        std::vector<std::string> getParticipantNames() const;
 
-    rtps::RTPSParticipant* rtps_participant()
-    {
-        return mp_rtpsParticipant;
-    }
+        /**
+         * This method can be used when using a StaticEndpointDiscovery mechanism differnet that the one
+         * included in FastRTPS, for example when communicating with other implementations.
+         * It indicates the Participant that an Endpoint from the XML has been discovered and
+         * should be activated.
+         * @param partguid Participant GUID_t.
+         * @param userId User defined ID as shown in the XML file.
+         * @param kind EndpointKind (WRITER or READER)
+         * @return True if correctly found and activated.
+         */
+        bool newRemoteEndpointDiscovered(const rtps::GUID_t& partguid, uint16_t userId,
+                rtps::EndpointKind_t kind);
 
-    bool getRegisteredType(const char* typeName, TopicDataType** type);
+        bool get_remote_writer_info(const rtps::GUID_t& writerGuid, rtps::WriterProxyData& returnedInfo);
+
+        bool get_remote_reader_info(const rtps::GUID_t& readerGuid, rtps::ReaderProxyData& returnedInfo);
+
+        rtps::RTPSParticipant::impl& rtps_participant()
+        {
+            return rtps_participant_;
+        }
+
+        bool getRegisteredType(const char* typeName, TopicDataType** type);
 
     private:
 
-    //!Participant Attributes
-    ParticipantAttributes m_att;
+        //!Participant Attributes
+        ParticipantAttributes m_att;
 
-    //!RTPSParticipant
-    rtps::RTPSParticipant* mp_rtpsParticipant;
+        //!RTPSParticipant
+        rtps::RTPSParticipant::impl rtps_participant_;
 
-    //!Participant Listener
-    ParticipantListener* mp_listener;
+        //!Participant Listener
+        Listener* mp_listener;
 
-    //!Publisher Vector
-    v_publishers m_publishers;
+        //!Publisher Vector
+        v_publishers m_publishers;
 
-    //!Subscriber Vector
-    t_v_SubscriberPairs m_subscribers;
+        //!Subscriber Vector
+        v_subscribers m_subscribers;
 
-    //!TOpicDatType vector
-    std::vector<TopicDataType*> m_types;
+        //!TOpicDatType vector
+        std::vector<TopicDataType*> m_types;
 };
 
 inline Participant::impl& get_implementation(Participant& participant)

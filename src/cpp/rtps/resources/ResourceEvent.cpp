@@ -30,11 +30,11 @@ namespace fastrtps{
 namespace rtps {
 
 
-ResourceEvent::ResourceEvent():
+ResourceEvent::ResourceEvent(RTPSParticipant::impl& participant):
     mp_b_thread(nullptr),
     mp_io_service(nullptr),
     mp_work(nullptr),
-    mp_RTPSParticipantImpl(nullptr)
+    participant_(participant)
     {
         mp_io_service = new asio::io_service();
         mp_work = (void*)new asio::io_service::work(*mp_io_service);
@@ -55,18 +55,17 @@ void ResourceEvent::run_io_service()
     mp_io_service->run();
 }
 
-void ResourceEvent::init_thread(RTPSParticipantImpl* pimpl)
+void ResourceEvent::init_thread()
 {
-    mp_RTPSParticipantImpl = pimpl;
     mp_b_thread = new std::thread(&ResourceEvent::run_io_service,this);
     mp_io_service->post(std::bind(&ResourceEvent::announce_thread,this));
-    mp_RTPSParticipantImpl->ResourceSemaphoreWait();
+    participant_.ResourceSemaphoreWait();
 }
 
 void ResourceEvent::announce_thread()
 {
     logInfo(RTPS_PARTICIPANT,"Thread: " << std::this_thread::get_id() << " created and waiting for tasks.");
-    mp_RTPSParticipantImpl->ResourceSemaphorePost();
+    participant_.ResourceSemaphorePost();
 
 }
 }

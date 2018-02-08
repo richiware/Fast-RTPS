@@ -40,8 +40,7 @@ namespace eprosima {
 namespace fastrtps{
 namespace rtps {
 
-void EDPSimplePUBListener::onNewCacheChangeAdded(RTPSReader* reader,
-        const CacheChange_t* const change_in)
+void EDPSimplePUBListener::onNewCacheChangeAdded(RTPSReader& reader, const CacheChange_t* const change_in)
 {
     CacheChange_t* change = (CacheChange_t*)change_in;
     //std::lock_guard<std::recursive_mutex> guard(*this->mp_SEDP->mp_PubReader.first->getMutex());
@@ -52,10 +51,11 @@ void EDPSimplePUBListener::onNewCacheChangeAdded(RTPSReader* reader,
     }
 
     //Call the slave, if it exists
-    attached_listener_mutex.lock();
-    if(attached_listener != nullptr)
-        attached_listener->onNewCacheChangeAdded(this->mp_SEDP->mp_PubReader.first, change_in);
-    attached_listener_mutex.unlock();
+    //TODO(Ricardo) Mutex!!
+    if(get_internal_listener() != nullptr)
+    {
+        get_internal_listener()->onNewCacheChangeAdded(*edpsimple_.mp_PubReader.first, change_in);
+    }
 
     if(change->kind == ALIVE)
     {
@@ -71,24 +71,25 @@ void EDPSimplePUBListener::onNewCacheChangeAdded(RTPSReader* reader,
         if(writerProxyData.readFromCDRMessage(&tempMsg))
         {
             change->instance_handle = writerProxyData.key();
-            if(writerProxyData.guid().guidPrefix == mp_SEDP->mp_RTPSParticipant->getGuid().guidPrefix)
+            if(writerProxyData.guid().guidPrefix == edpsimple_.participant_.guid().guidPrefix)
             {
                 logInfo(RTPS_EDP,"Message from own RTPSParticipant, ignoring");
-                mp_SEDP->mp_PubReader.second->remove_change(change);
+                edpsimple_.mp_PubReader.second->remove_change(change);
                 return;
             }
 
             //LOOK IF IS AN UPDATED INFORMATION
             ParticipantProxyData pdata;
-            if(this->mp_SEDP->mp_PDP->addWriterProxyData(&writerProxyData, pdata)) //ADDED NEW DATA
+            if(edpsimple_.pdpsimple_.addWriterProxyData(&writerProxyData, pdata)) //ADDED NEW DATA
             {
                 // At this point we can release reader lock, cause change is not used
-                reader->getMutex()->unlock();
+                // TODO(Ricardo) Problemo!!!
+                //reader.getMutex()->unlock();
 
-                mp_SEDP->pairing_writer_proxy_with_any_local_reader(&pdata, &writerProxyData);
+                edpsimple_.pairing_writer_proxy_with_any_local_reader(&pdata, &writerProxyData);
 
                 // Take again the reader lock.
-                reader->getMutex()->lock();
+                //reader->getMutex()->lock();
             }
             else //NOT ADDED BECAUSE IT WAS ALREADY THERE
             {
@@ -102,11 +103,11 @@ void EDPSimplePUBListener::onNewCacheChangeAdded(RTPSReader* reader,
         logInfo(RTPS_EDP,"Disposed Remote Writer, removing...");
 
         GUID_t auxGUID = iHandle2GUID(change->instance_handle);
-        this->mp_SEDP->mp_PDP->removeWriterProxyData(auxGUID);
+        edpsimple_.pdpsimple_.removeWriterProxyData(auxGUID);
     }
 
     //Removing change from history
-    this->mp_SEDP->mp_PubReader.second->remove_change(change);
+    edpsimple_.mp_PubReader.second->remove_change(change);
 
     return;
 }
@@ -165,8 +166,7 @@ bool EDPSimpleSUBListener::computeKey(CacheChange_t* change)
     return compute_key(&aux_msg,change);
 }
 
-void EDPSimpleSUBListener::onNewCacheChangeAdded(RTPSReader* reader,
-        const CacheChange_t* const change_in)
+void EDPSimpleSUBListener::onNewCacheChangeAdded(RTPSReader& reader, const CacheChange_t* const change_in)
 {
     CacheChange_t* change = (CacheChange_t*)change_in;
     //std::lock_guard<std::recursive_mutex> guard(*this->mp_SEDP->mp_SubReader.first->getMutex());
@@ -177,10 +177,10 @@ void EDPSimpleSUBListener::onNewCacheChangeAdded(RTPSReader* reader,
     }
 
     //Call the slave, if it exists
-    attached_listener_mutex.lock();
-    if(attached_listener != nullptr)
-        attached_listener->onNewCacheChangeAdded(this->mp_SEDP->mp_SubReader.first, change);
-    attached_listener_mutex.unlock();
+    if(get_internal_listener() != nullptr)
+    {
+        get_internal_listener()->onNewCacheChangeAdded(*edpsimple_.mp_SubReader.first, change);
+    }
 
     if(change->kind == ALIVE)
     {
@@ -196,24 +196,25 @@ void EDPSimpleSUBListener::onNewCacheChangeAdded(RTPSReader* reader,
         if(readerProxyData.readFromCDRMessage(&tempMsg))
         {
             change->instance_handle = readerProxyData.key();
-            if(readerProxyData.guid().guidPrefix == mp_SEDP->mp_RTPSParticipant->getGuid().guidPrefix)
+            if(readerProxyData.guid().guidPrefix == edpsimple_.participant_.guid().guidPrefix)
             {
                 logInfo(RTPS_EDP,"From own RTPSParticipant, ignoring");
-                mp_SEDP->mp_SubReader.second->remove_change(change);
+                edpsimple_.mp_SubReader.second->remove_change(change);
                 return;
             }
 
             //LOOK IF IS AN UPDATED INFORMATION
             ParticipantProxyData pdata;
-            if(this->mp_SEDP->mp_PDP->addReaderProxyData(&readerProxyData, pdata)) //ADDED NEW DATA
+            if(edpsimple_.pdpsimple_.addReaderProxyData(&readerProxyData, pdata)) //ADDED NEW DATA
             {
                 // At this point we can release reader lock, cause change is not used
-                reader->getMutex()->unlock();
+                //TODO(Ricardo) Maydayyy!!
+                //reader->getMutex()->unlock();
 
-                mp_SEDP->pairing_reader_proxy_with_any_local_writer(&pdata, &readerProxyData);
+                edpsimple_.pairing_reader_proxy_with_any_local_writer(&pdata, &readerProxyData);
 
                 // Take again the reader lock.
-                reader->getMutex()->lock();
+                //reader->getMutex()->lock();
             }
             else
             {
@@ -227,11 +228,11 @@ void EDPSimpleSUBListener::onNewCacheChangeAdded(RTPSReader* reader,
         logInfo(RTPS_EDP,"Disposed Remote Reader, removing...");
 
         GUID_t auxGUID = iHandle2GUID(change->instance_handle);
-        this->mp_SEDP->mp_PDP->removeReaderProxyData(auxGUID);
+        edpsimple_.pdpsimple_.removeReaderProxyData(auxGUID);
     }
 
     // Remove change from history.
-    this->mp_SEDP->mp_SubReader.second->remove_change(change);
+    edpsimple_.mp_SubReader.second->remove_change(change);
 
     return;
 }

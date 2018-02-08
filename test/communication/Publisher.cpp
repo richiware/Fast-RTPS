@@ -22,7 +22,6 @@
 #include <fastrtps/attributes/PublisherAttributes.h>
 #include <fastrtps/publisher/Publisher.h>
 #include <fastrtps/publisher/PublisherListener.h>
-#include <fastrtps/Domain.h>
 #include <fastrtps/utils/eClock.h>
 
 #include <types/HelloWorldType.h>
@@ -108,17 +107,16 @@ int main(int argc, char** argv)
         ++arg_count;
     }
 
+    // TODO(Ricardo) try statement
+
     ParticipantAttributes participant_attributes;
     participant_attributes.rtps.builtin.leaseDuration.seconds = 3;
     participant_attributes.rtps.builtin.leaseDuration_announcementperiod.seconds = 1;
     ParListener participant_listener(exit_on_lost_liveliness);
-    Participant* participant = Domain::createParticipant(participant_attributes, &participant_listener);
-
-    if(participant == nullptr)
-        return 1;
+    Participant participant(participant_attributes, &participant_listener);
 
     HelloWorldType type;
-    Domain::registerType(participant,&type);
+    participant.register_type(&type);
 
     PubListener listener;
 
@@ -128,12 +126,7 @@ int main(int argc, char** argv)
     publisher_attributes.topic.topicDataType = type.getName();
     publisher_attributes.topic.topicName = "HelloWorldTopic";
     publisher_attributes.qos.m_reliability.kind = RELIABLE_RELIABILITY_QOS;
-    Publisher* publisher = Domain::createPublisher(participant, publisher_attributes, &listener);
-    if(publisher == nullptr)
-    {
-        Domain::removeParticipant(participant);
-        return 1;
-    }
+    Publisher publisher(participant, publisher_attributes, &listener);
 
     {
         std::unique_lock<std::mutex> lock(listener.mutex_);
@@ -146,7 +139,7 @@ int main(int argc, char** argv)
 
     while(run)
     {
-        publisher->write((void*)&data);
+        publisher.write((void*)&data);
 
         if(data.index() == 4)
             data.index() = 1;
@@ -155,8 +148,6 @@ int main(int argc, char** argv)
 
         eClock::my_sleep(250);
     };
-
-    Domain::removeParticipant(participant);
 
     return 0;
 }

@@ -17,14 +17,11 @@
  */
 
 
-#ifndef STATELESSREADER_H_
-#define STATELESSREADER_H_
+#ifndef __RTPS_READER_STATELESSREADER_H__
+#define __RTPS_READER_STATELESSREADER_H__
 #ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
 
 #include "RTPSReader.h"
-
-#include <mutex>
-#include <map>
 
 namespace eprosima {
 namespace fastrtps{
@@ -36,123 +33,67 @@ namespace rtps {
  */
 class StatelessReader: public RTPSReader
 {
-    friend class RTPSParticipantImpl;
+    public:
 
-public:
-    virtual ~StatelessReader();
-private:
-    StatelessReader(RTPSParticipantImpl*,GUID_t& guid,
-            ReaderAttributes& att,ReaderHistory* hist,ReaderListener* listen=nullptr);
-public:
-    /**
-     * Add a matched writer represented by a WriterProxyData object.
-     * @param wdata Pointer to the WPD object to add.
-     * @return True if correctly added.
-     */
-    bool matched_writer_add(const RemoteWriterAttributes& wdata);
-    /**
-     * Remove a WriterProxyData from the matached writers.
-     * @param wdata Pointer to the WPD object.
-     * @return True if correct.
-     */
-    bool matched_writer_remove(const RemoteWriterAttributes& wdata);
+        class impl;
 
-    /**
-     * Tells us if a specific Writer is matched against this reader
-     * @param wdata Pointer to the WriterProxyData object
-     * @return True if it is matched.
-     */
-    bool matched_writer_is_matched(const RemoteWriterAttributes& wdata);
+        StatelessReader(RTPSParticipant&, const ReaderAttributes& att, ReaderHistory* hist,
+                ReaderListener* listen = nullptr);
 
-    /**
-     * Method to indicate the reader that some change has been removed due to HistoryQos requirements.
-     * @param change Pointer to the CacheChange_t.
-     * @param prox Pointer to the WriterProxy.
-     * @return True if correctly removed.
-     */
-    bool change_removed_by_history(CacheChange_t* change,WriterProxy* prox = nullptr);
+        virtual ~StatelessReader() = default;
 
-    /**
-     * Processes a new DATA message. Previously the message must have been accepted by function acceptMsgDirectedTo.
-     *
-     * @param change Pointer to the CacheChange_t.
-     * @return true if the reader accepts messages from the.
-     */
-    bool processDataMsg(CacheChange_t *change);
+        /**
+         * Add a matched writer represented by a WriterProxyData object.
+         * @param wdata Pointer to the WPD object to add.
+         * @return True if correctly added.
+         */
+        bool matched_writer_add(const RemoteWriterAttributes& wdata);
+        /**
+         * Remove a WriterProxyData from the matached writers.
+         * @param wdata Pointer to the WPD object.
+         * @return True if correct.
+         */
+        bool matched_writer_remove(const RemoteWriterAttributes& wdata);
 
-    /**
-     * Processes a new DATA FRAG message. Previously the message must have been accepted by function acceptMsgDirectedTo.
-     * @param change Pointer to the CacheChange_t.
-     * @param sampleSize Size of the complete assembled message.
-     * @param fragmentStartingNum fragment number of this particular fragment.
-     * @return true if the reader accepts message.
-     */
-    bool processDataFragMsg(CacheChange_t *change, uint32_t sampleSize, uint32_t fragmentStartingNum);
+        /**
+         * Tells us if a specific Writer is matched against this reader
+         * @param wdata Pointer to the WriterProxyData object
+         * @return True if it is matched.
+         */
+        bool matched_writer_is_matched(const RemoteWriterAttributes& wdata);
 
-    /**
-     * Processes a new HEARTBEAT message. Previously the message must have been accepted by function acceptMsgDirectedTo.
-     *
-     * @return true if the reader accepts messages from the.
-     */
-    bool processHeartbeatMsg(GUID_t &writerGUID, uint32_t hbCount, SequenceNumber_t &firstSN,
-            SequenceNumber_t &lastSN, bool finalFlag, bool livelinessFlag);
+        /**
+         * Read the next unread CacheChange_t from the history
+         * @param change Pointer to pointer of CacheChange_t
+         * @param wpout Pointer to pointer of the matched writer proxy
+         * @return True if read.
+         */
+        bool nextUnreadCache(CacheChange_t** change,WriterProxy** wpout=nullptr);
+        /**
+         * Take the next CacheChange_t from the history;
+         * @param change Pointer to pointer of CacheChange_t
+         * @param wpout Pointer to pointer of the matched writer proxy
+         * @return True if read.
+         */
+        bool nextUntakenCache(CacheChange_t** change,WriterProxy** wpout=nullptr);
 
-    bool processGapMsg(GUID_t &writerGUID, SequenceNumber_t &gapStart, SequenceNumberSet_t &gapList);
+        /*!
+         * @brief Returns there is a clean state with all Writers.
+         * StatelessReader allways return true;
+         * @return true
+         */
+        bool isInCleanState() const { return true; }
 
-    /**
-     * This method is called when a new change is received. This method calls the received_change of the History
-     * and depending on the implementation performs different actions.
-     * @param a_change Pointer of the change to add.
-     * @return True if added.
-     */
-    bool change_received(CacheChange_t* a_change);
+        private:
 
-    /**
-     * Read the next unread CacheChange_t from the history
-     * @param change Pointer to pointer of CacheChange_t
-     * @param wpout Pointer to pointer of the matched writer proxy
-     * @return True if read.
-     */
-    bool nextUnreadCache(CacheChange_t** change,WriterProxy** wpout=nullptr);
-    /**
-     * Take the next CacheChange_t from the history;
-     * @param change Pointer to pointer of CacheChange_t
-     * @param wpout Pointer to pointer of the matched writer proxy
-     * @return True if read.
-     */
-    bool nextUntakenCache(CacheChange_t** change,WriterProxy** wpout=nullptr);
+        StatelessReader(std::shared_ptr<RTPSReader::impl>& impl, ReaderListener* listener = nullptr);
 
-    /**
-     * Get the number of matched writers
-     * @return Number of matched writers
-     */
-    inline size_t getMatchedWritersSize() const {return m_matched_writers.size();};
-
-    /*!
-     * @brief Returns there is a clean state with all Writers.
-     * StatelessReader allways return true;
-     * @return true
-     */
-    bool isInCleanState() const { return true; }
-
-    inline RTPSParticipantImpl* getRTPSParticipant() const {return mp_RTPSParticipant;}
-
-private:
-
-    bool acceptMsgFrom(GUID_t& entityId);
-
-    bool thereIsUpperRecordOf(GUID_t& guid, SequenceNumber_t& seq);
-
-    //!List of GUID_t os matched writers.
-    //!Is only used in the Discovery, to correctly notify the user using SubscriptionListener::onSubscriptionMatched();
-    std::vector<RemoteWriterAttributes> m_matched_writers;
-
-	//!Information about changes already in History
-	std::map<GUID_t, SequenceNumber_t> m_historyRecord;
+        friend StatelessReader* create_statelessreader_from_implementation(std::shared_ptr<RTPSReader::impl>&);
 };
 
-}
-} /* namespace rtps */
-} /* namespace eprosima */
+} // namespace rtps
+} // namespace fastrtps
+} // namespace eprosima
+
 #endif
-#endif /* STATELESSREADER_H_ */
+#endif /* __RTPS_READER_STATELESSREADER_H__*/

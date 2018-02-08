@@ -20,14 +20,14 @@
 #ifndef _TEST_BLACKBOX_RTPSWITHREGISTRATIONWRITER_HPP_
 #define _TEST_BLACKBOX_RTPSWITHREGISTRATIONWRITER_HPP_
 
-#include <fastrtps/rtps/RTPSDomain.h>
 #include <fastrtps/rtps/participant/RTPSParticipant.h>
 #include <fastrtps/rtps/attributes/RTPSParticipantAttributes.h>
 #include <fastrtps/rtps/attributes/WriterAttributes.h>
 #include <fastrtps/rtps/writer/WriterListener.h>
 #include <fastrtps/qos/WriterQos.h>
 #include <fastrtps/attributes/TopicAttributes.h>
-#include <fastrtps/rtps/writer/RTPSWriter.h>
+#include <fastrtps/rtps/writer/StatefulWriter.h>
+#include <fastrtps/rtps/writer/StatelessWriter.h>
 #include <fastrtps/rtps/attributes/HistoryAttributes.h>
 #include <fastrtps/rtps/history/WriterHistory.h>
 
@@ -57,10 +57,13 @@ class RTPSWithRegistrationWriter
 
             ~Listener(){};
 
-            void onWriterMatched(eprosima::fastrtps::rtps::RTPSWriter* /*writer*/, eprosima::fastrtps::rtps::MatchingInfo& info)
+            void onWriterMatched(eprosima::fastrtps::rtps::RTPSWriter&,
+                    const eprosima::fastrtps::rtps::MatchingInfo& info) override
             {
                 if (info.status == eprosima::fastrtps::rtps::MATCHED_MATCHING)
+                {
                     writer_.matched();
+                }
             }
 
         private:
@@ -92,9 +95,13 @@ class RTPSWithRegistrationWriter
     virtual ~RTPSWithRegistrationWriter()
     {
         if(participant_ != nullptr)
-            eprosima::fastrtps::rtps::RTPSDomain::removeRTPSParticipant(participant_);
+        {
+            delete participant_;
+        }
         if(history_ != nullptr)
+        {
             delete(history_);
+        }
     }
 
     void init()
@@ -104,7 +111,8 @@ class RTPSWithRegistrationWriter
         pattr.builtin.use_SIMPLE_RTPSParticipantDiscoveryProtocol = true;
         pattr.builtin.use_WriterLivelinessProtocol = true;
         pattr.builtin.domainId = (uint32_t)GET_PID() % 230;
-        participant_ = eprosima::fastrtps::rtps::RTPSDomain::createParticipant(pattr);
+        participant_ = new eprosima::fastrtps::rtps::RTPSParticipant(pattr,
+                eprosima::fastrtps::rtps::GuidPrefix_t::unknown());
         ASSERT_NE(participant_, nullptr);
 
         //Create writerhistory
@@ -112,11 +120,19 @@ class RTPSWithRegistrationWriter
         history_ = new eprosima::fastrtps::rtps::WriterHistory(hattr_);
 
         //Create writer
-        writer_ = eprosima::fastrtps::rtps::RTPSDomain::createRTPSWriter(participant_, writer_attr_, *history_,
+        if(writer_qos_.m_reliability.kind == eprosima::fastrtps::RELIABLE_RELIABILITY_QOS)
+        {
+            writer_ = new eprosima::fastrtps::rtps::StatefulWriter(*participant_, writer_attr_, *history_,
                 &listener_);
+        }
+        else
+        {
+            writer_ = new eprosima::fastrtps::rtps::StatelessWriter(*participant_, writer_attr_, *history_,
+                &listener_);
+        }
         ASSERT_NE(writer_, nullptr);
 
-        ASSERT_EQ(participant_->registerWriter(writer_, topic_attr_, writer_qos_), true);
+        ASSERT_EQ(participant_->register_writer(*writer_, topic_attr_, writer_qos_), true);
 
         initialized_ = true;
     }

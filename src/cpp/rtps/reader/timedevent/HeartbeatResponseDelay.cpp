@@ -20,10 +20,8 @@
 #include <fastrtps/rtps/reader/timedevent/HeartbeatResponseDelay.h>
 #include <fastrtps/rtps/resources/ResourceEvent.h>
 #include <fastrtps/rtps/reader/WriterProxy.h>
-
-#include <fastrtps/rtps/reader/StatefulReader.h>
+#include "../StatefulReaderImpl.h"
 #include "../../participant/RTPSParticipantImpl.h"
-
 #include <fastrtps/rtps/messages/RTPSMessageCreator.h>
 #include <fastrtps/rtps/messages/CDRMessage.h>
 #include <fastrtps/log/Log.h>
@@ -40,11 +38,11 @@ HeartbeatResponseDelay::~HeartbeatResponseDelay()
     destroy();
 }
 
-HeartbeatResponseDelay::HeartbeatResponseDelay(WriterProxy* p_WP,double interval):
-    TimedEvent(p_WP->mp_SFR->getRTPSParticipant()->getEventResource().getIOService(),
-            p_WP->mp_SFR->getRTPSParticipant()->getEventResource().getThread(), interval),
-    mp_WP(p_WP), m_cdrmessages(p_WP->mp_SFR->getRTPSParticipant()->getMaxMessageSize(),
-            p_WP->mp_SFR->getRTPSParticipant()->getGuid().guidPrefix)
+HeartbeatResponseDelay::HeartbeatResponseDelay(WriterProxy& writer_proxy, double interval):
+    TimedEvent(writer_proxy.reader_.participant().getEventResource().getIOService(),
+            writer_proxy.reader_.participant().getEventResource().getThread(), interval),
+    writer_proxy_(writer_proxy), m_cdrmessages(writer_proxy.reader_.participant().getMaxMessageSize(),
+            writer_proxy.reader_.participant().guid().guidPrefix)
 {
 
 }
@@ -60,26 +58,27 @@ void HeartbeatResponseDelay::event(EventCode code, const char* msg)
         logInfo(RTPS_READER,"");
 
         // Protect reader
-        std::lock_guard<std::recursive_mutex> guard(*mp_WP->mp_SFR->getMutex());
+        std::lock_guard<std::recursive_mutex> guard(*writer_proxy_.reader_.getMutex());
 
-        const std::vector<ChangeFromWriter_t> missing_changes = mp_WP->missing_changes();
+        const std::vector<ChangeFromWriter_t> missing_changes = writer_proxy_.missing_changes();
         // Stores missing changes but there is some fragments received.
         std::vector<CacheChange_t*> uncompleted_changes;
 
-        RTPSMessageGroup group(mp_WP->mp_SFR->getRTPSParticipant(), mp_WP->mp_SFR, RTPSMessageGroup::READER, m_cdrmessages);
-        LocatorList_t locators(mp_WP->m_att.endpoint.unicastLocatorList);
-        locators.push_back(mp_WP->m_att.endpoint.multicastLocatorList);
+        RTPSMessageGroup group(writer_proxy_.reader_.participant(), &writer_proxy_.reader_, RTPSMessageGroup::READER, m_cdrmessages);
+        LocatorList_t locators(writer_proxy_.m_att.endpoint.unicastLocatorList);
+        locators.push_back(writer_proxy_.m_att.endpoint.multicastLocatorList);
 
-        if(!missing_changes.empty() || !mp_WP->m_heartbeatFinalFlag)
+        if(!missing_changes.empty() || !writer_proxy_.m_heartbeatFinalFlag)
         {
             SequenceNumberSet_t sns;
-            sns.base = mp_WP->available_changes_max();
+            sns.base = writer_proxy_.available_changes_max();
             sns.base++;
 
             for(auto ch : missing_changes)
             {
                 // Check if the CacheChange_t is uncompleted.
-                CacheChange_t* uncomplete_change = mp_WP->mp_SFR->findCacheInFragmentedCachePitStop(ch.getSequenceNumber(), mp_WP->m_att.guid);
+                CacheChange_t* uncomplete_change = writer_proxy_.reader_.findCacheInFragmentedCachePitStop(
+                        ch.getSequenceNumber(), writer_proxy_.m_att.guid);
 
                 if(uncomplete_change == nullptr)
                 {
@@ -96,14 +95,14 @@ void HeartbeatResponseDelay::event(EventCode code, const char* msg)
             }
 
             // TODO Protect
-            mp_WP->mp_SFR->m_acknackCount++;
+            writer_proxy_.reader_.m_acknackCount++;
             logInfo(RTPS_READER,"Sending ACKNACK: "<< sns;);
 
             bool final = false;
             if(sns.isSetEmpty())
                 final = true;
 
-            group.add_acknack(mp_WP->m_att.guid, sns, mp_WP->mp_SFR->m_acknackCount, final, locators);
+            group.add_acknack(writer_proxy_.m_att.guid, sns, writer_proxy_.reader_.m_acknackCount, final, locators);
         }
 
         // Now generage NACK_FRAGS
@@ -139,10 +138,10 @@ void HeartbeatResponseDelay::event(EventCode code, const char* msg)
                     ++frag_num;
                 }
 
-                ++mp_WP->mp_SFR->m_nackfragCount;
+                ++writer_proxy_.reader_.m_nackfragCount;
                 logInfo(RTPS_READER,"Sending NACKFRAG for sample" << cit->sequence_number << ": "<< frag_sns;);
 
-                group.add_nackfrag(mp_WP->m_att.guid, cit->sequence_number, frag_sns, mp_WP->mp_SFR->m_nackfragCount, locators);
+                group.add_nackfrag(writer_proxy_.m_att.guid, cit->sequence_number, frag_sns, writer_proxy_.reader_.m_nackfragCount, locators);
             }
         }
     }

@@ -25,12 +25,12 @@
 #include <condition_variable>
 #include <list>
 
-#include <fastrtps/rtps/resources/AsyncInterestTree.h>
+#include "AsyncInterestTree.h"
+#include "..//writer/RTPSWriter.h"
 
 namespace eprosima{
 namespace fastrtps{
 namespace rtps{
-class RTPSWriter;
 
 /**
  * @brief This static class owns a thread that manages asynchronous writes.
@@ -40,54 +40,55 @@ class RTPSWriter;
  */
 class AsyncWriterThread
 {
-public:
-    /**
-     * @brief Adds a writer to be managed by this thread.
-     * Only asynchronous writers are permitted.
-     * @param writer Asynchronous writer to be added. 
-     * @return Result of the operation.
-     */
-    static bool addWriter(RTPSWriter& writer);
+    public:
 
-    /**
-     * @brief Removes a writer.
-     * @param writer Asynchronous writer to be removed.
-     * @return Result of the operation.
-     */
-    static bool removeWriter(RTPSWriter& writer);
+        /**
+         * @brief Adds a writer to be managed by this thread.
+         * Only asynchronous writers are permitted.
+         * @param writer Asynchronous writer to be added. 
+         * @return Result of the operation.
+         */
+        static bool add_writer(RTPSWriter::impl& writer);
 
-    /**
-     * Wakes the thread up.
-     * @param interestedParticipant The participant interested in an async write.
-     */
-    static void wakeUp(const RTPSParticipantImpl* interestedParticipant);
+        /**
+         * @brief Removes a writer.
+         * @param writer Asynchronous writer to be removed.
+         * @return Result of the operation.
+         */
+        static bool remove_writer(RTPSWriter::impl& writer);
 
-    /**
-     * Wakes the thread up.
-     * @param interestedParticipant The writer interested in an async write.
-     */
-    static void wakeUp(const RTPSWriter* interestedWriter);
+        /**
+         * Wakes the thread up.
+         * @param interestedParticipant The participant interested in an async write.
+         */
+        static void wakeUp(const RTPSParticipant::impl& interestedParticipant);
 
-private:
-    AsyncWriterThread() = delete;
-    ~AsyncWriterThread() = delete;
-    AsyncWriterThread(const AsyncWriterThread&) = delete;
-    const AsyncWriterThread& operator=(const AsyncWriterThread&) = delete;
+        /**
+         * Wakes the thread up.
+         * @param interestedParticipant The writer interested in an async write.
+         */
+        static void wakeUp(const RTPSWriter::impl& interestedWriter);
 
-    //! @brief runs main method
-    static void run();
+    private:
+        AsyncWriterThread() = delete;
+        ~AsyncWriterThread() = delete;
+        AsyncWriterThread(const AsyncWriterThread&) = delete;
+        const AsyncWriterThread& operator=(const AsyncWriterThread&) = delete;
 
-    static std::thread* thread_;
-    static std::mutex data_structure_mutex_;
-    static std::mutex condition_variable_mutex_;
-    
-    //! List of asynchronous writers.
-    static std::list<RTPSWriter*> async_writers;
-    static AsyncInterestTree interestTree;
+        //! @brief runs main method
+        static void run();
 
-    static bool running_;
-    static bool run_scheduled_;
-    static std::condition_variable cv_;
+        static std::thread* thread_;
+        static std::mutex data_structure_mutex_;
+        static std::mutex condition_variable_mutex_;
+
+        //! List of asynchronous writers.
+        static std::list<RTPSWriter::impl*> async_writers;
+        static AsyncInterestTree interestTree;
+
+        static bool running_;
+        static bool run_scheduled_;
+        static std::condition_variable cv_;
 };
 
 } // namespace rtps

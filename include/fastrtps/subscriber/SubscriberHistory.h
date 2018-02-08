@@ -17,16 +17,15 @@
  *
  */
 
-#ifndef SUBSCRIBERHISTORY_H_
-#define SUBSCRIBERHISTORY_H_
+#ifndef __SUBSCRIBER_SUBSCRIBERHISTORY_H__
+#define __SUBSCRIBER_SUBSCRIBERHISTORY_H__
 #ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
 
 #include <fastrtps/rtps/resources/ResourceManagement.h>
 #include "../rtps/history/ReaderHistory.h"
 #include "../qos/QosPolicies.h"
 #include "SampleInfo.h"
-
-
+#include "../subscriber/Subscriber.h"
 
 namespace eprosima {
 namespace fastrtps {
@@ -35,14 +34,11 @@ namespace rtps{
 class WriterProxy;
 }
 
-
-class SubscriberImpl;
-
 /**
  * Class SubscriberHistory, container of the different CacheChanges of a subscriber
  *  @ingroup FASTRTPS_MODULE
  */
-class SubscriberHistory: public rtps::ReaderHistory
+class SubscriberHistory : public rtps::ReaderHistory
 {
     public:
 
@@ -56,8 +52,9 @@ class SubscriberHistory: public rtps::ReaderHistory
          * @param history History QoS policy for the reader
          * @param resource Resource Limit QoS policy for the reader
          */
-        SubscriberHistory(SubscriberImpl* pimpl,uint32_t payloadMax,
-                HistoryQosPolicy& history,ResourceLimitsQosPolicy& resource, rtps::MemoryManagementPolicy_t mempolicy);
+        SubscriberHistory(Subscriber::impl& impl, uint32_t payloadMax, const HistoryQosPolicy& history,
+                const ResourceLimitsQosPolicy& resource, const rtps::MemoryManagementPolicy_t mempolicy);
+
         virtual ~SubscriberHistory();
 
         /**
@@ -120,7 +117,7 @@ class SubscriberHistory: public rtps::ReaderHistory
         //!ResourceLimitsQosPolicy values.
         ResourceLimitsQosPolicy m_resourceLimitsQos;
         //!Publisher Pointer
-        SubscriberImpl* mp_subImpl;
+        Subscriber::impl& subscriber_;
 
         //!Type object to deserialize Key
         void * mp_getKeyObject;
@@ -129,7 +126,8 @@ class SubscriberHistory: public rtps::ReaderHistory
         bool find_Key(rtps::CacheChange_t* a_change,t_v_Inst_Caches::iterator* vecPairIterrator);
 };
 
-} /* namespace fastrtps */
-} /* namespace eprosima */
+} // namespace fastrtps
+} // namespace eprosima
+
 #endif
-#endif /* SUBSCRIBERHISTORY_H_ */
+#endif // __SUBSCRIBER_SUBSCRIBERHISTORY_H__

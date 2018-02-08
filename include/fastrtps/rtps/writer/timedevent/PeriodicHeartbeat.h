@@ -19,15 +19,16 @@
 
 #ifndef __RTPS_WRITER_TIMEDEVENT_PERIODICHEARTBEAT_H__
 #define __RTPS_WRITER_TIMEDEVENT_PERIODICHEARTBEAT_H__
+
 #ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
+
 #include "../../resources/TimedEvent.h"
+//TODO(Ricardo) File to src/cpp
+#include "../StatefulWriter.h"
 
 namespace eprosima {
 namespace fastrtps{
 namespace rtps{
-
-class StatefulWriter;
-
 
 /**
  * PeriodicHeartbeat class, controls the periodic send operation of HB.
@@ -36,12 +37,14 @@ class StatefulWriter;
 class PeriodicHeartbeat: public TimedEvent
 {
     public:
+
         /**
          *
          * @param p_RP
          * @param interval
          */
-        PeriodicHeartbeat(StatefulWriter& writer, double interval);
+        PeriodicHeartbeat(StatefulWriter::impl& writer, double interval);
+
         virtual ~PeriodicHeartbeat();
 
         /**
@@ -53,11 +56,12 @@ class PeriodicHeartbeat: public TimedEvent
         void event(EventCode code, const char* msg= nullptr);
 
         //!
-        StatefulWriter& writer_;
+        StatefulWriter::impl& writer_;
 };
 
 }
 }
-} /* namespace eprosima */
+}
+
 #endif
 #endif /* __RTPS_WRITER_TIMEDEVENT_PERIODICHEARTBEAT_H__*/

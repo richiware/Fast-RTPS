@@ -20,41 +20,93 @@
 #include "PublisherImpl.h"
 #include "../participant/ParticipantImpl.h"
 #include <fastrtps/TopicDataType.h>
-#include <fastrtps/publisher/PublisherListener.h>
 #include <fastrtps/rtps/attributes/HistoryAttributes.h>
-#include <fastrtps/rtps/writer/RTPSWriter.h>
-#include <fastrtps/rtps/writer/StatefulWriter.h>
+#include "../rtps/writer/RTPSWriterImpl.h"
+#include "../rtps/writer/StatefulWriterImpl.h"
 #include <fastrtps/rtps/participant/RTPSParticipant.h>
-#include <fastrtps/rtps/RTPSDomain.h>
 #include <fastrtps/log/Log.h>
 #include <fastrtps/utils/TimeConversion.h>
 
 using namespace eprosima::fastrtps;
 using namespace ::rtps;
 
-
-
 ::rtps::WriteParams WRITE_PARAM_DEFAULT;
 
-Publisher::impl::impl(Participant::impl& p, Publisher& publisher, TopicDataType* pdatatype,
-        PublisherAttributes& att, PublisherListener* listen) :
-    participant_(p), writer_(nullptr), type_(pdatatype), att_(att),
+Publisher::impl::impl(Participant::impl& participant, TopicDataType* type,
+        const PublisherAttributes& att, Publisher::impl::Listener* listener) :
+    participant_(participant), writer_(nullptr), type_(type), att_(att),
 #pragma warning (disable : 4355 )
-    history_(HistoryAttributes(att.historyMemoryPolicy, pdatatype->m_typeSize,
+    history_(HistoryAttributes(att.historyMemoryPolicy, type->m_typeSize,
                 att.topic.resourceLimitsQos.allocated_samples, att.topic.resourceLimitsQos.max_samples)),
-    listener_(listen),
+    listener_(listener),
 #pragma warning (disable : 4355 )
-    writer_listener_(publisher),
+    writer_listener_(*this),
     high_mark_for_frag_(0)
 {
 }
 
+bool Publisher::impl::init()
+{
+    history_.call_after_adding_change(std::bind(&Publisher::impl::unsent_change_added_to_history, this,
+            std::placeholders::_1));
+    history_.call_after_deleting_change(std::bind(&Publisher::impl::change_removed_by_history, this,
+            std::placeholders::_1, std::placeholders::_2));
+
+    WriterAttributes watt;
+    watt.throughputController = att_.throughputController;
+    watt.endpoint.durabilityKind = att_.qos.m_durability.kind == VOLATILE_DURABILITY_QOS ? VOLATILE : TRANSIENT_LOCAL;
+    watt.endpoint.endpointKind = WRITER;
+    watt.endpoint.multicastLocatorList = att_.multicastLocatorList;
+    watt.endpoint.reliabilityKind = att_.qos.m_reliability.kind == RELIABLE_RELIABILITY_QOS ? RELIABLE : BEST_EFFORT;
+    watt.endpoint.topicKind = att_.topic.topicKind;
+    watt.endpoint.unicastLocatorList = att_.unicastLocatorList;
+    watt.endpoint.outLocatorList = att_.outLocatorList;
+    watt.mode = att_.qos.m_publishMode.kind == eprosima::fastrtps::SYNCHRONOUS_PUBLISH_MODE ? SYNCHRONOUS_WRITER : ASYNCHRONOUS_WRITER;
+    watt.endpoint.properties = att_.properties;
+    if(att_.getEntityID() > 0)
+    {
+        watt.endpoint.setEntityID((uint8_t)att_.getEntityID());
+    }
+    if(att_.getUserDefinedID() > 0)
+    {
+        watt.endpoint.setUserDefinedID((uint8_t)att_.getUserDefinedID());
+    }
+    watt.times = att_.times;
+
+    writer_ = participant_.rtps_participant().create_writer(watt, history_, &writer_listener_);
+
+    if(writer_)
+    {
+        // Register the writer
+        if(participant_.rtps_participant().register_writer(*writer_, att_.topic, att_.qos))
+        {
+            return true;
+        }
+        else
+        {
+            logError(PUBLISHER,"Failed registering associated writer");
+        }
+        //TODO (Ricardo) Remove writer
+    }
+    else
+    {
+        logError(PUBLISHER,"Problem creating associated writer");
+    }
+
+    return false;
+}
+
 Publisher::impl::~impl()
 {
-    if(writer_ != nullptr)
+    deinit();
+}
+
+void Publisher::impl::deinit()
+{
+    if(writer_)
     {
         logInfo(PUBLISHER, this->getGuid().entityId << " in topic: " << att_.topic.topicName);
-        RTPSDomain::removeRTPSWriter(writer_);
+        participant_.rtps_participant().remove_writer(writer_);
     }
 }
 
@@ -126,7 +178,7 @@ bool Publisher::impl::create_new_change_with_params(ChangeKind_t change_kind, vo
             uint32_t writer_throughput_controller_bytes =
                 writer_->calculateMaxDataSize(att_.throughputController.bytesPerPeriod);
             uint32_t participant_throughput_controller_bytes =
-                writer_->calculateMaxDataSize(participant_.rtps_participant()->getRTPSParticipantAttributes().throughputController.bytesPerPeriod);
+                writer_->calculateMaxDataSize(participant_.rtps_participant().getRTPSParticipantAttributes().throughputController.bytesPerPeriod);
 
             high_mark_for_frag_ =
                 max_data_size > writer_throughput_controller_bytes ?
@@ -178,6 +230,17 @@ bool Publisher::impl::create_new_change_with_params(ChangeKind_t change_kind, vo
 }
 
 
+bool Publisher::impl::unsent_change_added_to_history(const CacheChange_t& change)
+{
+    return writer_->unsent_change_added_to_history(change);
+}
+
+bool Publisher::impl::change_removed_by_history(const SequenceNumber_t& sequence_number,
+                const InstanceHandle_t& handle)
+{
+    return writer_->change_removed_by_history(sequence_number, handle);
+}
+
 //TODO deprecated
 bool Publisher::impl::removeMinSeqChange()
 {
@@ -191,8 +254,8 @@ bool Publisher::impl::removeMinSeqChange()
     return false;
 }
 
-// TODO deprecated
-bool Publisher::impl::removeAllChange(size_t* removed)
+// TODO(Ricardo) deprecated
+bool Publisher::impl::removeAllChange(size_t*)
 {
     return false; //history_.removeAllChange(removed);
 }
@@ -274,23 +337,28 @@ bool Publisher::impl::updateAttributes(PublisherAttributes& att)
         if(att_.qos.m_reliability.kind == RELIABLE_RELIABILITY_QOS)
         {
             //UPDATE TIMES:
-            StatefulWriter* sfw = (StatefulWriter*)writer_;
+            StatefulWriter::impl* sfw = dynamic_cast<StatefulWriter::impl*>(writer_.get());
             sfw->updateTimes(att.times);
         }
         att_.qos.setQos(att.qos,false);
         att_ = att;
         //Notify the participant that a Writer has changed its QOS
-        participant_.rtps_participant()->updateWriter(writer_, att_. qos);
+        participant_.rtps_participant().update_local_writer(*writer_, att_. qos);
     }
 
 
     return updated;
 }
 
-void Publisher::impl::PublisherWriterListener::onWriterMatched(RTPSWriter* /*writer*/,MatchingInfo& info)
+void Publisher::impl::PublisherWriterListener::onWriterMatched(RTPSWriter::impl& writer, const MatchingInfo& info)
 {
-    if(get_implementation(publisher_).listener_ != nullptr)
-        get_implementation(publisher_).listener_->onPublicationMatched(&publisher_, info);
+    (void)writer;
+    assert(publisher_.writer_.get() == &writer);
+
+    if(publisher_.listener_ != nullptr)
+    {
+        publisher_.listener_->onPublicationMatched(publisher_, info);
+    }
 }
 
 bool Publisher::impl::wait_for_all_acked(const Time_t& max_wait)

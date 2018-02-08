@@ -17,10 +17,14 @@
  *
  */
 
-#ifndef BUILTINPROTOCOLS_H_
-#define BUILTINPROTOCOLS_H_
+#ifndef __RTPS_BUILTIN_BUILTINPROTOCOLS_H__
+#define __RTPS_BUILTIN_BUILTINPROTOCOLS_H__
 #ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
+
 #include "../attributes/RTPSParticipantAttributes.h"
+#include "../participant/RTPSParticipant.h"
+#include "../reader/RTPSReader.h"
+#include "../writer/RTPSWriter.h"
 
 
 namespace eprosima {
@@ -34,10 +38,6 @@ namespace fastrtps{
 namespace rtps {
 
 class PDPSimple;
-class WLP;
-class RTPSParticipantImpl;
-class RTPSWriter;
-class RTPSReader;
 
 /**
  * Class BuiltinProtocols that contains builtin endpoints implementing the discovery and liveliness protocols.
@@ -45,18 +45,19 @@ class RTPSReader;
  */
 class BuiltinProtocols
 {
-    friend class RTPSParticipantImpl;
-    private:
-    BuiltinProtocols();
-    virtual ~BuiltinProtocols();
     public:
+
+    BuiltinProtocols(RTPSParticipant::impl& participant, const BuiltinAttributes& attributes);
+
+    virtual ~BuiltinProtocols();
+
     /**
      * Initialize the builtin protocols.
      * @param attributes Discovery configuration attributes
      * @param p_part Pointer to the Participant implementation
      * @return True if correct.
      */
-    bool initBuiltinProtocols(RTPSParticipantImpl* p_part, BuiltinAttributes& attributes);
+    bool init();
 
     /**
      * Update the metatraffic locatorlist after it was created. Because when you create the EDP readers you are not sure the selected endpoints can be used.
@@ -68,11 +69,9 @@ class BuiltinProtocols
     //!BuiltinAttributes of the builtin protocols.
     BuiltinAttributes m_att;
     //!Pointer to the RTPSParticipantImpl.
-    RTPSParticipantImpl* mp_participantImpl;
+    RTPSParticipant::impl& participant_;
     //!Pointer to the PDPSimple.
     PDPSimple* mp_PDP;
-    //!Pointer to the WLP
-    WLP* mp_WLP;
     //!Locator list for metatraffic
     LocatorList_t m_metatrafficMulticastLocatorList;
     //!Locator List for metatraffic unicast
@@ -87,7 +86,7 @@ class BuiltinProtocols
      * @param wqos QoS policies dictated by the publisher
      * @return True if correct.
      */
-    bool addLocalWriter(RTPSWriter* w,TopicAttributes& topicAtt,WriterQos& wqos);
+    bool add_local_writer(RTPSWriter::impl& writer, TopicAttributes& topicAtt, WriterQos& wqos);
     /**
      * Add a local Reader to the BuiltinProtocols.
      * @param R Pointer to the RTPSReader.
@@ -95,33 +94,33 @@ class BuiltinProtocols
      * @param rqos QoS policies dictated by the subscriber
      * @return True if correct.
      */
-    bool addLocalReader(RTPSReader* R,TopicAttributes& topicAtt, ReaderQos& rqos);
+    bool add_local_reader(RTPSReader::impl& reader, TopicAttributes& topicAtt, ReaderQos& rqos);
     /**
      * Update a local Writer QOS
      * @param W Writer to update
      * @param wqos New Writer QoS
      * @return
      */
-    bool updateLocalWriter(RTPSWriter* W,WriterQos& wqos);
+    bool update_local_writer(RTPSWriter::impl& writer, WriterQos& wqos);
     /**
      * Update a local Reader QOS
      * @param R Reader to update
      * @param qos New Reader QoS
      * @return
      */
-    bool updateLocalReader(RTPSReader* R,ReaderQos& qos);
+    bool update_local_reader(RTPSReader::impl& reader, ReaderQos& qos);
     /**
      * Remove a local Writer from the builtinProtocols.
      * @param W Pointer to the writer.
      * @return True if correctly removed.
      */
-    bool removeLocalWriter(RTPSWriter* W);
+    bool remove_local_writer(RTPSWriter::impl& writer);
     /**
      * Remove a local Reader from the builtinProtocols.
      * @param R Pointer to the reader.
      * @return True if correctly removed.
      */
-    bool removeLocalReader(RTPSReader* R);
+    bool remove_local_reader(RTPSReader::impl& reader);
 
     //! Announce RTPSParticipantState (force the sending of a DPD message.)
     void announceRTPSParticipantState();
@@ -132,8 +131,8 @@ class BuiltinProtocols
 
 };
 
-}
-} /* namespace rtps */
-} /* namespace eprosima */
+} // namespace rtps
+} // namespace fastrtps
+} // namespace eprosima
 #endif
-#endif /* BUILTINPROTOCOLS_H_ */
+#endif // __RTPS_BUILTIN_BUILTINPROTOCOLS_H__

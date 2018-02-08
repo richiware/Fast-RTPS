@@ -45,43 +45,51 @@ class ReqRepHelloWorldReplier
     public:
 
         class ReplyListener: public eprosima::fastrtps::SubscriberListener
-    {
-        public:
-            ReplyListener(ReqRepHelloWorldReplier &replier) : replier_(replier) {};
-            ~ReplyListener(){};
-            void onNewDataMessage(eprosima::fastrtps::Subscriber *sub);
-            void onSubscriptionMatched(eprosima::fastrtps::Subscriber* /*sub*/, eprosima::fastrtps::rtps::MatchingInfo& info)
-            {
-                if (info.status == eprosima::fastrtps::rtps::MATCHED_MATCHING)
-                    replier_.matched();
-            }
+        {
+            public:
 
-        private:
+                ReplyListener(ReqRepHelloWorldReplier &replier) : replier_(replier) {};
 
-            ReplyListener& operator=(const ReplyListener&) = delete;
+                ~ReplyListener(){};
 
-            ReqRepHelloWorldReplier &replier_;
-    } request_listener_;
+                void onNewDataMessage(eprosima::fastrtps::Subscriber& subscriber) override;
+
+                void onSubscriptionMatched(eprosima::fastrtps::Subscriber&,
+                        const eprosima::fastrtps::rtps::MatchingInfo& info) override
+                {
+                    if (info.status == eprosima::fastrtps::rtps::MATCHED_MATCHING)
+                        replier_.matched();
+                }
+
+            private:
+
+                ReplyListener& operator=(const ReplyListener&) = delete;
+
+                ReqRepHelloWorldReplier &replier_;
+        } request_listener_;
 
         class RequestListener : public eprosima::fastrtps::PublisherListener
-    {
-        public:
+        {
+            public:
 
-            RequestListener(ReqRepHelloWorldReplier &replier) : replier_(replier){};
-            ~RequestListener(){};
-            void onPublicationMatched(eprosima::fastrtps::Publisher* /*pub*/, eprosima::fastrtps::rtps::MatchingInfo &info)
-            {
-                if (info.status == eprosima::fastrtps::rtps::MATCHED_MATCHING)
-                    replier_.matched();
-            }
+                RequestListener(ReqRepHelloWorldReplier &replier) : replier_(replier){};
 
-        private:
+                ~RequestListener(){};
 
-            RequestListener& operator=(const RequestListener&) = delete;
+                void onPublicationMatched(eprosima::fastrtps::Publisher&,
+                        const eprosima::fastrtps::rtps::MatchingInfo &info) override
+                {
+                    if (info.status == eprosima::fastrtps::rtps::MATCHED_MATCHING)
+                        replier_.matched();
+                }
 
-            ReqRepHelloWorldReplier &replier_;
+            private:
 
-    } reply_listener_;
+                RequestListener& operator=(const RequestListener&) = delete;
+
+                ReqRepHelloWorldReplier &replier_;
+
+        } reply_listener_;
 
         ReqRepHelloWorldReplier();
         virtual ~ReqRepHelloWorldReplier();

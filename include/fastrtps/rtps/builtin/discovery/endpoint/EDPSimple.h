@@ -17,24 +17,25 @@
  *
  */
 
-#ifndef EDPSIMPLE_H_
-#define EDPSIMPLE_H_
+#ifndef __RTPS_BUILDTIN_DISCOVERY_ENDPOINT_EDPSIMPLE_H__
+#define __RTPS_BUILDTIN_DISCOVERY_ENDPOINT_EDPSIMPLE_H__
 #ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
 
 #include "EDP.h"
+#include "../../../reader/StatefulReader.h"
+#include "../../../writer/RTPSWriter.h"
+#include "../../../history/WriterHistory.h"
+
+#include <memory>
 
 namespace eprosima {
 namespace fastrtps{
 namespace rtps {
 
-class StatefulReader;
-class StatefulWriter;
-class RTPSWriter;
-class RTPSReader;
+class EDPSimpleListener;
 class EDPSimplePUBListener;
 class EDPSimpleSUBListener;
 class ReaderHistory;
-class WriterHistory;
 
 
 /**
@@ -44,17 +45,43 @@ class WriterHistory;
  */
 class EDPSimple : public EDP
 {
-    typedef std::pair<StatefulWriter*,WriterHistory*> t_p_StatefulWriter;
-    typedef std::pair<StatefulReader*,ReaderHistory*> t_p_StatefulReader;
+    class EDPStatefulReader : public StatefulReader
+    {
+        public:
+
+            EDPStatefulReader(std::shared_ptr<RTPSReader::impl>& impl, EDPSimpleListener* listener);
+
+            virtual ReaderListener* getListener() override;
+
+            /**
+             * Switch the ReaderListener kind for the Reader.
+             * If the RTPSReader does not belong to the built-in protocols it switches out the old one.
+             * If it belongs to the built-in protocols, it sets the new ReaderListener callbacks to be called after the 
+             * built-in ReaderListener ones.
+             * @param target Pointed to ReaderLister to attach
+             * @return True is correctly set.
+             */
+            virtual bool setListener(ReaderListener* listener) override;
+
+        private:
+
+            EDPSimpleListener* user_listener_;
+    };
+
+    typedef std::pair<std::shared_ptr<RTPSWriter::impl>, WriterHistory::impl*> t_p_StatefulWriter;
+    typedef std::pair<EDPStatefulReader*, ReaderHistory*> t_p_StatefulReader;
 
     public:
+
     /**
      * Constructor.
      * @param p Pointer to the PDPSimple
      * @param part Pointer to the RTPSParticipantImpl
      */
-    EDPSimple(PDPSimple* p,RTPSParticipantImpl* part);
+    EDPSimple(PDPSimple& pdpsimple, RTPSParticipant::impl& participant);
+
     virtual ~EDPSimple();
+
     //!Discovery attributes.
     BuiltinAttributes m_discovery;
     //!Pointer to the Publications Writer (only created if indicated in the DiscoveryAtributes).
@@ -109,19 +136,19 @@ class EDPSimple : public EDP
      * @param R Pointer to the RTPSReader object.
      * @return True if correct.
      */
-    bool removeLocalReader(RTPSReader*R);
+    bool removeLocalReader(RTPSReader::impl& reader);
     /**
      * This methods generates the change disposing of the local Writer and calls the unpairing and removal methods of the base class.
      * @param W Pointer to the RTPSWriter object.
      * @return True if correct.
      */
-    bool removeLocalWriter(RTPSWriter*W);
+    bool removeLocalWriter(RTPSWriter::impl& writer);
 
 };
 
-}
-} /* namespace rtps */
-} /* namespace eprosima */
+} // namespace rtps
+} // namespace fastrtps
+} // namespace eprosima
 
 #endif
-#endif /* EDPSIMPLE_H_ */
+#endif // __RTPS_BUILDTIN_DISCOVERY_ENDPOINT_EDPSIMPLE_H__

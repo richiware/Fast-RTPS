@@ -16,221 +16,127 @@
  * @file RTPSReader.h
  */
 
+#ifndef __RTPS_READER_RTPSREADER_H__
+#define __RTPS_READER_RTPSREADER_H__
 
+#include "../../fastrtps_dll.h"
 
-#ifndef RTPSREADER_H_
-#define RTPSREADER_H_
+#include <memory>
 
+namespace eprosima {
+namespace fastrtps {
+namespace rtps {
 
-#include "../Endpoint.h"
-#include "../attributes/ReaderAttributes.h"
+// Forward declarations
+class ReaderListener;
+class ReaderHistory;
+struct CacheChange_t;
+class WriterProxy;
+struct SequenceNumber_t;
+class SequenceNumberSet_t;
+class FragmentedChangePitStop;
+class ReaderAttributes;
+class RemoteWriterAttributes;
+class RTPSParticipant;
+class EndpointAttributes;
 
-
-
-namespace eprosima
+/**
+ * Class RTPSReader, manages the reception of data from its matched writers.
+ * @ingroup READER_MODULE
+ */
+class RTPSReader
 {
-    namespace fastrtps
-    {
-        namespace rtps
-        {
+    class ListenerLink;
 
-            // Forward declarations
-            class ReaderListener;
-            class ReaderHistory;
-            struct CacheChange_t;
-            class WriterProxy;
-            struct SequenceNumber_t;
-            class SequenceNumberSet_t;
-            class FragmentedChangePitStop;
+    public:
 
-            /**
-             * Class RTPSReader, manages the reception of data from its matched writers.
-             * @ingroup READER_MODULE
-             */
-            class RTPSReader : public Endpoint
-            {
-                friend class ReaderHistory;
-                friend class RTPSParticipantImpl;
-                friend class MessageReceiver;
-                friend class EDP;
-                protected:
-                RTPSReader(RTPSParticipantImpl*,GUID_t& guid,
-                        ReaderAttributes& att,ReaderHistory* hist,ReaderListener* listen=nullptr);
-                virtual ~RTPSReader();
-                public:
-                /**
-                 * Add a matched writer represented by its attributes.
-                 * @param wdata Attributes of the writer to add.
-                 * @return True if correctly added.
-                 */
-                RTPS_DllAPI virtual bool matched_writer_add(const RemoteWriterAttributes& wdata) = 0;
+        class impl;
 
-                /**
-                 * Remove a writer represented by its attributes from the matched writers.
-                 * @param wdata Attributes of the writer to remove.
-                 * @return True if correctly removed.
-                 */
-                RTPS_DllAPI virtual bool matched_writer_remove(const RemoteWriterAttributes& wdata) = 0;
+        virtual ~RTPSReader();
 
-                /**
-                 * Tells us if a specific Writer is matched against this reader
-                 * @param wdata Pointer to the WriterProxyData object
-                 * @return True if it is matched.
-                 */
-                RTPS_DllAPI virtual bool matched_writer_is_matched(const RemoteWriterAttributes& wdata) = 0;
+        /**
+         * Add a matched writer represented by its attributes.
+         * @param wdata Attributes of the writer to add.
+         * @return True if correctly added.
+         */
+        RTPS_DllAPI virtual bool matched_writer_add(const RemoteWriterAttributes& wdata) = 0;
 
-                /**
-                 * Returns true if the reader accepts a message directed to entityId.
-                 */
-                RTPS_DllAPI bool acceptMsgDirectedTo(EntityId_t& entityId);
+        /**
+         * Remove a writer represented by its attributes from the matched writers.
+         * @param wdata Attributes of the writer to remove.
+         * @return True if correctly removed.
+         */
+        RTPS_DllAPI virtual bool matched_writer_remove(const RemoteWriterAttributes& wdata) = 0;
 
-                /**
-                 * Processes a new DATA message. Previously the message must have been accepted by function acceptMsgDirectedTo.
-                 *
-                 * @param change Pointer to the CacheChange_t.
-                 * @return true if the reader accepts messages from the.
-                 */
-                RTPS_DllAPI virtual bool processDataMsg(CacheChange_t *change) = 0;
+        /**
+         * Tells us if a specific Writer is matched against this reader
+         * @param wdata Pointer to the WriterProxyData object
+         * @return True if it is matched.
+         */
+        RTPS_DllAPI virtual bool matched_writer_is_matched(const RemoteWriterAttributes& wdata) = 0;
 
-                /**
-                 * Processes a new DATA FRAG message. Previously the message must have been accepted by function acceptMsgDirectedTo.
-                 *
-                 * @param change Pointer to the CacheChange_t.
-                 * @param sampleSize Size of the complete, assembled message.
-                 * @param fragmentStartingNum Starting number of this particular fragment.
-                 * @return true if the reader accepts message.
-                 */
-                RTPS_DllAPI virtual bool processDataFragMsg(CacheChange_t *change, uint32_t sampleSize, uint32_t fragmentStartingNum) = 0;
+        /**
+         * Get the associated listener, secondary attached Listener in case it is of coumpound type
+         * @return Pointer to the associated reader listener.
+         */
+        RTPS_DllAPI virtual ReaderListener* getListener();
 
-                /**
-                 * Processes a new HEARTBEAT message. Previously the message must have been accepted by function acceptMsgDirectedTo.
-                 *
-                 * @return true if the reader accepts messages from the.
-                 */
-                RTPS_DllAPI virtual bool processHeartbeatMsg(GUID_t &writerGUID, uint32_t hbCount, SequenceNumber_t &firstSN,
-                        SequenceNumber_t &lastSN, bool finalFlag, bool livelinessFlag) = 0;
+        /**
+         * Switch the ReaderListener kind for the Reader.
+         * If the RTPSReader does not belong to the built-in protocols it switches out the old one.
+         * If it belongs to the built-in protocols, it sets the new ReaderListener callbacks to be called after the 
+         * built-in ReaderListener ones.
+         * @param target Pointed to ReaderLister to attach
+         * @return True is correctly set.
+         */
+        RTPS_DllAPI virtual bool setListener(ReaderListener* target);
 
-                RTPS_DllAPI virtual bool processGapMsg(GUID_t &writerGUID, SequenceNumber_t &gapStart, SequenceNumberSet_t &gapList) = 0;
+        RTPS_DllAPI EndpointAttributes* getAttributes();
 
-                /**
-                 * Method to indicate the reader that some change has been removed due to HistoryQos requirements.
-                 * @param change Pointer to the CacheChange_t.
-                 * @param prox Pointer to the WriterProxy.
-                 * @return True if correctly removed.
-                 */
-                RTPS_DllAPI virtual bool change_removed_by_history(CacheChange_t* cachechange, WriterProxy* prox = nullptr) = 0;
+        /**
+         * Read the next unread CacheChange_t from the history
+         * @param change POinter to pointer of CacheChange_t
+         * @param wp Pointer to pointer to the WriterProxy
+         * @return True if read.
+         */
+        RTPS_DllAPI virtual bool nextUnreadCache(CacheChange_t** change, WriterProxy** wp) = 0;
 
-                /**
-                 * Get the associated listener, secondary attached Listener in case it is of coumpound type
-                 * @return Pointer to the associated reader listener.
-                 */
-                RTPS_DllAPI ReaderListener* getListener();
+        /**
+         * Get the next CacheChange_t from the history to take.
+         * @param change Pointer to pointer of CacheChange_t.
+         * @param wp Pointer to pointer to the WriterProxy.
+         * @return True if read.
+         */
+        RTPS_DllAPI virtual bool nextUntakenCache(CacheChange_t** change, WriterProxy** wp) = 0;
 
-                /**
-                 * Switch the ReaderListener kind for the Reader.
-                 * If the RTPSReader does not belong to the built-in protocols it switches out the old one.
-                 * If it belongs to the built-in protocols, it sets the new ReaderListener callbacks to be called after the 
-                 * built-in ReaderListener ones.
-                 * @param target Pointed to ReaderLister to attach
-                 * @return True is correctly set.
-                 */
-                RTPS_DllAPI bool setListener(ReaderListener* target);
+        /*!
+         * @brief Returns there is a clean state with all Writers.
+         * It occurs when the Reader received all samples sent by Writers. In other words,
+         * its WriterProxies are up to date.
+         * @return There is a clean state with all Writers.
+         */
+        virtual bool isInCleanState() const = 0;
 
-                /**
-                 * Reserve a CacheChange_t.
-                 * @param change Pointer to pointer to the Cache.
-                 * @return True if correctly reserved.
-                 */
-                RTPS_DllAPI bool reserveCache(CacheChange_t** change, uint32_t dataCdrSerializedSize);
+    private:
 
-                /**
-                 * Release a cacheChange.
-                 */
-                RTPS_DllAPI void releaseCache(CacheChange_t* change);
+        RTPSReader& operator=(const RTPSReader&) = delete;
 
-                /**
-                 * Read the next unread CacheChange_t from the history
-                 * @param change POinter to pointer of CacheChange_t
-                 * @param wp Pointer to pointer to the WriterProxy
-                 * @return True if read.
-                 */
-                RTPS_DllAPI virtual bool nextUnreadCache(CacheChange_t** change, WriterProxy** wp) = 0;
+        friend impl& get_implementation(RTPSReader& reader);
 
-                /**
-                 * Get the next CacheChange_t from the history to take.
-                 * @param change Pointer to pointer of CacheChange_t.
-                 * @param wp Pointer to pointer to the WriterProxy.
-                 * @return True if read.
-                 */
-                RTPS_DllAPI virtual bool nextUntakenCache(CacheChange_t** change, WriterProxy** wp) = 0;
+    protected:
 
-                /**
-                 * @return True if the reader expects Inline QOS.
-                 */
-                RTPS_DllAPI inline bool expectsInlineQos(){ return m_expectsInlineQos; };
-                //! Returns a pointer to the associated History.
-                RTPS_DllAPI inline ReaderHistory* getHistory() {return mp_history;};
+        RTPSReader(RTPSParticipant& participant, const ReaderAttributes& att, ReaderHistory* hist,
+                ReaderListener* listener = nullptr);
 
-                /*!
-                 * @brief Search if there is a CacheChange_t, giving SequenceNumber_t and writer GUID_t,
-                 * waiting to be completed because it is fragmented.
-                 * @param sequence_number SequenceNumber_t of the searched CacheChange_t.
-                 * @param writer_guid writer GUID_t of the searched CacheChange_t.
-                 * @return If a CacheChange_t was found, it will be returned. In other case nullptr is returned.
-                 */
-                CacheChange_t* findCacheInFragmentedCachePitStop(const SequenceNumber_t& sequence_number,
-                        const GUID_t& writer_guid);
+        RTPSReader(std::shared_ptr<impl>& impl, ReaderListener* listener = nullptr);
 
-                /*!
-                 * @brief Returns there is a clean state with all Writers.
-                 * It occurs when the Reader received all samples sent by Writers. In other words,
-                 * its WriterProxies are up to date.
-                 * @return There is a clean state with all Writers.
-                */
-                virtual bool isInCleanState() const = 0;
+        std::unique_ptr<ListenerLink> listener_link_;
 
-                protected:
-                void setTrustedWriter(EntityId_t writer)
-                {
-                    m_acceptMessagesFromUnkownWriters=false;
-                    m_trustedWriterEntityId = writer;
-                }
-                //!ReaderHistory
-                ReaderHistory* mp_history;
-                //!Listener
-                ReaderListener* mp_listener;
-                //!Accept msg to unknwon readers (default=true)
-                bool m_acceptMessagesToUnknownReaders;
-                //!Accept msg from unknwon writers (BE-true,RE-false)
-                bool m_acceptMessagesFromUnkownWriters;
-                //!Trusted writer (for Builtin)
-                EntityId_t m_trustedWriterEntityId;
-                //!Expects Inline Qos.
-                bool m_expectsInlineQos;
+        std::shared_ptr<impl> impl_;
+};
 
-                //TODO Select one
-                FragmentedChangePitStop* fragmentedChangePitStop_;
+} //namespace rtps
+} //namespace fastrtps
+} //namespace eprosima
 
-                private:
-
-                RTPSReader& operator=(const RTPSReader&) = delete;
-
-                public:
-
-                /**
-                 * Get mutex
-                 * @return Associated Mutex
-                 */
-                RTPS_DllAPI inline std::recursive_mutex* getMutex() const { return mp_mutex; }
-
-                protected:
-
-                //!Endpoint Mutex
-                std::recursive_mutex* mp_mutex;
-            };
-
-        } /* namespace rtps */
-    } /* namespace fastrtps */
-} /* namespace eprosima */
-
-#endif /* RTPSREADER_H_ */
+#endif // __RTPS_READER_RTPSREADER_H__

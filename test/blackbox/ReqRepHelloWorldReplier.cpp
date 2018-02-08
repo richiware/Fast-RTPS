@@ -19,7 +19,6 @@
 
 #include "ReqRepHelloWorldReplier.hpp"
 
-#include <fastrtps/Domain.h>
 #include <fastrtps/participant/Participant.h>
 #include <fastrtps/attributes/ParticipantAttributes.h>
 
@@ -52,24 +51,26 @@ ReqRepHelloWorldReplier::ReqRepHelloWorldReplier(): request_listener_(*this), re
 ReqRepHelloWorldReplier::~ReqRepHelloWorldReplier()
 {
     if(participant_ != nullptr)
-        Domain::removeParticipant(participant_);
+    {
+        delete participant_;
+    }
 }
 
 void ReqRepHelloWorldReplier::init()
 {
     ParticipantAttributes pattr;
     pattr.rtps.builtin.domainId = (uint32_t)GET_PID() % 230;
-    participant_ = Domain::createParticipant(pattr);
+    participant_ = new Participant(pattr);
     ASSERT_NE(participant_, nullptr);
 
     // Register type
-    ASSERT_EQ(Domain::registerType(participant_,&type_), true);
+    ASSERT_EQ(participant_->register_type(&type_), true);
 
     //Create subscriber
     sattr.topic.topicKind = NO_KEY;
     sattr.topic.topicDataType = "HelloWorldType";
     configSubscriber("Request");
-    request_subscriber_ = Domain::createSubscriber(participant_, sattr, &request_listener_);
+    request_subscriber_ = new Subscriber(*participant_, sattr, &request_listener_);
     ASSERT_NE(request_subscriber_, nullptr);
 
     //Create publisher
@@ -77,7 +78,7 @@ void ReqRepHelloWorldReplier::init()
     puattr.topic.topicDataType = "HelloWorldType";
     puattr.topic.topicName = "HelloWorldTopicReply";
     configPublisher("Reply");
-    reply_publisher_ = Domain::createPublisher(participant_, puattr, &reply_listener_);
+    reply_publisher_ = new Publisher(*participant_, puattr, &reply_listener_);
     ASSERT_NE(reply_publisher_, nullptr);
 
     initialized_ = true;
@@ -113,14 +114,12 @@ void ReqRepHelloWorldReplier::matched()
         cvDiscovery_.notify_one();
 }
 
-void ReqRepHelloWorldReplier::ReplyListener::onNewDataMessage(Subscriber *sub)
+void ReqRepHelloWorldReplier::ReplyListener::onNewDataMessage(Subscriber& subscriber)
 {
-    ASSERT_NE(sub, nullptr);
-
     HelloWorld hello;
     SampleInfo_t info;
 
-    if(sub->takeNextData((void*)&hello, &info))
+    if(subscriber.takeNextData((void*)&hello, &info))
     {
         if(info.sampleKind == ALIVE)
         {

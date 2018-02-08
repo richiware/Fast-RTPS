@@ -22,7 +22,8 @@
 #ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
 
 #include <fastrtps/rtps/reader/ReaderListener.h>
-#include "../../../reader/CompoundReaderListener.h"
+
+#include <mutex>
 
 namespace eprosima {
 namespace fastrtps {
@@ -32,55 +33,88 @@ class EDPSimple;
 class RTPSReader;
 struct CacheChange_t;
 
+class EDPSimpleListener : public ReaderListener
+{
+    public:
+
+        EDPSimpleListener() : internal_listener_(nullptr) {}
+
+        virtual ~EDPSimpleListener() = default;
+
+        void set_internal_listener(ReaderListener* internal_listener)
+        {
+            std::unique_lock<std::mutex> lock(mutex_);
+            internal_listener_ = internal_listener;
+        }
+
+        ReaderListener* get_internal_listener()
+        {
+            std::unique_lock<std::mutex> lock(mutex_);
+            return internal_listener_;
+        }
+
+    private:
+
+        ReaderListener* internal_listener_;
+
+        std::mutex mutex_;
+};
+
 /**
  * Class EDPSimplePUBReaderListener, used to define the behavior when a new WriterProxyData is received.
  *@ingroup DISCOVERY_MODULE
  */
-class EDPSimplePUBListener : public CompoundReaderListener{
+class EDPSimplePUBListener : public EDPSimpleListener
+{
     public:
+
         /**
           Constructor
          * @param p Pointer to the EDPSimple associated with this listener.
          */
-        EDPSimplePUBListener(EDPSimple* p):mp_SEDP(p){};
+        EDPSimplePUBListener(EDPSimple& edpsimple): edpsimple_(edpsimple) {}
+
         virtual ~EDPSimplePUBListener(){};
         /**
          * Virtual method, 
          * @param reader
          * @param change
          */
-        void onNewCacheChangeAdded(RTPSReader* reader,const CacheChange_t* const  change);
+        void onNewCacheChangeAdded(RTPSReader& reader, const CacheChange_t* const  change) override;
         /**
          * Compute the Key from a CacheChange_t
          * @param change Pointer to the change.
          */
         bool computeKey(CacheChange_t* change);
+
         //!Pointer to the EDPSimple
-        EDPSimple* mp_SEDP;
+        EDPSimple& edpsimple_;
 };
 /**
  * Class EDPSimpleSUBReaderListener, used to define the behavior when a new ReaderProxyData is received.
  *@ingroup DISCOVERY_MODULE
  */
-class EDPSimpleSUBListener:public CompoundReaderListener{
+class EDPSimpleSUBListener : public EDPSimpleListener
+{
     public:
         /**
          * @param p
          */
-        EDPSimpleSUBListener(EDPSimple* p):mp_SEDP(p){}
+        EDPSimpleSUBListener(EDPSimple& edpsimple) : edpsimple_(edpsimple) {}
 
         virtual ~EDPSimpleSUBListener(){}
         /**
          * @param reader
          * @param change
          */
-        void onNewCacheChangeAdded(RTPSReader* reader, const CacheChange_t* const change);
+        void onNewCacheChangeAdded(RTPSReader& reader, const CacheChange_t* const change) override;
         /**
          * @param change
          */
         bool computeKey(CacheChange_t* change);
+
         //!Pointer to the EDPSimple
-        EDPSimple* mp_SEDP;
+        EDPSimple& edpsimple_;
 };
 
 } /* namespace rtps */

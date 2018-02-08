@@ -16,13 +16,11 @@
  * @file PublisherListener.h	
  */
 
-#ifndef PUBLISHERLISTENER_H_
-#define PUBLISHERLISTENER_H_
+#ifndef __PUBLISHER_PUBLISHERLISTENER_H__
+#define __PUBLISHER_PUBLISHERLISTENER_H__
 
 #include "../rtps/common/Types.h"
 #include "../rtps/common/MatchingInfo.h"
-
-
 
 namespace eprosima {
 namespace fastrtps {
@@ -36,18 +34,22 @@ class Publisher;
  */
 class RTPS_DllAPI PublisherListener
 {
-public:
-	PublisherListener(){};
-	virtual ~PublisherListener(){};
-	/**
-	 * This method is called when the Publisher is matched (or unmatched) against an endpoint.
-	 * @param pub Pointer to the associated Publisher
-	 * @param info Information regarding the matched subscriber
-	 */
-	virtual void onPublicationMatched(Publisher* pub, rtps::MatchingInfo& info){(void)pub; (void)info;};
+    public:
+
+        PublisherListener(){};
+
+        virtual ~PublisherListener(){};
+
+        /**
+         * This method is called when the Publisher is matched (or unmatched) against an endpoint.
+         * @param pub Pointer to the associated Publisher
+         * @param info Information regarding the matched subscriber
+         */
+        virtual void onPublicationMatched(Publisher& publisher, const rtps::MatchingInfo& info)
+        { (void)publisher; (void)info; }
 };
 
-} /* namespace rtps */
-} /* namespace eprosima */
+} // namespace rtps
+} // namespace eprosima
 
-#endif /* PUBLISHERLISTENER_H_ */
+#endif // __PUBLISHER_PUBLISHERLISTENER_H__

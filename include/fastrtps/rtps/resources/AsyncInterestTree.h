@@ -15,7 +15,9 @@
 #ifndef _RTPS_RESOURCES_ASYNC_INTEREST_TREE_H_
 #define _RTPS_RESOURCES_ASYNC_INTEREST_TREE_H_
 
-#include <fastrtps/rtps/writer/RTPSWriter.h>
+#include "../writer/RTPSWriter.h"
+#include "../participant/RTPSParticipant.h"
+
 #include <mutex>
 #include <set>
 
@@ -25,40 +27,40 @@ namespace rtps {
 
 class AsyncInterestTree
 {
-public:
+    public:
 
-   AsyncInterestTree();
-   /**
-    * Registers a writer in a hidden set.
-    * Threadsafe thanks to set swap.
-    */
-   void RegisterInterest(const RTPSWriter*);
+        AsyncInterestTree();
+        /**
+         * Registers a writer in a hidden set.
+         * Threadsafe thanks to set swap.
+         */
+        void RegisterInterest(const RTPSWriter::impl&);
 
-   /**
-    * Registers all writers from  participant in a hidden set.
-    * Threadsafe thanks to set swap.
-    */
-   void RegisterInterest(const RTPSParticipantImpl*);
+        /**
+         * Registers all writers from  participant in a hidden set.
+         * Threadsafe thanks to set swap.
+         */
+        void RegisterInterest(const RTPSParticipant::impl&);
 
-   /**
-    * Clears the visible set and swaps
-    * with the hidden set.
-    */
-   void Swap();
+        /**
+         * Clears the visible set and swaps
+         * with the hidden set.
+         */
+        void Swap();
 
-   //! Extracts from the visible set 
-   std::set<const RTPSWriter*> GetInterestedWriters() const;
+        //! Extracts from the visible set 
+        std::set<const RTPSWriter::impl*> GetInterestedWriters() const;
 
-private:
-   std::set<const RTPSWriter*> mInterestAlpha, mInterestBeta;
-   mutable std::mutex mMutexActive, mMutexHidden;
-   
-   std::set<const RTPSWriter*>* mActiveInterest;
-   std::set<const RTPSWriter*>* mHiddenInterest;
+    private:
+        std::set<const RTPSWriter::impl*> mInterestAlpha, mInterestBeta;
+        mutable std::mutex mMutexActive, mMutexHidden;
+
+        std::set<const RTPSWriter::impl*>* mActiveInterest;
+        std::set<const RTPSWriter::impl*>* mHiddenInterest;
 };
 
-} /* namespace rtps */
-} /* namespace fastrtps */
-} /* namespace eprosima */
+} // namespace rtps
+} // namespace fastrtps
+} // namespace eprosima
 
 #endif // _RTPS_RESOURCES_ASYNC_INTEREST_TREE_H_

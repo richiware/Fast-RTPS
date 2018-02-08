@@ -18,18 +18,14 @@
  */
 
 #include <fastrtps/rtps/reader/timedevent/InitialAckNack.h>
-#include <mutex>
-
 #include <fastrtps/rtps/resources/ResourceEvent.h>
-
-#include <fastrtps/rtps/reader/StatefulReader.h>
+#include "../StatefulReaderImpl.h"
 #include <fastrtps/rtps/reader/WriterProxy.h>
-
 #include "../../participant/RTPSParticipantImpl.h"
-
 #include <fastrtps/rtps/messages/RTPSMessageCreator.h>
-
 #include <fastrtps/log/Log.h>
+
+#include <mutex>
 
 namespace eprosima {
 namespace fastrtps{
@@ -43,11 +39,11 @@ InitialAckNack::~InitialAckNack()
     destroy();
 }
 
-InitialAckNack::InitialAckNack(WriterProxy* wp, double interval):
-    TimedEvent(wp->mp_SFR->getRTPSParticipant()->getEventResource().getIOService(),
-            wp->mp_SFR->getRTPSParticipant()->getEventResource().getThread(), interval),
-    m_cdrmessages(wp->mp_SFR->getRTPSParticipant()->getMaxMessageSize(),
-            wp->mp_SFR->getRTPSParticipant()->getGuid().guidPrefix), wp_(wp)
+InitialAckNack::InitialAckNack(WriterProxy& writer_proxy, double interval):
+    TimedEvent(writer_proxy.reader_.participant().getEventResource().getIOService(),
+            writer_proxy.reader_.participant().getEventResource().getThread(), interval),
+    m_cdrmessages(writer_proxy.reader_.participant().getMaxMessageSize(),
+            writer_proxy.reader_.participant().guid().guidPrefix), writer_proxy_(writer_proxy)
 {
 }
 
@@ -62,9 +58,9 @@ void InitialAckNack::event(EventCode code, const char* msg)
         Count_t acknackCount = 0;
 
         {//BEGIN PROTECTION
-            std::lock_guard<std::recursive_mutex> guard_reader(*wp_->mp_SFR->getMutex());
-            wp_->mp_SFR->m_acknackCount++;
-            acknackCount = wp_->mp_SFR->m_acknackCount;
+            std::lock_guard<std::recursive_mutex> guard_reader(*writer_proxy_.reader_.getMutex());
+            writer_proxy_.reader_.m_acknackCount++;
+            acknackCount = writer_proxy_.reader_.m_acknackCount;
         }
 
         // Send initial NACK.
@@ -73,12 +69,12 @@ void InitialAckNack::event(EventCode code, const char* msg)
 
         logInfo(RTPS_READER,"Sending ACKNACK: "<< sns);
 
-        RTPSMessageGroup group(wp_->mp_SFR->getRTPSParticipant(), wp_->mp_SFR, RTPSMessageGroup::READER, m_cdrmessages);
+        RTPSMessageGroup group(writer_proxy_.reader_.participant(), &writer_proxy_.reader_, RTPSMessageGroup::READER, m_cdrmessages);
 
-        LocatorList_t locators(wp_->m_att.endpoint.unicastLocatorList);
-        locators.push_back(wp_->m_att.endpoint.multicastLocatorList);
+        LocatorList_t locators(writer_proxy_.m_att.endpoint.unicastLocatorList);
+        locators.push_back(writer_proxy_.m_att.endpoint.multicastLocatorList);
 
-        group.add_acknack(wp_->m_att.guid, sns, acknackCount, false, locators);
+        group.add_acknack(writer_proxy_.m_att.guid, sns, acknackCount, false, locators);
     }
     else if(code == EVENT_ABORT)
     {

@@ -21,9 +21,9 @@
 #define PDPSIMPLELISTENER_H_
 #ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
 
-#include "../../../reader/ReaderListener.h"
-#include "../../../../qos/ParameterList.h"
-#include "../../data/ParticipantProxyData.h"
+#include "../../../reader/RTPSReaderImpl.h"
+#include <fastrtps/qos/ParameterList.h>
+#include <fastrtps/rtps/builtin/data/ParticipantProxyData.h>
 
 
 namespace eprosima {
@@ -32,45 +32,49 @@ namespace rtps {
 
 class PDPSimple;
 class DiscoveredParticipantData;
-class RTPSReader;
-
 
 /**
  * Class PDPSimpleListener, specification of SubscriberListener used by the SPDP to perform the History check when a new message is received.
  * This class is implemented in order to use the same structure than with any other RTPSReader.
  *@ingroup DISCOVERY_MODULE
  */
-class PDPSimpleListener: public ReaderListener {
-public:
-	/**
-	* @param in_SPDP
-	*/
-	PDPSimpleListener(PDPSimple* in_SPDP) : mp_SPDP(in_SPDP)
-	{
-	}
+class PDPSimpleListener : public RTPSReader::impl::Listener
+{
+    public:
+        /**
+         * @param in_SPDP
+         */
+        PDPSimpleListener(PDPSimple& pdpsimple) : pdpsimple_(pdpsimple)
+        {
+        }
 
-	virtual ~PDPSimpleListener() {}
-	//!Pointer to the associated mp_SPDP;
-	PDPSimple* mp_SPDP;
-	/**
-	 * New added cache
-	 * @param reader
-	 * @param change
-	 */
-	void onNewCacheChangeAdded(RTPSReader* reader,const CacheChange_t* const change);
-	/**
-	 * Process a new added cache with this method.
-	 * @return True on success
-	 */
-	bool newAddedCache();
-	/**
-	 * Get the key of a CacheChange_t
-	 * @param change Pointer to the CacheChange_t
-	 * @return True on success
-	 */
-	bool getKey(CacheChange_t* change);
-	//!Auxiliary message.
-	CDRMessage_t aux_msg;
+        virtual ~PDPSimpleListener() {}
+
+        //!Pointer to the associated mp_SPDP;
+        PDPSimple& pdpsimple_;
+
+        /**
+         * New added cache
+         * @param reader
+         * @param change
+         */
+        void onNewCacheChangeAdded(RTPSReader::impl& reader, const CacheChange_t* const change) override;
+
+        /**
+         * Process a new added cache with this method.
+         * @return True on success
+         */
+
+        bool newAddedCache();
+        /**
+         * Get the key of a CacheChange_t
+         * @param change Pointer to the CacheChange_t
+         * @return True on success
+         */
+        bool getKey(CacheChange_t* change);
+
+        //!Auxiliary message.
+        CDRMessage_t aux_msg;
 };
 
 

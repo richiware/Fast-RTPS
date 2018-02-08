@@ -17,9 +17,10 @@
  *
  */
 
-#ifndef INITIALACKNACK_H_
-#define INITIALACKNACK_H_
+#ifndef __RTPS_READER_TIMEDEVENT_INITIALACKNACK_H__
+#define __RTPS_READER_TIMEDEVENT_INITIALACKNACK_H__
 #ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
+
 #include <fastrtps/rtps/resources/TimedEvent.h>
 #include <fastrtps/rtps/common/CDRMessage_t.h>
 #include <fastrtps/rtps/common/Guid.h>
@@ -46,7 +47,8 @@ class InitialAckNack: public TimedEvent
          * @param p_RP
          * @param interval
          */
-        InitialAckNack(WriterProxy* wp, double interval);
+        InitialAckNack(WriterProxy& writer_proxy, double interval);
+
         virtual ~InitialAckNack();
 
         /**
@@ -60,11 +62,12 @@ class InitialAckNack: public TimedEvent
         //!
         RTPSMessageGroup_t m_cdrmessages;
         //!
-        WriterProxy* wp_;
+        WriterProxy& writer_proxy_;
 };
 
 }
 }
-} /* namespace eprosima */
+}
+
 #endif
-#endif /* INITIALACKNACK_H_ */
+#endif // __RTPS_READER_TIMEDEVENT_INITIALACKNACK_H__

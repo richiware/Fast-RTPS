@@ -17,110 +17,147 @@
  *
  */
 
-#include <fastrtps/rtps/participant/RTPSParticipant.h>
 #include "RTPSParticipantImpl.h"
 #include <fastrtps/rtps/Endpoint.h>
+#include "../reader/RTPSReaderImpl.h"
+#include "../writer/RTPSWriterImpl.h"
+#include <fastrtps/rtps/participant/RTPSParticipantListener.h>
 
 namespace eprosima {
 namespace fastrtps{
 namespace rtps {
 
-RTPSParticipant::RTPSParticipant(RTPSParticipantImpl* pimpl):mp_impl(pimpl)
+class RTPSParticipant::ListenerLink : public RTPSParticipant::impl::Listener
+{
+    public:
+
+        ListenerLink(RTPSParticipant& participant, RTPSParticipantListener* listener) :
+            participant_(participant), listener_(listener)
+        {
+        }
+
+        RTPSParticipant::impl::Listener* rtps_listener()
+        {
+            if(listener_)
+            {
+                return this;
+            }
+
+            return nullptr;
+        }
+
+        void onRTPSParticipantDiscovery(RTPSParticipant::impl& participant,
+                const RTPSParticipantDiscoveryInfo& info) override
+        {
+            assert(listener_);
+            assert(participant_.impl_.get() == &participant);
+            listener_->onRTPSParticipantDiscovery(participant_, info);
+        }
+
+#if HAVE_SECURITY
+        void onRTPSParticipantAuthentication(RTPSParticipant::impl& participant,
+                const RTPSParticipantAuthenticationInfo& info) override
+        {
+            assert(listener_);
+            assert(participant_.impl_.get() == &participant);
+            listener_->onRTPSParticipantAuthentication(participant_, info);
+        }
+#endif
+
+    private:
+
+        RTPSParticipant& participant_;
+
+        RTPSParticipantListener* listener_;
+};
+
+}
+}
+}
+
+using namespace eprosima::fastrtps::rtps;
+
+RTPSParticipant::RTPSParticipant(const RTPSParticipantAttributes& param, const GuidPrefix_t& guid,
+                RTPSParticipantListener* listener) : listener_link_(new ListenerLink(*this, listener)),
+    impl_(new impl(param, guid, listener_link_->rtps_listener())) //C++14 std::make_unique
 {
 }
 
 RTPSParticipant::~RTPSParticipant()
 {
-
 }
 
-const GUID_t& RTPSParticipant::getGuid() const
+const GUID_t& RTPSParticipant::guid() const
 {
-    return mp_impl->getGuid();
+    return impl_->guid();
 }
 
 void RTPSParticipant::announceRTPSParticipantState()
 {
-    return mp_impl->announceRTPSParticipantState();
+    return impl_->announceRTPSParticipantState();
 }
 
 void RTPSParticipant::stopRTPSParticipantAnnouncement()
 {
-    return mp_impl->stopRTPSParticipantAnnouncement();
+    return impl_->stopRTPSParticipantAnnouncement();
 }
 
 void RTPSParticipant::resetRTPSParticipantAnnouncement()
 {
-    return mp_impl->resetRTPSParticipantAnnouncement();
+    return impl_->resetRTPSParticipantAnnouncement();
 }
 
 bool RTPSParticipant::newRemoteWriterDiscovered(const GUID_t& pguid, int16_t userDefinedId)
 {
-    return mp_impl->newRemoteEndpointDiscovered(pguid,userDefinedId, WRITER);
+    return impl_->newRemoteEndpointDiscovered(pguid,userDefinedId, WRITER);
 }
 bool RTPSParticipant::newRemoteReaderDiscovered(const GUID_t& pguid, int16_t userDefinedId)
 {
-    return mp_impl->newRemoteEndpointDiscovered(pguid,userDefinedId, READER);
+    return impl_->newRemoteEndpointDiscovered(pguid,userDefinedId, READER);
 }
 uint32_t RTPSParticipant::getRTPSParticipantID() const
 {
-    return mp_impl->getRTPSParticipantID();
+    return impl_->getRTPSParticipantID();
 }
 
-bool RTPSParticipant::registerWriter(RTPSWriter* Writer,TopicAttributes& topicAtt,WriterQos& wqos)
+bool RTPSParticipant::register_writer(RTPSWriter& writer, TopicAttributes& topicAtt, WriterQos& wqos)
 {
-    return mp_impl->registerWriter(Writer,topicAtt, wqos);
+    return impl_->register_writer(get_implementation(writer), topicAtt, wqos);
 }
 
-bool RTPSParticipant::registerReader(RTPSReader* Reader,TopicAttributes& topicAtt,ReaderQos& rqos)
+bool RTPSParticipant::register_reader(RTPSReader& reader,TopicAttributes& topicAtt, ReaderQos& rqos)
 {
-    return mp_impl->registerReader(Reader,topicAtt, rqos);
+    return impl_->register_reader(get_implementation(reader), topicAtt, rqos);
 }
 
-bool RTPSParticipant::updateWriter(RTPSWriter* Writer,WriterQos& wqos)
+bool RTPSParticipant::update_writer(RTPSWriter& writer, WriterQos& wqos)
 {
-    return mp_impl->updateLocalWriter(Writer, wqos);
+    return impl_->update_local_writer(get_implementation(writer), wqos);
 }
 
-bool RTPSParticipant::updateReader(RTPSReader* Reader,ReaderQos& rqos)
+bool RTPSParticipant::update_reader(RTPSReader& reader, ReaderQos& rqos)
 {
-    return mp_impl->updateLocalReader(Reader, rqos);
+    return impl_->update_local_reader(get_implementation(reader), rqos);
 }
 
 std::pair<StatefulReader*,StatefulReader*> RTPSParticipant::getEDPReaders(){	
-    return mp_impl->getEDPReaders();
+    return impl_->getEDPReaders();
 }
 
 std::vector<std::string> RTPSParticipant::getParticipantNames() const {
-    return mp_impl->getParticipantNames();
+    return impl_->getParticipantNames();
 }
 
 RTPSParticipantAttributes RTPSParticipant::getRTPSParticipantAttributes() const {
-    return mp_impl->getRTPSParticipantAttributes();
-}
-
-uint32_t RTPSParticipant::getMaxMessageSize() const
-{
-    return mp_impl->getMaxMessageSize();
-}
-
-uint32_t RTPSParticipant::getMaxDataSize() const
-{
-    return mp_impl->getMaxDataSize();
+    return impl_->getRTPSParticipantAttributes();
 }
 
 bool RTPSParticipant::get_remote_writer_info(const GUID_t& writerGuid, WriterProxyData& returnedInfo)
 {
-    return mp_impl->get_remote_writer_info(writerGuid, returnedInfo);
+    return impl_->get_remote_writer_info(writerGuid, returnedInfo);
 }
 
 bool RTPSParticipant::get_remote_reader_info(const GUID_t& readerGuid, ReaderProxyData& returnedInfo)
 {
-    return mp_impl->get_remote_reader_info(readerGuid, returnedInfo);
+    return impl_->get_remote_reader_info(readerGuid, returnedInfo);
 }
-
-} /* namespace rtps */
-} /* namespace fastrtps */
-} /* namespace eprosima */
-
-

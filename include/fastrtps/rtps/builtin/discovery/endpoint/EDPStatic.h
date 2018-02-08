@@ -17,20 +17,20 @@
  *
  */
 
-#ifndef EDPSTATIC_H_
-#define EDPSTATIC_H_
+#ifndef __RTPS_BUILTIN_DISCOVERY_ENDPOINT_EDPSTATIC_H__
+#define __RTPS_BUILTIN_DISCOVERY_ENDPOINT_EDPSTATIC_H__
 #ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
 
 #include "EDP.h"
 
-
 namespace eprosima {
-namespace fastrtps{
-namespace xmlparser{
+namespace fastrtps {
+
+namespace xmlparser {
     class XMLEndpointParser;
 }
-namespace rtps {
 
+namespace rtps {
 
 /**
  * Class EDPStaticProperty, used to read and write the strings from the properties used to transmit the EntityId_t.
@@ -38,121 +38,127 @@ namespace rtps {
  */
 class EDPStaticProperty
 {
-public:
-	EDPStaticProperty():m_userId(0){};
-	~EDPStaticProperty(){};
-	//!Endpoint type
-	std::string m_endpointType;
-	//!Status
-	std::string m_status;
-	//!User ID as string
-	std::string m_userIdStr;
-	//!User ID
-	uint16_t m_userId;
-	//!Entity ID
-	EntityId_t m_entityId;
-	/**
-	* Convert information to a property
-	* @param type Type of endpoint
-	* @param status Status of the endpoint
-	* @param id User Id
-	* @param ent EntityId
-	* @return Pair of two strings.
-	*/
-	static std::pair<std::string,std::string> toProperty(std::string type,std::string status,uint16_t id,const EntityId_t& ent);
-	/**
-	* @param in_property Input property-
-	* @return True if correctly read
-	*/
-	bool fromProperty(std::pair<std::string,std::string> in_property);
+    public:
+
+        EDPStaticProperty():m_userId(0){};
+        ~EDPStaticProperty(){};
+        //!Endpoint type
+        std::string m_endpointType;
+        //!Status
+        std::string m_status;
+        //!User ID as string
+        std::string m_userIdStr;
+        //!User ID
+        uint16_t m_userId;
+        //!Entity ID
+        EntityId_t m_entityId;
+        /**
+         * Convert information to a property
+         * @param type Type of endpoint
+         * @param status Status of the endpoint
+         * @param id User Id
+         * @param ent EntityId
+         * @return Pair of two strings.
+         */
+        static std::pair<std::string,std::string> toProperty(std::string type,std::string status,uint16_t id,const EntityId_t& ent);
+        /**
+         * @param in_property Input property-
+         * @return True if correctly read
+         */
+        bool fromProperty(std::pair<std::string,std::string> in_property);
 };
 
 /**
  * Class EDPStatic, implements a static endpoint discovery module.
  * @ingroup DISCOVERYMODULE
  */
-class EDPStatic : public EDP {
-public:
-	/**
-	* Constructor.
-	* @param p Pointer to the PDPSimple.
-	* @param part Pointer to the RTPSParticipantImpl.
-	*/
-	EDPStatic(PDPSimple* p,RTPSParticipantImpl* part);
-	virtual ~EDPStatic();
-	/**
-	 * Abstract method to initialize the EDP.
-	 * @param attributes DiscoveryAttributes structure.
-	 * @return True if correct.
-	 */
-	bool initEDP(BuiltinAttributes& attributes);
-	/**
-	 * Abstract method that assigns remote endpoints when a new RTPSParticipantProxyData is discovered.
-	 * @param pdata Pointer to the ParticipantProxyData.
-	 */
-	void assignRemoteEndpoints(const ParticipantProxyData& pdata);
-	/**
-	 * Abstract method that removes a local Reader from the discovery method
-	 * @param R Pointer to the Reader to remove.
-	 * @return True if correctly removed.
-	 */
-	bool removeLocalReader(RTPSReader* R);
-	/**
-	 * Abstract method that removes a local Writer from the discovery method
-	 * @param W Pointer to the Writer to remove.
-	 * @return True if correctly removed.
-	 */
-	bool removeLocalWriter(RTPSWriter*W);
+class EDPStatic : public EDP
+{
+    public:
 
-	/**
-	 * After a new local ReaderProxyData has been created some processing is needed (depends on the implementation).
-	 * @param rdata Pointer to the ReaderProxyData object.
-	 * @return True if correct.
-	 */
-	bool processLocalReaderProxyData(ReaderProxyData* rdata);
-	/**
-	 * After a new local WriterProxyData has been created some processing is needed (depends on the implementation).
-	 * @param wdata Pointer to the Writer ProxyData object.
-	 * @return True if correct.
-	 */
-	bool processLocalWriterProxyData(WriterProxyData* wdata);
+        /**
+         * Constructor.
+         * @param p Pointer to the PDPSimple.
+         * @param part Pointer to the RTPSParticipantImpl.
+         */
+        EDPStatic(PDPSimple& p, RTPSParticipant::impl& part);
 
-	/**
-	 * New Remote Writer has been found and this method process it and calls the pairing methods.
-	 * @param pdata Pointer to the RTPSParticipantProxyData object.
-	 * @param userId UserId.
-	 * @param entId EntityId.
-	 * @return True if correct.
-	 */
-	bool newRemoteWriter(const ParticipantProxyData& pdata, uint16_t userId, EntityId_t entId=c_EntityId_Unknown);
-	/**
-	 * New Remote Reader has been found and this method process it and calls the pairing methods.
-	 * @param pdata Pointer to the RTPSParticipantProxyData object.
-	 * @param userId UserId.
-	 * @param entId EntityId.
-	 * @return true if correct.
-	 */
-	bool newRemoteReader(const ParticipantProxyData& pdata, uint16_t userId, EntityId_t entId=c_EntityId_Unknown);
-	/**
-	* This method checks the provided entityId against the topic type to see if it matches
-	* @param rdata Pointer to the readerProxyData
-	* @return True if its correct.
-	**/
-	bool checkEntityId(ReaderProxyData* rdata);
-	/**
-	* This method checks the provided entityId against the topic type to see if it matches
-	* @param wdata Pointer to the writerProxyData
-	* @return True if its correct.
-	**/
-	bool checkEntityId(WriterProxyData* wdata);
-private:
-	xmlparser::XMLEndpointParser* mp_edpXML;
-	BuiltinAttributes m_attributes;
+        virtual ~EDPStatic();
+        /**
+         * Abstract method to initialize the EDP.
+         * @param attributes DiscoveryAttributes structure.
+         * @return True if correct.
+         */
+        bool initEDP(BuiltinAttributes& attributes);
+        /**
+         * Abstract method that assigns remote endpoints when a new RTPSParticipantProxyData is discovered.
+         * @param pdata Pointer to the ParticipantProxyData.
+         */
+        void assignRemoteEndpoints(const ParticipantProxyData& pdata);
+        /**
+         * Abstract method that removes a local Reader from the discovery method
+         * @param R Pointer to the Reader to remove.
+         * @return True if correctly removed.
+         */
+        bool removeLocalReader(RTPSReader::impl& reader);
+        /**
+         * Abstract method that removes a local Writer from the discovery method
+         * @param W Pointer to the Writer to remove.
+         * @return True if correctly removed.
+         */
+        bool removeLocalWriter(RTPSWriter::impl& writer);
+
+        /**
+         * After a new local ReaderProxyData has been created some processing is needed (depends on the implementation).
+         * @param rdata Pointer to the ReaderProxyData object.
+         * @return True if correct.
+         */
+        bool processLocalReaderProxyData(ReaderProxyData* rdata);
+        /**
+         * After a new local WriterProxyData has been created some processing is needed (depends on the implementation).
+         * @param wdata Pointer to the Writer ProxyData object.
+         * @return True if correct.
+         */
+        bool processLocalWriterProxyData(WriterProxyData* wdata);
+
+        /**
+         * New Remote Writer has been found and this method process it and calls the pairing methods.
+         * @param pdata Pointer to the RTPSParticipantProxyData object.
+         * @param userId UserId.
+         * @param entId EntityId.
+         * @return True if correct.
+         */
+        bool newRemoteWriter(const ParticipantProxyData& pdata, uint16_t userId, EntityId_t entId=c_EntityId_Unknown);
+        /**
+         * New Remote Reader has been found and this method process it and calls the pairing methods.
+         * @param pdata Pointer to the RTPSParticipantProxyData object.
+         * @param userId UserId.
+         * @param entId EntityId.
+         * @return true if correct.
+         */
+        bool newRemoteReader(const ParticipantProxyData& pdata, uint16_t userId, EntityId_t entId=c_EntityId_Unknown);
+        /**
+         * This method checks the provided entityId against the topic type to see if it matches
+         * @param rdata Pointer to the readerProxyData
+         * @return True if its correct.
+         **/
+        bool checkEntityId(ReaderProxyData* rdata);
+        /**
+         * This method checks the provided entityId against the topic type to see if it matches
+         * @param wdata Pointer to the writerProxyData
+         * @return True if its correct.
+         **/
+        bool checkEntityId(WriterProxyData* wdata);
+
+    private:
+
+        xmlparser::XMLEndpointParser* mp_edpXML;
+        BuiltinAttributes m_attributes;
 };
 
-}
-} /* namespace rtps */
-} /* namespace eprosima */
+} // namespace rtps
+} // namespace fastrtps
+} // namespace eprosima
 
 #endif
-#endif /* EDPSTATIC_H_ */
+#endif // __RTPS_BUILTIN_DISCOVERY_ENDPOINT_EDPSTATIC_H__
