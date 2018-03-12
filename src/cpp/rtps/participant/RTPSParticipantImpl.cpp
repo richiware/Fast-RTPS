@@ -447,12 +447,18 @@ std::shared_ptr<RTPSWriter::impl> RTPSParticipant::impl::create_writer(const Wri
     if(entityId == c_EntityId_Unknown)
     {
         if(param.endpoint.topicKind == NO_KEY)
+        {
             entId.value[3] = 0x03;
+        }
         else if(param.endpoint.topicKind == WITH_KEY)
+        {
             entId.value[3] = 0x02;
+        }
         uint32_t idnum;
         if(param.endpoint.getEntityID()>0)
+        {
             idnum = param.endpoint.getEntityID();
+        }
         else
         {
             id_counter_++;

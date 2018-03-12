@@ -180,7 +180,8 @@ bool ReaderProxy::requested_changes_set(std::vector<SequenceNumber_t>& seqNumSet
     {
         auto chit = m_changesForReader.find(*sit);
 
-        if(chit != m_changesForReader.end() && chit->is_relevant())
+        // Not relevant CacheChanges also are set to REQUESTED because it will provoke to send a GAP for them.
+        if(chit != m_changesForReader.end())
         {
             ChangeForReader_t newch(*chit);
             newch.set_status(REQUESTED);
@@ -197,6 +198,11 @@ bool ReaderProxy::requested_changes_set(std::vector<SequenceNumber_t>& seqNumSet
     if(isSomeoneWasSetRequested)
     {
         logInfo(RTPS_WRITER,"Requested Changes: " << seqNumSet);
+    }
+    else if(!seqNumSet.empty())
+    {
+        logWarning(RTPS_WRITER,"Requested Changes: " << seqNumSet
+                   << " not found (low mark: " << changesFromRLowMark_ << ")");
     }
 
     return isSomeoneWasSetRequested;

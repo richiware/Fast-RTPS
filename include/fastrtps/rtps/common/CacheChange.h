@@ -165,6 +165,7 @@ namespace eprosima
 
                 std::vector<uint32_t>* getDataFragments() const { return dataFragments_; }
 
+                //TODO(Ricardo) Its necessary fragment size?
                 uint16_t getFragmentSize() const { return fragment_size_; }
 
                 void setFragmentSize(uint16_t fragment_size)
@@ -173,7 +174,7 @@ namespace eprosima
 
                     if (fragment_size == 0) {
                         dataFragments_->clear();
-                    } 
+                    }
                     else
                     {
                         //TODO Mirar si cuando se compatibilice con RTI funciona el calculo, porque ellos
@@ -300,9 +301,12 @@ namespace eprosima
 
                 void mark_all_fragments_as_unsent()
                 {
-                    for (uint32_t i = 1; i != num_fragments_ + 1; ++i)
+                    if(is_relevant_)
                     {
-                        unsent_fragments_.insert(i); // Indexed on 1
+                        for (uint32_t i = 1; i != num_fragments_ + 1; ++i)
+                        {
+                            unsent_fragments_.insert(i); // Indexed on 1
+                        }
                     }
                 }
 
@@ -313,8 +317,13 @@ namespace eprosima
 
                 void mark_fragment_as_unsent(const FragmentNumberSet_t& unsentFragments)
                 {
-                    for(auto element : unsentFragments.set)
-                        unsent_fragments_.insert(element);
+                    if(is_relevant_)
+                    {
+                        for(auto element : unsentFragments.set)
+                        {
+                            unsent_fragments_.insert(element);
+                        }
+                    }
                 }
 
                 private:
