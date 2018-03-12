@@ -71,6 +71,8 @@ class Subscriber::impl
 
     void deinit();
 
+    bool enable();
+
     /**
      * Method to block the current thread until an unread message is available
      */

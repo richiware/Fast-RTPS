@@ -32,6 +32,9 @@ namespace fastrtps{
 namespace rtps{
 
 
+//TODO(Ricardo) Convert SequenceNumber_t to uint64_t. Be careful with serialization in CDR.
+
+
 //!@brief Structure SequenceNumber_t, different for each change in the same writer.
 //!@ingroup COMMON_MODULE
 struct RTPS_DllAPI SequenceNumber_t
@@ -90,9 +93,14 @@ struct RTPS_DllAPI SequenceNumber_t
     SequenceNumber_t& operator++()
     {
         if(low == UINT32_MAX)
-        { ++high; low = 0; }
+        {
+            ++high;
+            low = 0;
+        }
         else
+        {
             ++low;
+        }
 
         return *this;
     }
@@ -101,6 +109,29 @@ struct RTPS_DllAPI SequenceNumber_t
     {
         SequenceNumber_t result(*this);
         ++(*this);
+        return result;
+    }
+
+    //! Decrease SequenceNumber in 1.
+    SequenceNumber_t& operator--()
+    {
+        if(low == 0)
+        {
+            --high;
+            low = UINT32_MAX;
+        }
+        else
+        {
+            --low;
+        }
+
+        return *this;
+    }
+
+    SequenceNumber_t operator--(int)
+    {
+        SequenceNumber_t result(*this);
+        --(*this);
         return result;
     }
 

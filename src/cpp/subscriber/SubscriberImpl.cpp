@@ -67,17 +67,7 @@ bool Subscriber::impl::init()
 
     if(reader_)
     {
-        //REGISTER THE READER
-        if(participant_.rtps_participant().register_reader(*reader_,
-                    att_.topic, att_.qos))
-        {
-            return true;
-        }
-        else
-        {
-            logError(PUBLISHER,"Failed registering associated reader");
-        }
-        //TODO (Ricardo) Remove reader
+        return true;
     }
     else
     {
@@ -101,6 +91,23 @@ void Subscriber::impl::deinit()
     }
 }
 
+bool Subscriber::impl::enable()
+{
+    bool returned_value = false;
+
+    //Register the reader
+    if(participant_.rtps_participant().register_reader(*reader_,
+                att_.topic, att_.qos))
+    {
+        returned_value = true;
+    }
+    else
+    {
+        logError(PUBLISHER,"Failed registering associated reader");
+    }
+
+    return returned_value;
+}
 
 void Subscriber::impl::waitForUnreadMessage()
 {

@@ -1855,6 +1855,8 @@ BLACKBOXTEST(BlackBox, EDPSlaveReaderAttachment)
 }
 
 // Used to detect Github issue #155
+// TODO(Ricardo) Remove
+/*
 BLACKBOXTEST(BlackBox, EndpointRediscovery)
 {
     PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
@@ -1895,6 +1897,7 @@ BLACKBOXTEST(BlackBox, EndpointRediscovery)
 
     writer.waitDiscovery();
 }
+*/
 
 // Used to detect Github issue #154
 BLACKBOXTEST(BlackBox, LocalInitialPeers)

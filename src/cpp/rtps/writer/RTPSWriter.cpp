@@ -123,11 +123,6 @@ void RTPSWriter::impl::deinit_()
     history_.clear();
 }
 
-SequenceNumber_t RTPSWriter::impl::next_sequence_number_nts() const
-{
-    return last_cachechange_seqnum_ + 1;
-}
-
 CacheChange_ptr RTPSWriter::new_change(const std::function<uint32_t()>& data_cdr_serialize_size,
         ChangeKind_t change_kind, InstanceHandle_t handle)
 {
@@ -142,6 +137,7 @@ CacheChange_ptr RTPSWriter::impl::new_change(const std::function<uint32_t()>& da
 
     std::lock_guard<std::mutex> guard(mutex_);
 
+    // TODO(Ricardo) Two protections, here with writer's mutex and with cachechantpool's mutex. Review
     if(!cachechange_pool_.reserve_cache(&cachechange, data_cdr_serialize_size))
     {
         logWarning(RTPS_WRITER,"Problem reserving Cache from the History");
@@ -149,7 +145,6 @@ CacheChange_ptr RTPSWriter::impl::new_change(const std::function<uint32_t()>& da
     }
     assert(cachechange != nullptr);
 
-    cachechange->sequence_number = ++last_cachechange_seqnum_;
     cachechange->kind = change_kind;
     if(att_.topicKind == WITH_KEY && !handle.is_unknown())
     {
@@ -159,18 +154,6 @@ CacheChange_ptr RTPSWriter::impl::new_change(const std::function<uint32_t()>& da
     cachechange->writer_guid = guid_;
     cachechange->write_params = WriteParams();
     return CacheChange_ptr(&cachechange_pool_, cachechange);
-}
-
-void RTPSWriter::reuse_change(CacheChange_ptr& change)
-{
-    impl_->reuse_change(change);
-}
-
-void RTPSWriter::impl::reuse_change(CacheChange_ptr& change)
-{
-    std::lock_guard<std::mutex> guard(mutex_);
-    // TODO System to verify is my change.
-    change->sequence_number = ++last_cachechange_seqnum_;
 }
 
 uint32_t RTPSWriter::impl::getTypeMaxSerialized() const

@@ -248,6 +248,7 @@ void PDPSimple::announceParticipantState(bool new_change, bool dispose)
                 ParameterList::writeParameterListToCDRMsg(&aux_msg, &parameter_list, true);
                 change->serialized_payload.length = (uint16_t)aux_msg.length;
 
+                //TODO (Ricardo) Messages error in add_changes used on discovery.
                 spdp_writer_history_->add_change(change);
             }
 

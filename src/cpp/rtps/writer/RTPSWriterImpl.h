@@ -67,8 +67,6 @@ class RTPSWriter::impl : public Endpoint
         CacheChange_ptr new_change(const std::function<uint32_t()>& dataCdrSerializedSize,
                 ChangeKind_t changeKind, InstanceHandle_t handle = c_InstanceHandle_Unknown);
 
-        void reuse_change(CacheChange_ptr& change);
-
         /**
          * Add a matched reader.
          * @param ratt Pointer to the ReaderProxyData object added.
@@ -152,8 +150,6 @@ class RTPSWriter::impl : public Endpoint
         //TODO(Ricardo) participant acces in endpoint class?
         inline RTPSParticipant::impl& participant() const {return participant_;}
 
-        SequenceNumber_t next_sequence_number_nts() const;
-
         /**
          * Add a change to the unsent list.
          * @param change Pointer to the change to add.
@@ -203,9 +199,6 @@ class RTPSWriter::impl : public Endpoint
         void init_header();
 
     private:
-
-        //! Last CacheChange Sequence Number added to the History.
-        SequenceNumber_t last_cachechange_seqnum_;
 
         CacheChangePool cachechange_pool_;
 

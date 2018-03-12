@@ -71,7 +71,8 @@ bool SubscriberHistory::received_change(CacheChange_t* a_change, size_t unknown_
         if(m_historyQos.kind == KEEP_ALL_HISTORY_QOS)
         {
             // TODO(Ricardo) Check
-            if(m_changes.size() + unknown_missing_changes_up_to < (size_t)m_resourceLimitsQos.max_samples)
+            if(m_resourceLimitsQos.max_samples == 0 ||
+                    m_changes.size() + unknown_missing_changes_up_to < (size_t)m_resourceLimitsQos.max_samples)
             {
                 add = true;
             }

@@ -46,13 +46,23 @@ WriterHistory::impl::impl(const HistoryAttributes& attributes): attributes_(attr
 {
 }
 
-bool WriterHistory::add_change(CacheChange_ptr& change)
+SequenceNumber_t WriterHistory::add_change(CacheChange_ptr& change)
 {
     return impl_->add_change(change);
 }
 
-bool WriterHistory::impl::add_change(CacheChange_ptr& change)
+SequenceNumber_t WriterHistory::impl::add_change(CacheChange_ptr& change)
 {
+    std::unique_lock<std::mutex> lock(mutex_);
+    return add_change_nts(change);
+}
+
+SequenceNumber_t WriterHistory::impl::add_change_nts(CacheChange_ptr& change)
+{
+#if defined(__DEBUG)
+    assert(get_mutex_owner() == get_thread_id());
+#endif
+
     assert(change);
 
     if((attributes_.memoryPolicy == PREALLOCATED_MEMORY_MODE) &&
@@ -62,12 +72,11 @@ bool WriterHistory::impl::add_change(CacheChange_ptr& change)
                 "Change payload size of '" << change->serialized_payload.length <<
                 "' bytes is larger than the history payload size of '" << attributes_.payloadMaxSize <<
                 "' bytes and cannot be resized.");
-        return false;
+        return SequenceNumber_t::unknown();
     }
 
-    std::unique_lock<std::mutex> lock(mutex_);
-
     bool add_permitted = true;
+    change->sequence_number = ++last_cachechange_seqnum_;
 
     if(call_after_adding_change_)
     {
@@ -81,10 +90,11 @@ bool WriterHistory::impl::add_change(CacheChange_ptr& change)
 
         changes_.emplace_hint(changes_.end(), change->sequence_number, std::move(change));
 
-        return true;
+        return last_cachechange_seqnum_;
     }
 
-    return false;
+    --last_cachechange_seqnum_;
+    return SequenceNumber_t::unknown();
 }
 
 CacheChange_ptr WriterHistory::remove_change(const SequenceNumber_t& sequence_number)
@@ -107,6 +117,10 @@ CacheChange_ptr WriterHistory::impl::remove_change_nts(const SequenceNumber_t& s
 
 CacheChange_ptr WriterHistory::impl::remove_change_nts_(iterator& element)
 {
+#if defined(__DEBUG)
+    assert(get_mutex_owner() == get_thread_id());
+#endif
+
     if(element != changes_.end())
     {
         bool remove_permitted = true;
@@ -230,6 +244,11 @@ int WriterHistory::impl::get_thread_id() const
     return syscall(__NR_gettid);
 }
 #endif
+
+SequenceNumber_t WriterHistory::impl::next_sequence_number_nts() const
+{
+    return last_cachechange_seqnum_ + 1;
+}
 
 } /* namespace rtps */
 } /* namespace fastrtps */

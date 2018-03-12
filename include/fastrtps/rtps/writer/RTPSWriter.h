@@ -65,8 +65,6 @@ class RTPSWriter
         RTPS_DllAPI CacheChange_ptr new_change(const std::function<uint32_t()>& dataCdrSerializedSize,
                 ChangeKind_t changeKind, InstanceHandle_t handle = c_InstanceHandle_Unknown);
 
-        RTPS_DllAPI void reuse_change(CacheChange_ptr& change);
-
         /**
          * Add a matched reader.
          * @param ratt Pointer to the ReaderProxyData object added.

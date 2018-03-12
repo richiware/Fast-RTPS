@@ -152,8 +152,6 @@ class StatefulWriter::impl : public RTPSWriter::impl
 
         void add_flow_controller(std::unique_ptr<FlowController> controller);
 
-        SequenceNumber_t next_sequence_number() const;
-
         void send_heartbeat(bool final = false);
 
         void send_heartbeat_to(const ReaderProxy& remote_reader, bool final = false);

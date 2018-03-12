@@ -56,6 +56,13 @@ namespace fastrtps {
                 listener_ = listener;
             }
 
+            virtual void onNewDataMessage(Subscriber::impl& subscriber) override
+            {
+                assert(listener_);
+                assert(subscriber_.impl_.get() == &subscriber);
+                listener_->onNewDataMessage(subscriber_);
+            }
+
             virtual void onSubscriptionMatched(Subscriber::impl& subscriber, const rtps::MatchingInfo& info) override
             {
                 assert(listener_);
@@ -80,7 +87,14 @@ Subscriber::Subscriber(Participant& participant, const SubscriberAttributes& att
     listener_link_(new ListenerLink(*this, listener)),
     impl_(get_implementation(participant).create_subscriber(att, listener_link_->impl_listener()))
 {
-    if(!impl_)
+    if(impl_)
+    {
+        if(!impl_->enable())
+        {
+            throw Error("Error enabling publisher");
+        }
+    }
+    else
     {
         throw Error("Error creating publisher");
     }

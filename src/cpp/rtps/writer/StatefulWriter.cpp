@@ -814,12 +814,6 @@ void StatefulWriter::impl::add_flow_controller(std::unique_ptr<FlowController> c
     m_controllers.push_back(std::move(controller));
 }
 
-SequenceNumber_t StatefulWriter::impl::next_sequence_number() const
-{
-    std::lock_guard<std::mutex> guard(mutex_);
-    return next_sequence_number_nts();
-}
-
 void StatefulWriter::impl::send_heartbeat(bool final)
 {
     SequenceNumber_t first_seq;
@@ -828,6 +822,16 @@ void StatefulWriter::impl::send_heartbeat(bool final)
         std::unique_lock<std::mutex> history_lock(history_.lock_for_transaction());
         first_seq = history_.get_min_sequence_number_nts();
         last_seq = history_.get_max_sequence_number_nts();
+        if(first_seq == c_SequenceNumber_Unknown || last_seq == c_SequenceNumber_Unknown)
+        {
+            first_seq = history_.next_sequence_number_nts();
+            last_seq = SequenceNumber_t(0, 0);
+        }
+        else
+        {
+            (void)first_seq;
+            assert(first_seq <= last_seq);
+        }
     }
 
     std::lock_guard<std::mutex> guard(mutex_);
@@ -843,6 +847,16 @@ void StatefulWriter::impl::send_heartbeat_to(const ReaderProxy& remote_reader, b
         std::unique_lock<std::mutex> history_lock(history_.lock_for_transaction());
         first_seq = history_.get_min_sequence_number_nts();
         last_seq = history_.get_max_sequence_number_nts();
+        if(first_seq == c_SequenceNumber_Unknown || last_seq == c_SequenceNumber_Unknown)
+        {
+            first_seq = history_.next_sequence_number_nts();
+            last_seq = SequenceNumber_t(0, 0);
+        }
+        else
+        {
+            (void)first_seq;
+            assert(first_seq <= last_seq);
+        }
     }
 
     std::lock_guard<std::mutex> guard(mutex_);
@@ -862,17 +876,6 @@ void StatefulWriter::impl::send_heartbeat_to_nts(const ReaderProxy& remote_reade
 void StatefulWriter::impl::send_heartbeat_nts_(const std::vector<GUID_t>& remote_readers, const LocatorList_t &locators,
         RTPSMessageGroup& message_group, SequenceNumber_t first_seq, SequenceNumber_t last_seq, bool final)
 {
-    if (first_seq == c_SequenceNumber_Unknown || last_seq == c_SequenceNumber_Unknown)
-    {
-        first_seq = next_sequence_number_nts();
-        last_seq = SequenceNumber_t(0, 0);
-    }
-    else
-    {
-        (void)first_seq;
-        assert(first_seq <= last_seq);
-    }
-
     incrementHBCount();
 
     // FinalFlag is always false because this class is used only by StatefulWriter in Reliable.

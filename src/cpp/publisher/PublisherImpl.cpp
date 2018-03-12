@@ -13,7 +13,7 @@
 // limitations under the License.
 
 /*
- * Publisher.cpp
+ * PublisherImpl.cpp
  *
  */
 
@@ -26,6 +26,12 @@
 #include <fastrtps/rtps/participant/RTPSParticipant.h>
 #include <fastrtps/log/Log.h>
 #include <fastrtps/utils/TimeConversion.h>
+
+#if defined(__DEBUG)
+#include <sys/syscall.h>
+#include <unistd.h>
+#include <pthread.h>
+#endif
 
 using namespace eprosima::fastrtps;
 using namespace ::rtps;
@@ -47,9 +53,9 @@ Publisher::impl::impl(Participant::impl& participant, TopicDataType* type,
 
 bool Publisher::impl::init()
 {
-    history_.call_after_adding_change(std::bind(&Publisher::impl::unsent_change_added_to_history, this,
+    history_.call_after_adding_change(std::bind(&Publisher::impl::unsent_change_added_to_history_nts_, this,
             std::placeholders::_1));
-    history_.call_after_deleting_change(std::bind(&Publisher::impl::change_removed_by_history, this,
+    history_.call_after_deleting_change(std::bind(&Publisher::impl::change_removed_by_history_, this,
             std::placeholders::_1, std::placeholders::_2));
 
     WriterAttributes watt;
@@ -77,16 +83,7 @@ bool Publisher::impl::init()
 
     if(writer_)
     {
-        // Register the writer
-        if(participant_.rtps_participant().register_writer(*writer_, att_.topic, att_.qos))
-        {
-            return true;
-        }
-        else
-        {
-            logError(PUBLISHER,"Failed registering associated writer");
-        }
-        //TODO (Ricardo) Remove writer
+        return true;
     }
     else
     {
@@ -110,6 +107,23 @@ void Publisher::impl::deinit()
     }
 }
 
+bool Publisher::impl::enable()
+{
+    bool returned_value = false;
+
+    // Register the writer
+    if(participant_.rtps_participant().register_writer(*writer_, att_.topic, att_.qos))
+    {
+        returned_value = true;
+    }
+    else
+    {
+        logError(PUBLISHER,"Failed registering associated writer");
+    }
+
+    return returned_value;
+}
+
 bool Publisher::impl::create_new_change(ChangeKind_t change_kind, void* data)
 {
     return create_new_change_with_params(change_kind, data, WRITE_PARAM_DEFAULT);
@@ -124,6 +138,7 @@ bool Publisher::impl::create_new_change_with_params(ChangeKind_t change_kind, vo
         return false;
     }
 
+    std::unique_lock<std::mutex> history_lock(history_.lock_for_transaction());
     std::unique_lock<std::mutex> lock(mutex_);
 
     if(change_kind == NOT_ALIVE_UNREGISTERED || change_kind == NOT_ALIVE_DISPOSED ||
@@ -140,18 +155,22 @@ bool Publisher::impl::create_new_change_with_params(ChangeKind_t change_kind, vo
 
     if(att_.topic.topicKind == WITH_KEY)
     {
-        type_->getKey(data,&handle);
+        type_->getKey(data, &handle);
     }
 
     map::iterator map_it = changes_by_instance_.find(handle);
 
     // Currently write fails if exceeded max_instances. Check this value.
-    if(att_.topic.resourceLimitsQos.max_instances > 0 &&
-            static_cast<int32_t>(changes_by_instance_.size()) == att_.topic.resourceLimitsQos.max_instances &&
-            map_it == changes_by_instance_.end())
+    if(map_it == changes_by_instance_.end())
     {
-        logWarning(PUBLISHER, "Exceeded QoS max_instances");
-        return false;
+        if(att_.topic.resourceLimitsQos.max_instances > 0 &&
+            static_cast<int32_t>(changes_by_instance_.size()) == att_.topic.resourceLimitsQos.max_instances)
+        {
+            logWarning(PUBLISHER, "Exceeded QoS max_instances");
+            return false;
+        }
+
+        changes_by_instance_.emplace(std::piecewise_construct, std::make_tuple(handle), std::make_tuple());
     }
 
     //NOTA Cuando se vaya a eliminar un dato por KEEP_ALL, antes se usaba try_to_remove. Ahora llamar al
@@ -217,28 +236,61 @@ bool Publisher::impl::create_new_change_with_params(ChangeKind_t change_kind, vo
             change->write_params = wparams;
         }
 
-        //TODO Falta que el history vuelva a llamar aqui, como hacia con el PublisherHistory.
-        if(!history_.add_change(change))
-        {
-            return false;
-        }
+        GUID_t writer_guid(change->writer_guid);
+        SequenceNumber_t sequence_number = history_.add_change_nts(change);
 
-        return true;
+        if(sequence_number != SequenceNumber_t::unknown())
+        {
+            if(&wparams != &WRITE_PARAM_DEFAULT)
+            {
+                wparams.sample_identity().writer_guid(writer_guid);
+                wparams.sample_identity().sequence_number(sequence_number);
+            }
+
+            return true;
+        }
     }
 
     return false;
 }
 
 
-bool Publisher::impl::unsent_change_added_to_history(const CacheChange_t& change)
+bool Publisher::impl::unsent_change_added_to_history_nts_(const CacheChange_t& change)
 {
-    return writer_->unsent_change_added_to_history(change);
+#if defined(__DEBUG)
+    assert(get_mutex_owner_() == get_thread_id_());
+#endif
+
+    bool returned_value = false;
+
+    if(writer_->unsent_change_added_to_history(change))
+    {
+        map::iterator map_it = changes_by_instance_.find(change.instance_handle);
+        assert(map_it != changes_by_instance_.end());
+
+        map_it->second.insert(map_it->second.end(), change.sequence_number);
+        returned_value = true;
+    }
+
+    return returned_value;
 }
 
-bool Publisher::impl::change_removed_by_history(const SequenceNumber_t& sequence_number,
+bool Publisher::impl::change_removed_by_history_(const SequenceNumber_t& sequence_number,
                 const InstanceHandle_t& handle)
 {
-    return writer_->change_removed_by_history(sequence_number, handle);
+    std::unique_lock<std::mutex> lock(mutex_);
+    bool returned_value = false;
+
+    if(writer_->change_removed_by_history(sequence_number, handle))
+    {
+        map::iterator map_it = changes_by_instance_.find(handle);
+        assert(map_it != changes_by_instance_.end());
+
+        map_it->second.erase(sequence_number);
+        returned_value = true;
+    }
+
+    return returned_value;
 }
 
 //TODO deprecated
@@ -365,3 +417,16 @@ bool Publisher::impl::wait_for_all_acked(const Time_t& max_wait)
 {
     return writer_->wait_for_all_acked(max_wait);
 }
+
+#if defined(__DEBUG)
+int Publisher::impl::get_mutex_owner_() const
+{
+    auto mutex = mutex_.native_handle();
+    return mutex->__data.__owner;
+}
+
+int Publisher::impl::get_thread_id_() const
+{
+    return syscall(__NR_gettid);
+}
+#endif

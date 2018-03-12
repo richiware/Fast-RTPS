@@ -73,6 +73,8 @@ class Publisher::impl
 
         void deinit();
 
+        bool enable();
+
         /**
          * 
          * @param kind
@@ -141,20 +143,25 @@ class Publisher::impl
 
     private:
 
-        bool unsent_change_added_to_history(const rtps::CacheChange_t&);
+        bool unsent_change_added_to_history_nts_(const rtps::CacheChange_t&);
 
         /**
          * Indicate the writer that a change has been removed by the history due to some HistoryQos requirement.
          * @param a_change Pointer to the change that is going to be removed.
          * @return True if removed correctly.
          */
-        bool change_removed_by_history(const rtps::SequenceNumber_t& sequence_number,
+        bool change_removed_by_history_(const rtps::SequenceNumber_t& sequence_number,
                 const rtps::InstanceHandle_t& handle);
+
+#if defined(__DEBUG)
+        int get_mutex_owner_() const;
+
+        int get_thread_id_() const;
+#endif
 
         Participant::impl& participant_;
 
         //TODO Make private again
-    public:
 
         //! Pointer to the associated Data Writer.
         std::shared_ptr<rtps::RTPSWriter::impl> writer_;
@@ -186,7 +193,11 @@ class Publisher::impl
 
         map changes_by_instance_;
 
+#if defined(__DEBUG)
+        mutable std::mutex mutex_;
+#else
         std::mutex mutex_;
+#endif
 };
 
 inline Publisher::impl& get_implementation(Publisher& publisher) { return *publisher.impl_; }

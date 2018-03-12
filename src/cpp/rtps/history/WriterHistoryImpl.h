@@ -43,7 +43,9 @@ class WriterHistory::impl
 
     const HistoryAttributes& attributes() { return attributes_; }
 
-    bool add_change(CacheChange_ptr& change);
+    SequenceNumber_t add_change(CacheChange_ptr& change);
+
+    SequenceNumber_t add_change_nts(CacheChange_ptr& change);
 
     CacheChange_ptr remove_change(const SequenceNumber_t& sequence_number);
 
@@ -62,6 +64,8 @@ class WriterHistory::impl
     SequenceNumber_t get_min_sequence_number_nts() const;
 
     SequenceNumber_t get_max_sequence_number_nts() const;
+
+    SequenceNumber_t next_sequence_number_nts() const;
 
     const CacheChange_t* get_change_nts(const SequenceNumber_t& sequence_number) const;
 
@@ -99,7 +103,13 @@ class WriterHistory::impl
     HistoryAttributes attributes_;
 
     //! Mutex that protects history.
+#if defined(__DEBUG)
     mutable std::mutex mutex_;
+#else
+    std::mutex mutex_;
+#endif
+
+    SequenceNumber_t last_cachechange_seqnum_;
 
     map changes_;
 

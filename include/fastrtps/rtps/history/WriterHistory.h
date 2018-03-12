@@ -55,7 +55,7 @@ class WriterHistory
      * @param a_change Pointer to the CacheChange to add.
      * @return True if added.
      */
-    RTPS_DllAPI bool add_change(CacheChange_ptr& change);
+    RTPS_DllAPI SequenceNumber_t add_change(CacheChange_ptr& change);
 
     RTPS_DllAPI CacheChange_ptr remove_change(const SequenceNumber_t& sequence_number);
 

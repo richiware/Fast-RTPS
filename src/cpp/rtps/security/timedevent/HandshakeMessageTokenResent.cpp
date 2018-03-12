@@ -62,12 +62,13 @@ void HandshakeMessageTokenResent::event(EventCode code, const char* msg)
 
                     if(p_change)
                     {
-                        security_manager_.participant_stateless_message_writer_->reuse_change(p_change);
                         logInfo(SECURITY, "Authentication handshake resent to participant " <<
                                 remote_participant_key_);
-                        if(security_manager_.participant_stateless_message_writer_history_->add_change(p_change))
+                        SequenceNumber_t new_sequence_number =
+                            security_manager_.participant_stateless_message_writer_history_->add_change(p_change);
+                        if(new_sequence_number != SequenceNumber_t::unknown())
                         {
-                            remote_participant_info->change_sequence_number_ = p_change->sequence_number;
+                            remote_participant_info->change_sequence_number_ = new_sequence_number;
                         }
                         //TODO (Ricardo) What to do if not added?
                     }

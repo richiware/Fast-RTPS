@@ -581,11 +581,13 @@ bool SecurityManager::on_process_handshake(const GUID_t& remote_participant_guid
                 // Send
                 logInfo(SECURITY, "Authentication handshake sent to participant " <<
                         remote_participant_guid);
-                if(participant_stateless_message_writer_history_->add_change(change))
+
+                SequenceNumber_t new_sequence_number = participant_stateless_message_writer_history_->add_change(change);
+                if(new_sequence_number != SequenceNumber_t::unknown())
                 {
                     handshake_message_send = true;
                     expected_sequence_number = message.message_identity().sequence_number();
-                    remote_participant_info->change_sequence_number_ = change->sequence_number;
+                    remote_participant_info->change_sequence_number_ = new_sequence_number;
                 }
                 else
                 {
@@ -1083,12 +1085,10 @@ void SecurityManager::process_participant_stateless_message(const CacheChange_t*
 
                         if(p_change)
                         {
-                            participant_stateless_message_writer_->reuse_change(p_change);
-                            //TODO Mechanism to alert you insert an old sequence number.
-                            if(participant_stateless_message_writer_history_->add_change(p_change))
+                            SequenceNumber_t new_sequence_number = participant_stateless_message_writer_history_->add_change(p_change);
+                            if(new_sequence_number != SequenceNumber_t::unknown())
                             {
-                                remote_participant_info->change_sequence_number_ =
-                                    p_change->sequence_number;
+                                remote_participant_info->change_sequence_number_ = new_sequence_number;
                             }
                             //TODO (Ricardo) What to do if not added?
                         }
@@ -1151,11 +1151,10 @@ void SecurityManager::process_participant_stateless_message(const CacheChange_t*
 
                     if(p_change)
                     {
-                        participant_stateless_message_writer_->reuse_change(p_change);
-                        if(participant_stateless_message_writer_history_->add_change(p_change))
+                        SequenceNumber_t new_sequence_number = participant_stateless_message_writer_history_->add_change(p_change);
+                        if(new_sequence_number != SequenceNumber_t::unknown())
                         {
-                            remote_participant_info->change_sequence_number_ =
-                                p_change->sequence_number;
+                            remote_participant_info->change_sequence_number_ = new_sequence_number;
                         }
                         //TODO (Ricardo) What to do if not added?
                     }
@@ -1640,7 +1639,7 @@ ParticipantCryptoHandle* SecurityManager::register_and_match_crypto_endpoint(con
                     change->serialized_payload.length = aux_msg.length;
 
                     // Send
-                    if(!participant_volatile_message_secure_writer_history_->add_change(change))
+                    if(participant_volatile_message_secure_writer_history_->add_change(change) == SequenceNumber_t::unknown())
                     {
                         logError(SECURITY, "WriterHistory cannot add the CacheChange_t");
                     }
@@ -2044,7 +2043,8 @@ bool SecurityManager::discovered_reader(const GUID_t& writer_guid, const GUID_t&
                                 change->serialized_payload.length = aux_msg.length;
 
                                 // Send
-                                if(participant_volatile_message_secure_writer_history_->add_change(change))
+                                if(participant_volatile_message_secure_writer_history_->add_change(change) !=
+                                        SequenceNumber_t::unknown())
                                 {
                                     logInfo(SECURITY, "Process successful discovering remote reader " << remote_reader_data.guid());
                                     local_writer->second.associated_readers.emplace(remote_reader_data.guid(),
@@ -2298,7 +2298,8 @@ bool SecurityManager::discovered_writer(const GUID_t& reader_guid, const GUID_t&
                                 change->serialized_payload.length = aux_msg.length;
 
                                 // Send
-                                if(participant_volatile_message_secure_writer_history_->add_change(change))
+                                if(participant_volatile_message_secure_writer_history_->add_change(change) !=
+                                        SequenceNumber_t::unknown())
                                 {
                                     logInfo(SECURITY, "Process successful discovering remote writer " << remote_writer_data.guid());
                                     local_reader->second.associated_writers.emplace(remote_writer_data.guid(),

@@ -72,6 +72,7 @@ Locator_t RTPSParticipant::impl::applyLocatorAdaptRule(Locator_t loc)
 //TODO(Ricardo) Remove GUID. Better be inside attributes.
 //TODO(Ricardo) ParticipantID is calculate by networkmanager trying to open ports.
 //TODO(Ricardo) InstanceID is diferent that ParticipantID.
+//TODO(Ricardo) Make throw exception. Before all pointer has to ve unqiue_ptr.
 RTPSParticipant::impl::impl(const RTPSParticipantAttributes& PParam,
         const GuidPrefix_t& guid, Listener* listener) : att_(PParam),
     event_thread_(nullptr),
@@ -1102,11 +1103,11 @@ std::pair<StatefulReader*,StatefulReader*> RTPSParticipant::impl::getEDPReaders(
     {
         //TODO(Ricardo) Review.
         //Means the EDP attached is actually non static and therefore it has Readers
-        //buffer.first=EDPPointer->mp_SubReader.first;
-        //buffer.second=EDPPointer->mp_PubReader.first;
+        buffer.first = EDPPointer->mp_SubReader.first;
+        buffer.second = EDPPointer->mp_PubReader.first;
     }else{
-        buffer.first=nullptr;
-        buffer.second=nullptr;
+        buffer.first = nullptr;
+        buffer.second = nullptr;
     }
     return buffer;
 

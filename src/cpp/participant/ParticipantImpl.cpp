@@ -242,7 +242,6 @@ std::shared_ptr<Subscriber::impl> Participant::impl::create_subscriber(const Sub
     return nullptr;
 }
 
-
 bool Participant::impl::getRegisteredType(const char* typeName, TopicDataType** type)
 {
     for(std::vector<TopicDataType*>::iterator it=m_types.begin();

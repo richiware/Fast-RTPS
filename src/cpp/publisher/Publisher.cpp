@@ -81,7 +81,14 @@ Publisher::Publisher(Participant& participant, const PublisherAttributes& att,
     listener_link_(new ListenerLink(*this, listener)),
     impl_(get_implementation(participant).create_publisher(att, listener_link_->impl_listener()))
 {
-    if(!impl_)
+    if(impl_)
+    {
+        if(!impl_->enable())
+        {
+            throw Error("Error enabling publisher");
+        }
+    }
+    else
     {
         throw Error("Error creating publisher");
     }
