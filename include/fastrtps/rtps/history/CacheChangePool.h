@@ -20,20 +20,13 @@
 #ifndef _RTPS_HISTORY_CACHECHANGEPOOL_H_
 #define _RTPS_HISTORY_CACHECHANGEPOOL_H_
 
-#include "../resources/ResourceManagement.h"
 #include "../common/CacheChange.h"
 
 #include <vector>
-#include <functional>
-#include <cstdint>
-#include <cstddef>
 #include <mutex>
-#include <memory>
-#include <cassert>
-
 
 namespace eprosima {
-namespace fastrtps{
+namespace fastrtps {
 namespace rtps {
 
 /**
@@ -44,7 +37,6 @@ class CacheChangePool
 {
     public:
 
-        virtual ~CacheChangePool();
         /**
          * Constructor.
          * @param pool_size The initial pool size
@@ -52,7 +44,9 @@ class CacheChangePool
          * @param max_pool_size Maximum payload size. If set to 0 the pool will keep reserving until something breaks.
          * @param memoryPolicy Memory management policy.
          */
-        CacheChangePool(int32_t pool_size, uint32_t payload_size, int32_t max_pool_size, MemoryManagementPolicy_t memoryPolicy);
+        CacheChangePool(int32_t pool_size, uint32_t payload_size, int32_t max_pool_size);
+
+        virtual ~CacheChangePool();
 
         /*!
          * @brief Reserves a CacheChange from the pool.
@@ -62,86 +56,26 @@ class CacheChangePool
          * PREALLOCATED_WITH_REALLOC_MEMORY_MODE)
          * @return True whether the CacheChange could be allocated. In other case returns false.
          */
-        bool reserve_cache(CacheChange_t** chan, const std::function<uint32_t()>& calculateSizeFunc);
+        CacheChange_ptr reserve_cache();
 
-        /*!
-         * @brief Reserves a CacheChange from the pool.
-         * @param chan Returned pointer to the reserved CacheChange.
-         * @param dataSize Size of the data which will go into the CacheChange if it is necessary (on memory management
-         * policy DYNAMIC_RESERVE_MEMORY_MODE and PREALLOCATED_WITH_REALLOC_MEMORY_MODE). In other case this variable is not used.
-         * @return True whether the CacheChange could be allocated. In other case returns false.
-         */
-        bool reserve_cache(CacheChange_t** chan, uint32_t dataSize);
+        //!Get the initial payload size associated with the Pool.
+        //TODO(Ricardo) Review if necesssary
+        uint32_t get_initial_payload_size() const { return payload_size_; }
+
+    private:
+
+        friend void CacheChangePoolDeleter::operator()(CacheChange_t*);
 
         //!Release a Cache back to the pool.
         void release_cache(CacheChange_t*);
 
-        //!Get the size of the cache vector; all of them (reserved and not reserved).
-        size_t get_allCachesSize(){return m_allCaches.size();}
+        bool allocate_group_nts(uint32_t pool_size);
 
-        //!Get the number of frre caches.
-        size_t get_freeCachesSize(){return m_freeCaches.size();}
-
-        //!Get the initial payload size associated with the Pool.
-        uint32_t get_initial_payload_size() const { return m_initial_payload_size; }
-
-    private:
-
-        uint32_t m_initial_payload_size;
-        uint32_t m_payload_size;
-        uint32_t m_pool_size;
-        uint32_t m_max_pool_size;
-        std::vector<CacheChange_t*> m_freeCaches;
-        std::vector<CacheChange_t*> m_allCaches;
-        bool allocateGroup(uint32_t pool_size);
-        CacheChange_t* allocateSingle(uint32_t dataSize);
-        std::mutex* mp_mutex;
-        MemoryManagementPolicy_t memoryMode;
-};
-
-class CacheChangePoolDeleter
-{
-    public:
-
-        CacheChangePoolDeleter() : pool_(nullptr) {}
-
-        CacheChangePoolDeleter(CacheChangePool* pool) : pool_(pool) {}
-
-        CacheChangePoolDeleter(CacheChangePoolDeleter&& other) = default;
-
-        CacheChangePoolDeleter& operator=(CacheChangePoolDeleter&&) = default;
-
-        void operator()(CacheChange_t* cachechange)
-        {
-            if(pool_)
-            {
-                pool_->release_cache(cachechange);
-            }
-        }
-
-    private:
-
-        CacheChangePool* pool_;
-};
-
-class CacheChange_ptr : protected std::unique_ptr<CacheChange_t, CacheChangePoolDeleter>
-{
-    public:
-
-        typedef std::unique_ptr<CacheChange_t, CacheChangePoolDeleter> Base;
-
-        using Base::operator->;
-        using Base::operator*;
-        using Base::operator bool;
-
-        CacheChange_ptr() {}
-
-        CacheChange_ptr(CacheChangePool* pool, CacheChange_t* cachechange) :
-            Base(cachechange, CacheChangePoolDeleter(pool)) {}
-
-        CacheChange_ptr(CacheChange_ptr&& other) = default;
-
-        CacheChange_ptr& operator=(CacheChange_ptr&&) = default;
+        uint32_t payload_size_;
+        uint32_t pool_size_;
+        uint32_t max_pool_size_;
+        std::vector<CacheChange_t*> free_caches_;
+        std::mutex mutex_;
 };
 
 }

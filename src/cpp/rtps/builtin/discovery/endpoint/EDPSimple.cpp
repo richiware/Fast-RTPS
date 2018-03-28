@@ -270,8 +270,7 @@ bool EDPSimple::processLocalReaderProxyData(ReaderProxyData* rdata)
     if(mp_SubWriter.first !=nullptr)
     {
         // TODO(Ricardo) Write a getCdrSerializedPayload for ReaderProxyData.
-        CacheChange_ptr change = mp_SubWriter.first->new_change([]() ->
-                uint32_t {return DISCOVERY_SUBSCRIPTION_DATA_MAX_SIZE;}, ALIVE,rdata->key());
+        CacheChange_ptr change = mp_SubWriter.first->new_change(ALIVE,rdata->key());
 
         if(change)
         {
@@ -327,8 +326,7 @@ bool EDPSimple::processLocalWriterProxyData(WriterProxyData* wdata)
     logInfo(RTPS_EDP, wdata->guid().entityId);
     if(mp_PubWriter.first !=nullptr)
     {
-        CacheChange_ptr change = mp_PubWriter.first->new_change([]() ->
-                uint32_t {return DISCOVERY_PUBLICATION_DATA_MAX_SIZE;}, ALIVE, wdata->key());
+        CacheChange_ptr change = mp_PubWriter.first->new_change(ALIVE, wdata->key());
 
         if(change)
         {
@@ -387,8 +385,7 @@ bool EDPSimple::removeLocalWriter(RTPSWriter::impl& writer)
         InstanceHandle_t iH;
         iH = writer.getGuid();
 
-        CacheChange_ptr change = mp_PubWriter.first->new_change([]() ->
-                uint32_t {return DISCOVERY_PUBLICATION_DATA_MAX_SIZE;}, NOT_ALIVE_DISPOSED_UNREGISTERED,iH);
+        CacheChange_ptr change = mp_PubWriter.first->new_change(NOT_ALIVE_DISPOSED_UNREGISTERED,iH);
 
         if(change)
         {
@@ -426,8 +423,7 @@ bool EDPSimple::removeLocalReader(RTPSReader::impl& reader)
     {
         InstanceHandle_t iH;
         iH = (reader.getGuid());
-        CacheChange_ptr change = mp_SubWriter.first->new_change([]() ->
-                uint32_t {return DISCOVERY_SUBSCRIPTION_DATA_MAX_SIZE;}, NOT_ALIVE_DISPOSED_UNREGISTERED,iH);
+        CacheChange_ptr change = mp_SubWriter.first->new_change(NOT_ALIVE_DISPOSED_UNREGISTERED,iH);
 
         if(change)
         {

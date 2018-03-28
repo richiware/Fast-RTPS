@@ -46,18 +46,21 @@ class FragmentedChangePitStop
              * This constructor has to be used if the ChangeInPit will be used to be stored in a container.
              * @param change Related CacheChange_t.
              */
-            ChangeInPit(CacheChange_t* change) : sequence_number_(change->sequence_number), change_(change) {};
+            ChangeInPit(CacheChange_ptr&& change) : sequence_number_(change->sequence_number), change_(std::move(change)) {};
 
             /*!
              * @brief Constructor used to generated a simple key for searching in a container.
              * @param sequence_number SequenceNumber_t used as key.
              * @remarks Not use this constructor if the object will be stored in a container.
              */
-            ChangeInPit(const SequenceNumber_t &sequence_number) : sequence_number_(sequence_number), change_(nullptr) {};
+            ChangeInPit(const SequenceNumber_t &sequence_number) : sequence_number_(sequence_number) {};
 
-            ChangeInPit(const ChangeInPit& cip) : sequence_number_(cip.sequence_number_), change_(cip.change_) {};
+            ChangeInPit(ChangeInPit&& cip) : sequence_number_(std::move(cip.sequence_number_)),
+            change_(std::move(cip.change_)) {};
 
-            CacheChange_t* getChange() const { return change_; }
+            const CacheChange_ptr& getChange() const { return change_; }
+
+            CacheChange_ptr release() const { return std::move(change_); }
 
             bool operator==(const ChangeInPit& cip) const
             {
@@ -69,7 +72,8 @@ class FragmentedChangePitStop
             ChangeInPit& operator=(const ChangeInPit& cip) = delete;
 
             const SequenceNumber_t sequence_number_;
-            CacheChange_t* change_;
+            // TODO(Ricardo) Sera eliminado cuando los fragmetnos tb se gestionen en el history.
+            mutable CacheChange_ptr change_;
 
         public:
             /*!
@@ -101,7 +105,7 @@ class FragmentedChangePitStop
      * @return If a CacheChange_t is completed with new incomming fragments, this will be returned.
      * In other case nullptr is returned.
      */
-    CacheChange_t* process(CacheChange_t* incoming_change, uint32_t sampleSize, uint32_t fragmentStartingNum);
+    CacheChange_ptr process(CacheChange_ptr& incoming_change, uint32_t sampleSize, uint32_t fragmentStartingNum);
 
     /*!
      * @brief Search if there is a CacheChange_t, giving SequenceNumber_t and writer GUID_t,

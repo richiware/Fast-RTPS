@@ -39,7 +39,7 @@ History::History(const HistoryAttributes & att):
     m_att(att),
     m_isHistoryFull(false),
     mp_invalidCache(nullptr),
-    m_changePool(att.initialReservedCaches,att.payloadMaxSize,att.maximumReservedCaches,att.memoryPolicy),
+    m_changePool(att.initialReservedCaches, att.payloadMaxSize, att.maximumReservedCaches),
     mp_minSeqCacheChange(nullptr),
     mp_maxSeqCacheChange(nullptr),
     mp_mutex(nullptr)
@@ -76,7 +76,7 @@ bool History::remove_all_changes()
     {
         while(!m_changes.empty())
         {
-            remove_change(m_changes.front());
+            remove_change(&*m_changes.front());
         }
         m_changes.clear();
         m_isHistoryFull = false;
@@ -116,12 +116,11 @@ bool History::get_change(const SequenceNumber_t& seq, const GUID_t& guid,CacheCh
     }
 
     std::lock_guard<std::recursive_mutex> guard(*mp_mutex);
-    for(std::vector<CacheChange_t*>::iterator it = m_changes.begin();
-            it!=m_changes.end();++it)
+    for(auto it = m_changes.begin(); it != m_changes.end(); ++it)
     {
         if((*it)->sequence_number == seq && (*it)->writer_guid == guid)
         {
-            *change = *it;
+            *change = &**it;
             return true;
         }
         else if((*it)->sequence_number > seq)
@@ -144,8 +143,7 @@ namespace rtps{
 void History::print_changes_seqNum2()
 {
     std::stringstream ss;
-    for(std::vector<CacheChange_t*>::iterator it = m_changes.begin();
-            it!=m_changes.end();++it)
+    for(auto it = m_changes.begin(); it != m_changes.end(); ++it)
     {
         ss << (*it)->sequence_number << "-";
     }

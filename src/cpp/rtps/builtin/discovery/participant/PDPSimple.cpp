@@ -228,7 +228,7 @@ void PDPSimple::announceParticipantState(bool new_change, bool dispose)
             // TODO Reuse change returned by this function
             spdp_writer_history_->remove_min_change();
             // TODO(Ricardo) Change DISCOVERY_PARTICIPANT_DATA_MAX_SIZE with getLocalParticipantProxyData()->size().
-            CacheChange_ptr change = spdp_writer_->new_change([]() -> uint32_t {return DISCOVERY_PARTICIPANT_DATA_MAX_SIZE;}, ALIVE, key);
+            CacheChange_ptr change = spdp_writer_->new_change(ALIVE, key);
 
             if(change)
             {
@@ -274,9 +274,8 @@ void PDPSimple::announceParticipantState(bool new_change, bool dispose)
 
         // TODO Reuse change returned by this function
         spdp_writer_history_->remove_min_change();
-        CacheChange_ptr change = spdp_writer_->new_change([]() ->
-                uint32_t {return DISCOVERY_PARTICIPANT_DATA_MAX_SIZE;},
-                NOT_ALIVE_DISPOSED_UNREGISTERED, getLocalParticipantProxyData()->m_key);
+        CacheChange_ptr change = spdp_writer_->new_change(NOT_ALIVE_DISPOSED_UNREGISTERED,
+                getLocalParticipantProxyData()->m_key);
 
         if(change)
         {
@@ -738,7 +737,7 @@ bool PDPSimple::removeRemoteParticipant(GUID_t& partGUID)
         {
             if((*it)->instance_handle == pdata->m_key)
             {
-                spdp_reader_history_->remove_change(*it);
+                spdp_reader_history_->remove_change(&**it);
                 break;
             }
         }

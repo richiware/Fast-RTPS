@@ -110,17 +110,6 @@ void default_send_print(const Data1mb& data)
 using namespace eprosima::fastrtps;
 using namespace eprosima::fastrtps::rtps;
 
-#if defined(PREALLOCATED_WITH_REALLOC_MEMORY_MODE_TEST)
-#define MEMORY_MODE_STRING ReallocMem
-#elif defined(DYNAMIC_RESERVE_MEMORY_MODE_TEST)
-#define MEMORY_MODE_STRING DynMem
-#else
-#define MEMORY_MODE_STRING PreallocMem
-#endif
-
-#define PASTER(x, y) x ## _ ## y
-#define EVALUATOR(x, y) PASTER(x, y)
-#define BLACKBOXTEST(test_case_name, test_name) TEST(EVALUATOR(test_case_name, MEMORY_MODE_STRING), test_name)
 #define TEST_TOPIC_NAME std::string(test_info_->test_case_name() + std::string("_") + test_info_->name())
 
 uint32_t global_port = 0;
@@ -297,7 +286,7 @@ void print_non_received_messages(const std::list<T>& data, const std::function<v
 }
 /***** End auxiliary lambda function *****/
 
-BLACKBOXTEST(BlackBox, RTPSAsNonReliableSocket)
+TEST(BlackBox, RTPSAsNonReliableSocket)
 {
     RTPSAsSocketReader<HelloWorldType> reader(TEST_TOPIC_NAME);
     RTPSAsSocketWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
@@ -328,7 +317,7 @@ BLACKBOXTEST(BlackBox, RTPSAsNonReliableSocket)
     ASSERT_LE(data.size(), data_length - 2);
 }
 
-BLACKBOXTEST(BlackBox, AsyncRTPSAsNonReliableSocket)
+TEST(BlackBox, AsyncRTPSAsNonReliableSocket)
 {
     RTPSAsSocketReader<HelloWorldType> reader(TEST_TOPIC_NAME);
     RTPSAsSocketWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
@@ -360,7 +349,7 @@ BLACKBOXTEST(BlackBox, AsyncRTPSAsNonReliableSocket)
     ASSERT_LE(data.size(), data_length - 2);
 }
 
-BLACKBOXTEST(BlackBox, AsyncRTPSAsNonReliableSocketWithWriterSpecificFlowControl)
+TEST(BlackBox, AsyncRTPSAsNonReliableSocketWithWriterSpecificFlowControl)
 {
     RTPSAsSocketReader<HelloWorldType> reader(TEST_TOPIC_NAME);
     RTPSAsSocketWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
@@ -395,7 +384,7 @@ BLACKBOXTEST(BlackBox, AsyncRTPSAsNonReliableSocketWithWriterSpecificFlowControl
     ASSERT_LE(data.size(), data_length - 2);
 }
 
-BLACKBOXTEST(BlackBox, RTPSAsReliableSocket)
+TEST(BlackBox, RTPSAsReliableSocket)
 {
     RTPSAsSocketReader<HelloWorldType> reader(TEST_TOPIC_NAME);
     RTPSAsSocketWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
@@ -427,7 +416,7 @@ BLACKBOXTEST(BlackBox, RTPSAsReliableSocket)
     ASSERT_EQ(data.size(), 0);
 }
 
-BLACKBOXTEST(BlackBox, AsyncRTPSAsReliableSocket)
+TEST(BlackBox, AsyncRTPSAsReliableSocket)
 {
     RTPSAsSocketReader<HelloWorldType> reader(TEST_TOPIC_NAME);
     RTPSAsSocketWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
@@ -460,7 +449,7 @@ BLACKBOXTEST(BlackBox, AsyncRTPSAsReliableSocket)
     ASSERT_EQ(data.size(), 0);
 }
 
-BLACKBOXTEST(BlackBox, RTPSAsNonReliableWithRegistration)
+TEST(BlackBox, RTPSAsNonReliableWithRegistration)
 {
     RTPSWithRegistrationReader<HelloWorldType> reader(TEST_TOPIC_NAME);
     RTPSWithRegistrationWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
@@ -494,7 +483,7 @@ BLACKBOXTEST(BlackBox, RTPSAsNonReliableWithRegistration)
     ASSERT_LE(data.size(), data_length - 2);
 }
 
-BLACKBOXTEST(BlackBox, AsyncRTPSAsNonReliableWithRegistration)
+TEST(BlackBox, AsyncRTPSAsNonReliableWithRegistration)
 {
     RTPSWithRegistrationReader<HelloWorldType> reader(TEST_TOPIC_NAME);
     RTPSWithRegistrationWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
@@ -529,7 +518,7 @@ BLACKBOXTEST(BlackBox, AsyncRTPSAsNonReliableWithRegistration)
     ASSERT_LE(data.size(), data_length - 2);
 }
 
-BLACKBOXTEST(BlackBox, RTPSAsReliableWithRegistration)
+TEST(BlackBox, RTPSAsReliableWithRegistration)
 {
     RTPSWithRegistrationReader<HelloWorldType> reader(TEST_TOPIC_NAME);
     RTPSWithRegistrationWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
@@ -564,7 +553,7 @@ BLACKBOXTEST(BlackBox, RTPSAsReliableWithRegistration)
     ASSERT_EQ(data.size(), 0);
 }
 
-BLACKBOXTEST(BlackBox, AsyncRTPSAsReliableWithRegistration)
+TEST(BlackBox, AsyncRTPSAsReliableWithRegistration)
 {
     RTPSWithRegistrationReader<HelloWorldType> reader(TEST_TOPIC_NAME);
     RTPSWithRegistrationWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
@@ -599,7 +588,7 @@ BLACKBOXTEST(BlackBox, AsyncRTPSAsReliableWithRegistration)
     ASSERT_EQ(data.size(), 0);
 }
 
-BLACKBOXTEST(BlackBox, PubSubAsNonReliableHelloworld)
+TEST(BlackBox, PubSubAsNonReliableHelloworld)
 {
     PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
     PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
@@ -627,7 +616,7 @@ BLACKBOXTEST(BlackBox, PubSubAsNonReliableHelloworld)
     reader.block_for_at_least(2);
 }
 
-BLACKBOXTEST(BlackBox, AsyncPubSubAsNonReliableHelloworld)
+TEST(BlackBox, AsyncPubSubAsNonReliableHelloworld)
 {
     PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
     PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
@@ -657,7 +646,7 @@ BLACKBOXTEST(BlackBox, AsyncPubSubAsNonReliableHelloworld)
     reader.block_for_at_least(2);
 }
 
-BLACKBOXTEST(BlackBox, PubSubAsReliableHelloworld)
+TEST(BlackBox, PubSubAsReliableHelloworld)
 {
     PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
     PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
@@ -688,7 +677,7 @@ BLACKBOXTEST(BlackBox, PubSubAsReliableHelloworld)
     reader.block_for_all();
 }
 
-BLACKBOXTEST(BlackBox, AsyncPubSubAsReliableHelloworld)
+TEST(BlackBox, AsyncPubSubAsReliableHelloworld)
 {
     PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
     PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
@@ -720,7 +709,7 @@ BLACKBOXTEST(BlackBox, AsyncPubSubAsReliableHelloworld)
     reader.block_for_all();
 }
 
-BLACKBOXTEST(BlackBox, ReqRepAsReliableHelloworld)
+TEST(BlackBox, ReqRepAsReliableHelloworld)
 {
     ReqRepAsReliableHelloWorldRequester requester;
     ReqRepAsReliableHelloWorldReplier replier;
@@ -741,7 +730,7 @@ BLACKBOXTEST(BlackBox, ReqRepAsReliableHelloworld)
     }
 }
 
-BLACKBOXTEST(BlackBox, ParticipantRemoval)
+TEST(BlackBox, ParticipantRemoval)
 {
     PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
     PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
@@ -772,7 +761,7 @@ BLACKBOXTEST(BlackBox, ParticipantRemoval)
     reader.wait_participant_undiscovery();
 }
 
-BLACKBOXTEST(BlackBox, PubSubAsReliableData64kb)
+TEST(BlackBox, PubSubAsReliableData64kb)
 {
     PubSubReader<Data64kbType> reader(TEST_TOPIC_NAME);
     PubSubWriter<Data64kbType> writer(TEST_TOPIC_NAME);
@@ -803,7 +792,7 @@ BLACKBOXTEST(BlackBox, PubSubAsReliableData64kb)
     reader.block_for_all();
 }
 
-BLACKBOXTEST(BlackBox, AsyncPubSubAsReliableData64kbWithParticipantFlowControl)
+TEST(BlackBox, AsyncPubSubAsReliableData64kbWithParticipantFlowControl)
 {
     PubSubReader<Data64kbType> reader(TEST_TOPIC_NAME);
     PubSubWriter<Data64kbType> writer(TEST_TOPIC_NAME);
@@ -839,7 +828,7 @@ BLACKBOXTEST(BlackBox, AsyncPubSubAsReliableData64kbWithParticipantFlowControl)
     reader.block_for_all();
 }
 
-BLACKBOXTEST(BlackBox, AsyncPubSubAsReliableData64kbWithParticipantFlowControlAndUserTransport)
+TEST(BlackBox, AsyncPubSubAsReliableData64kbWithParticipantFlowControlAndUserTransport)
 {
     PubSubReader<Data64kbType> reader(TEST_TOPIC_NAME);
     PubSubWriter<Data64kbType> writer(TEST_TOPIC_NAME);
@@ -879,7 +868,7 @@ BLACKBOXTEST(BlackBox, AsyncPubSubAsReliableData64kbWithParticipantFlowControlAn
     reader.block_for_all();
 }
 
-BLACKBOXTEST(BlackBox, PubSubAsNonReliableData300kb)
+TEST(BlackBox, PubSubAsNonReliableData300kb)
 {
     // Mutes an expected error
     Log::SetErrorStringFilter(std::regex("^((?!Big data).)*$"));
@@ -897,7 +886,7 @@ BLACKBOXTEST(BlackBox, PubSubAsNonReliableData300kb)
     ASSERT_FALSE(data.empty());
 }
 
-BLACKBOXTEST(BlackBox, PubSubAsReliableData300kb)
+TEST(BlackBox, PubSubAsReliableData300kb)
 {
     // Mutes an expected error
     Log::SetErrorStringFilter(std::regex("^((?!Big data).)*$"));
@@ -915,7 +904,7 @@ BLACKBOXTEST(BlackBox, PubSubAsReliableData300kb)
     ASSERT_FALSE(data.empty());
 }
 
-BLACKBOXTEST(BlackBox, AsyncPubSubAsNonReliableData300kb)
+TEST(BlackBox, AsyncPubSubAsNonReliableData300kb)
 {
     PubSubReader<Data1mbType> reader(TEST_TOPIC_NAME);
     PubSubWriter<Data1mbType> writer(TEST_TOPIC_NAME);
@@ -952,7 +941,7 @@ BLACKBOXTEST(BlackBox, AsyncPubSubAsNonReliableData300kb)
     reader.block_for_at_least(2);
 }
 
-BLACKBOXTEST(BlackBox, AsyncPubSubAsReliableData300kb)
+TEST(BlackBox, AsyncPubSubAsReliableData300kb)
 {
     PubSubReader<Data1mbType> reader(TEST_TOPIC_NAME);
     PubSubWriter<Data1mbType> writer(TEST_TOPIC_NAME);
@@ -990,7 +979,7 @@ BLACKBOXTEST(BlackBox, AsyncPubSubAsReliableData300kb)
     reader.block_for_all();
 }
 
-BLACKBOXTEST(BlackBox, AsyncPubSubWithFlowController64kb)
+TEST(BlackBox, AsyncPubSubWithFlowController64kb)
 {
     PubSubReader<Data64kbType> reader(TEST_TOPIC_NAME);
     PubSubWriter<Data64kbType> slowWriter(TEST_TOPIC_NAME);
@@ -1019,7 +1008,7 @@ BLACKBOXTEST(BlackBox, AsyncPubSubWithFlowController64kb)
     ASSERT_EQ(reader.getReceivedCount(), 1);
 }
 
-BLACKBOXTEST(BlackBox, AsyncPubSubAsReliableData300kbInLossyConditions)
+TEST(BlackBox, AsyncPubSubAsReliableData300kbInLossyConditions)
 {
     PubSubReader<Data1mbType> reader(TEST_TOPIC_NAME);
     PubSubWriter<Data1mbType> writer(TEST_TOPIC_NAME);
@@ -1072,7 +1061,7 @@ BLACKBOXTEST(BlackBox, AsyncPubSubAsReliableData300kbInLossyConditions)
 }
 
 
-BLACKBOXTEST(BlackBox, AsyncFragmentSizeTest)
+TEST(BlackBox, AsyncFragmentSizeTest)
 {
     // ThroghputController size large than maxMessageSize.
     {
@@ -1168,7 +1157,7 @@ BLACKBOXTEST(BlackBox, AsyncFragmentSizeTest)
     }
 }
 
-BLACKBOXTEST(BlackBox, FlowControllerIfNotAsync)
+TEST(BlackBox, FlowControllerIfNotAsync)
 {
     PubSubWriter<Data64kbType> writer(TEST_TOPIC_NAME);
 
@@ -1178,7 +1167,7 @@ BLACKBOXTEST(BlackBox, FlowControllerIfNotAsync)
     ASSERT_FALSE(writer.isInitialized());
 }
 
-BLACKBOXTEST(BlackBox, UDPv4TransportWrongConfig)
+TEST(BlackBox, UDPv4TransportWrongConfig)
 {
     {
         PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
@@ -1218,7 +1207,7 @@ BLACKBOXTEST(BlackBox, UDPv4TransportWrongConfig)
 }
 
 // Test created to check bug #1568 (Github #34)
-BLACKBOXTEST(BlackBox, PubSubAsNonReliableKeepLastReaderSmallDepth)
+TEST(BlackBox, PubSubAsNonReliableKeepLastReaderSmallDepth)
 {
     PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
     PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
@@ -1261,7 +1250,7 @@ BLACKBOXTEST(BlackBox, PubSubAsNonReliableKeepLastReaderSmallDepth)
 }
 
 //Test created to deal with Issue 39 on Github
-BLACKBOXTEST(BlackBox, CacheChangeReleaseTest)
+TEST(BlackBox, CacheChangeReleaseTest)
 {
     PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
     PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
@@ -1301,7 +1290,7 @@ BLACKBOXTEST(BlackBox, CacheChangeReleaseTest)
 }
 
 // Test created to check bug #1555 (Github #31)
-BLACKBOXTEST(BlackBox, PubSubAsReliableKeepLastReaderSmallDepth)
+TEST(BlackBox, PubSubAsReliableKeepLastReaderSmallDepth)
 {
     PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
     PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
@@ -1348,7 +1337,7 @@ BLACKBOXTEST(BlackBox, PubSubAsReliableKeepLastReaderSmallDepth)
 }
 
 // Test created to check bug #1738 (Github #54)
-BLACKBOXTEST(BlackBox, PubSubAsReliableKeepLastWriterSmallDepth)
+TEST(BlackBox, PubSubAsReliableKeepLastWriterSmallDepth)
 {
     PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
     PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
@@ -1380,7 +1369,7 @@ BLACKBOXTEST(BlackBox, PubSubAsReliableKeepLastWriterSmallDepth)
 }
 
 // Test created to check bug #1558 (Github #33)
-BLACKBOXTEST(BlackBox, PubSubKeepAll)
+TEST(BlackBox, PubSubKeepAll)
 {
     PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
     PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
@@ -1427,7 +1416,7 @@ BLACKBOXTEST(BlackBox, PubSubKeepAll)
 }
 
 // Test created to check bug #1558 (Github #33)
-BLACKBOXTEST(BlackBox, PubSubKeepAllTransient)
+TEST(BlackBox, PubSubKeepAllTransient)
 {
     PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
     PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
@@ -1474,7 +1463,7 @@ BLACKBOXTEST(BlackBox, PubSubKeepAllTransient)
     }
 }
 
-BLACKBOXTEST(BlackBox, PubReliableKeepAllSubNonReliable)
+TEST(BlackBox, PubReliableKeepAllSubNonReliable)
 {
     PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
     PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
@@ -1506,7 +1495,7 @@ BLACKBOXTEST(BlackBox, PubReliableKeepAllSubNonReliable)
 }
 
 //Verify that outLocatorList is used to select the desired output channel
-BLACKBOXTEST(BlackBox, PubSubOutLocatorSelection){
+TEST(BlackBox, PubSubOutLocatorSelection){
 
     PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
     PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
@@ -1550,7 +1539,7 @@ BLACKBOXTEST(BlackBox, PubSubOutLocatorSelection){
 }
 
 //Verify that Cachechanges are removed from History when the a Writer unmatches
-BLACKBOXTEST(BlackBox, StatefulReaderCacheChangeRelease){
+TEST(BlackBox, StatefulReaderCacheChangeRelease){
     PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
     PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
 
@@ -1577,7 +1566,7 @@ BLACKBOXTEST(BlackBox, StatefulReaderCacheChangeRelease){
     ASSERT_EQ(reader.getReceivedCount(), 0);
 }
 
-BLACKBOXTEST(BlackBox, PubSubMoreThan256Unacknowledged)
+TEST(BlackBox, PubSubMoreThan256Unacknowledged)
 {
     PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
 
@@ -1604,7 +1593,7 @@ BLACKBOXTEST(BlackBox, PubSubMoreThan256Unacknowledged)
     reader.block_for_all();
 }
 
-BLACKBOXTEST(BlackBox, StaticDiscovery)
+TEST(BlackBox, StaticDiscovery)
 {
     char* value = nullptr;
     std::string TOPIC_RANDOM_NUMBER;
@@ -1713,7 +1702,7 @@ BLACKBOXTEST(BlackBox, StaticDiscovery)
     reader.block_for_all();
 }
 
-BLACKBOXTEST(BlackBox, PubSubAsReliableHelloworldMulticastDisabled)
+TEST(BlackBox, PubSubAsReliableHelloworldMulticastDisabled)
 {
     PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
     PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
@@ -1747,7 +1736,7 @@ BLACKBOXTEST(BlackBox, PubSubAsReliableHelloworldMulticastDisabled)
 }
 
 // Test created to check bug #2010 (Github #90)
-BLACKBOXTEST(BlackBox, PubSubAsReliableHelloworldPartitions)
+TEST(BlackBox, PubSubAsReliableHelloworldPartitions)
 {
     PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
     PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
@@ -1780,7 +1769,7 @@ BLACKBOXTEST(BlackBox, PubSubAsReliableHelloworldPartitions)
     reader.block_for_all();
 }
 
-BLACKBOXTEST(BlackBox, PubSubAsReliableHelloworldUserData)
+TEST(BlackBox, PubSubAsReliableHelloworldUserData)
 {
     PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
     PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
@@ -1808,7 +1797,7 @@ BLACKBOXTEST(BlackBox, PubSubAsReliableHelloworldUserData)
     ASSERT_TRUE(reader.getDiscoveryResult());
 }
 
-BLACKBOXTEST(BlackBox, PubSubAsReliableHelloworldParticipantDiscovery)
+TEST(BlackBox, PubSubAsReliableHelloworldParticipantDiscovery)
 {
     PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
     PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
@@ -1848,7 +1837,7 @@ BLACKBOXTEST(BlackBox, PubSubAsReliableHelloworldParticipantDiscovery)
     ASSERT_TRUE(reader.getDiscoveryResult());
 }
 
-BLACKBOXTEST(BlackBox, EDPSlaveReaderAttachment)
+TEST(BlackBox, EDPSlaveReaderAttachment)
 {
     PubSubWriter<HelloWorldType> checker(TEST_TOPIC_NAME);
     PubSubReader<HelloWorldType>* reader = new PubSubReader<HelloWorldType>(TEST_TOPIC_NAME);
@@ -1883,7 +1872,7 @@ BLACKBOXTEST(BlackBox, EDPSlaveReaderAttachment)
 // Used to detect Github issue #155
 // TODO(Ricardo) Remove
 /*
-BLACKBOXTEST(BlackBox, EndpointRediscovery)
+TEST(BlackBox, EndpointRediscovery)
 {
     PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
     PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
@@ -1926,7 +1915,7 @@ BLACKBOXTEST(BlackBox, EndpointRediscovery)
 */
 
 // Used to detect Github issue #154
-BLACKBOXTEST(BlackBox, LocalInitialPeers)
+TEST(BlackBox, LocalInitialPeers)
 {
     PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
     PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
@@ -1978,7 +1967,7 @@ BLACKBOXTEST(BlackBox, LocalInitialPeers)
 }
 
 // Regression test of Refs #2535, github micro-RTPS #1
-BLACKBOXTEST(BlackBox, PubXmlLoadedPartition)
+TEST(BlackBox, PubXmlLoadedPartition)
 {
     PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
     PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
@@ -2014,7 +2003,7 @@ BLACKBOXTEST(BlackBox, PubXmlLoadedPartition)
 
 #if HAVE_SECURITY
 
-BLACKBOXTEST(BlackBox, BuiltinAuthenticationPlugin_PKIDH_validation_ok)
+TEST(BlackBox, BuiltinAuthenticationPlugin_PKIDH_validation_ok)
 {
     PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
     PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
@@ -2071,7 +2060,7 @@ BLACKBOXTEST(BlackBox, BuiltinAuthenticationPlugin_PKIDH_validation_ok)
 }
 
 // Used to detect Github issue #106
-BLACKBOXTEST(BlackBox, BuiltinAuthenticationPlugin_PKIDH_validation_ok_same_participant)
+TEST(BlackBox, BuiltinAuthenticationPlugin_PKIDH_validation_ok_same_participant)
 {
     PubSubWriterReader<HelloWorldType> wreader(TEST_TOPIC_NAME);
 
@@ -2105,7 +2094,7 @@ BLACKBOXTEST(BlackBox, BuiltinAuthenticationPlugin_PKIDH_validation_ok_same_part
     wreader.block_for_all();
 }
 
-BLACKBOXTEST(BlackBox, BuiltinAuthenticationPlugin_PKIDH_validation_fail)
+TEST(BlackBox, BuiltinAuthenticationPlugin_PKIDH_validation_fail)
 {
     {
         PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
@@ -2165,7 +2154,7 @@ BLACKBOXTEST(BlackBox, BuiltinAuthenticationPlugin_PKIDH_validation_fail)
     }
 }
 
-BLACKBOXTEST(BlackBox, BuiltinAuthenticationPlugin_PKIDH_lossy_conditions)
+TEST(BlackBox, BuiltinAuthenticationPlugin_PKIDH_lossy_conditions)
 {
     PubSubReader<Data1mbType> reader(TEST_TOPIC_NAME);
     PubSubWriter<Data1mbType> writer(TEST_TOPIC_NAME);
@@ -2219,7 +2208,7 @@ BLACKBOXTEST(BlackBox, BuiltinAuthenticationPlugin_PKIDH_lossy_conditions)
     reader.waitDiscovery();
 }
 
-BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_besteffort_rtps_ok)
+TEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_besteffort_rtps_ok)
 {
     PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
     PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
@@ -2281,7 +2270,7 @@ BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_besteffort_rtps_ok)
     reader.block_for_at_least(2);
 }
 
-BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_reliable_rtps_ok)
+TEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_reliable_rtps_ok)
 {
     PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
     PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
@@ -2344,7 +2333,7 @@ BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_reliable_rtps_ok)
 }
 
 // Used to detect Github issue #106
-BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_rtps_ok_same_participant)
+TEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_rtps_ok_same_participant)
 {
     PubSubWriterReader<HelloWorldType> wreader(TEST_TOPIC_NAME);
 
@@ -2382,7 +2371,7 @@ BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_rtps_ok_same_partici
     wreader.block_for_all();
 }
 
-BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_besteffort_large_string)
+TEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_besteffort_large_string)
 {
     PubSubReader<StringType> reader(TEST_TOPIC_NAME);
     PubSubWriter<StringType> writer(TEST_TOPIC_NAME);
@@ -2444,7 +2433,7 @@ BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_besteffort_large_str
     reader.block_for_at_least(2);
 }
 
-BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_reliable_rtps_large_string)
+TEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_reliable_rtps_large_string)
 {
     PubSubReader<StringType> reader(TEST_TOPIC_NAME);
     PubSubWriter<StringType> writer(TEST_TOPIC_NAME);
@@ -2506,7 +2495,7 @@ BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_reliable_rtps_large_
     reader.block_for_all();
 }
 
-BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_besteffort_rtps_data300kb)
+TEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_besteffort_rtps_data300kb)
 {
     PubSubReader<Data1mbType> reader(TEST_TOPIC_NAME);
     PubSubWriter<Data1mbType> writer(TEST_TOPIC_NAME);
@@ -2575,7 +2564,7 @@ BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_besteffort_rtps_data
     reader.block_for_at_least(2);
 }
 
-BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_reliable_rtps_data300kb)
+TEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_reliable_rtps_data300kb)
 {
     PubSubReader<Data1mbType> reader(TEST_TOPIC_NAME);
     PubSubWriter<Data1mbType> writer(TEST_TOPIC_NAME);
@@ -2644,7 +2633,7 @@ BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_reliable_rtps_data30
     reader.block_for_all();
 }
 
-BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_besteffort_submessage_ok)
+TEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_besteffort_submessage_ok)
 {
     PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
     PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
@@ -2709,7 +2698,7 @@ BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_besteffort_submessag
     reader.block_for_at_least(2);
 }
 
-BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_reliable_submessage_ok)
+TEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_reliable_submessage_ok)
 {
     PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
     PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
@@ -2775,7 +2764,7 @@ BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_reliable_submessage_
 }
 
 // Used to detect Github issue #106
-BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_submessage_ok_same_participant)
+TEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_submessage_ok_same_participant)
 {
     PubSubWriterReader<HelloWorldType> wreader(TEST_TOPIC_NAME);
 
@@ -2816,7 +2805,7 @@ BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_submessage_ok_same_p
     wreader.block_for_all();
 }
 
-BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_besteffort_submessage_large_string)
+TEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_besteffort_submessage_large_string)
 {
     PubSubReader<StringType> reader(TEST_TOPIC_NAME);
     PubSubWriter<StringType> writer(TEST_TOPIC_NAME);
@@ -2881,7 +2870,7 @@ BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_besteffort_submessag
     reader.block_for_at_least(2);
 }
 
-BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_reliable_submessage_large_string)
+TEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_reliable_submessage_large_string)
 {
     PubSubReader<StringType> reader(TEST_TOPIC_NAME);
     PubSubWriter<StringType> writer(TEST_TOPIC_NAME);
@@ -2946,7 +2935,7 @@ BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_reliable_submessage_
     reader.block_for_all();
 }
 
-BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_besteffort_submessage_data300kb)
+TEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_besteffort_submessage_data300kb)
 {
     PubSubReader<Data1mbType> reader(TEST_TOPIC_NAME);
     PubSubWriter<Data1mbType> writer(TEST_TOPIC_NAME);
@@ -3018,7 +3007,7 @@ BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_besteffort_submessag
     reader.block_for_at_least(2);
 }
 
-BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_reliable_submessage_data300kb)
+TEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_reliable_submessage_data300kb)
 {
     PubSubReader<Data1mbType> reader(TEST_TOPIC_NAME);
     PubSubWriter<Data1mbType> writer(TEST_TOPIC_NAME);
@@ -3090,7 +3079,7 @@ BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_reliable_submessage_
     reader.block_for_all();
 }
 
-BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_besteffort_payload_ok)
+TEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_besteffort_payload_ok)
 {
     PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
     PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
@@ -3155,7 +3144,7 @@ BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_besteffort_payload_o
     reader.block_for_at_least(2);
 }
 
-BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_reliable_payload_ok)
+TEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_reliable_payload_ok)
 {
     PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
     PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
@@ -3221,7 +3210,7 @@ BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_reliable_payload_ok)
 }
 
 // Used to detect Github issue #106
-BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_payload_ok_same_participant)
+TEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_payload_ok_same_participant)
 {
     PubSubWriterReader<HelloWorldType> wreader(TEST_TOPIC_NAME);
 
@@ -3262,7 +3251,7 @@ BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_payload_ok_same_part
     wreader.block_for_all();
 }
 
-BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_besteffort_payload_large_string)
+TEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_besteffort_payload_large_string)
 {
     PubSubReader<StringType> reader(TEST_TOPIC_NAME);
     PubSubWriter<StringType> writer(TEST_TOPIC_NAME);
@@ -3327,7 +3316,7 @@ BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_besteffort_payload_l
     reader.block_for_at_least(2);
 }
 
-BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_reliable_payload_large_string)
+TEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_reliable_payload_large_string)
 {
     PubSubReader<StringType> reader(TEST_TOPIC_NAME);
     PubSubWriter<StringType> writer(TEST_TOPIC_NAME);
@@ -3392,7 +3381,7 @@ BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_reliable_payload_lar
     reader.block_for_all();
 }
 
-BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_besteffort_payload_data300kb)
+TEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_besteffort_payload_data300kb)
 {
     PubSubReader<Data1mbType> reader(TEST_TOPIC_NAME);
     PubSubWriter<Data1mbType> writer(TEST_TOPIC_NAME);
@@ -3464,7 +3453,7 @@ BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_besteffort_payload_d
     reader.block_for_at_least(2);
 }
 
-BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_reliable_payload_data300kb)
+TEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_reliable_payload_data300kb)
 {
     PubSubReader<Data1mbType> reader(TEST_TOPIC_NAME);
     PubSubWriter<Data1mbType> writer(TEST_TOPIC_NAME);
@@ -3536,7 +3525,7 @@ BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_reliable_payload_dat
     reader.block_for_all();
 }
 
-BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_besteffort_all_ok)
+TEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_besteffort_all_ok)
 {
     PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
     PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
@@ -3605,7 +3594,7 @@ BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_besteffort_all_ok)
     reader.block_for_at_least(2);
 }
 
-BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_reliable_all_ok)
+TEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_reliable_all_ok)
 {
     PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
     PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
@@ -3674,7 +3663,7 @@ BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_reliable_all_ok)
     reader.block_for_all();
 }
 
-BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_besteffort_all_large_string)
+TEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_besteffort_all_large_string)
 {
     PubSubReader<StringType> reader(TEST_TOPIC_NAME);
     PubSubWriter<StringType> writer(TEST_TOPIC_NAME);
@@ -3743,7 +3732,7 @@ BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_besteffort_all_large
     reader.block_for_at_least(2);
 }
 
-BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_reliable_all_large_string)
+TEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_reliable_all_large_string)
 {
     PubSubReader<StringType> reader(TEST_TOPIC_NAME);
     PubSubWriter<StringType> writer(TEST_TOPIC_NAME);
@@ -3812,7 +3801,7 @@ BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_reliable_all_large_s
     reader.block_for_all();
 }
 
-BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_besteffort_all_data300kb)
+TEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_besteffort_all_data300kb)
 {
     PubSubReader<Data1mbType> reader(TEST_TOPIC_NAME);
     PubSubWriter<Data1mbType> writer(TEST_TOPIC_NAME);
@@ -3888,7 +3877,7 @@ BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_besteffort_all_data3
     reader.block_for_at_least(2);
 }
 
-BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_reliable_all_data300kb)
+TEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_reliable_all_data300kb)
 {
     PubSubReader<Data1mbType> reader(TEST_TOPIC_NAME);
     PubSubWriter<Data1mbType> writer(TEST_TOPIC_NAME);
@@ -3965,7 +3954,7 @@ BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_reliable_all_data300
 }
 
 // Regression test of Refs #2457
-BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_reliable_all_data300kb_mix)
+TEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_reliable_all_data300kb_mix)
 {
     PubSubReader<Data1mbType> reader(TEST_TOPIC_NAME);
     PubSubWriter<Data1mbType> writer(TEST_TOPIC_NAME);
@@ -4042,7 +4031,7 @@ BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_reliable_all_data300
 }
 
 // Regression test of Refs #2457, Github ros2 #438.
-BLACKBOXTEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_user_data)
+TEST(BlackBox, BuiltinAuthenticationAndCryptoPlugin_user_data)
 {
     PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
     PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);
@@ -4120,7 +4109,7 @@ void send_async_data(PubSubWriter<T>& writer, std::list<typename T::type> data_t
     ASSERT_TRUE(data_to_send.empty());
 }
 
-BLACKBOXTEST(BlackBox, PubSubAsReliableMultithreadKeepLast1)
+TEST(BlackBox, PubSubAsReliableMultithreadKeepLast1)
 {
     PubSubReader<HelloWorldType> reader(TEST_TOPIC_NAME);
     PubSubWriter<HelloWorldType> writer(TEST_TOPIC_NAME);

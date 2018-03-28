@@ -545,12 +545,7 @@ bool SecurityManager::on_process_handshake(const GUID_t& remote_participant_guid
         ParticipantGenericMessage message = generate_authentication_message(std::move(message_identity),
                 remote_participant_guid, *handshake_message);
 
-        CacheChange_ptr change = participant_stateless_message_writer_->new_change([&message]() -> uint32_t
-                {
-                    return static_cast<uint32_t>(ParticipantGenericMessageHelper::serialized_size(message)
-                            + 4 /*encapsulation*/);
-                }
-                , ALIVE, c_InstanceHandle_Unknown);
+        CacheChange_ptr change = participant_stateless_message_writer_->new_change(ALIVE, c_InstanceHandle_Unknown);
 
         if(change)
         {
@@ -1605,12 +1600,7 @@ ParticipantCryptoHandle* SecurityManager::register_and_match_crypto_endpoint(con
                     local_participant_crypto_tokens);
 
             CacheChange_ptr change =
-                participant_volatile_message_secure_writer_->new_change([&message]() -> uint32_t
-                    {
-                        return static_cast<uint32_t>(ParticipantGenericMessageHelper::serialized_size(message)
-                                + 4 /*encapsulation*/);
-                    }
-                    , ALIVE, c_InstanceHandle_Unknown);
+                participant_volatile_message_secure_writer_->new_change(ALIVE, c_InstanceHandle_Unknown);
 
             if(change)
             {
@@ -2009,12 +1999,7 @@ bool SecurityManager::discovered_reader(const GUID_t& writer_guid, const GUID_t&
                                 remote_reader_data.guid(), writer_guid, local_writer_crypto_tokens);
 
                         CacheChange_ptr change =
-                            participant_volatile_message_secure_writer_->new_change([&message]() -> uint32_t
-                                {
-                                return static_cast<uint32_t>(ParticipantGenericMessageHelper::serialized_size(message)
-                                        + 4 /*encapsulation*/);
-                                }
-                                , ALIVE, c_InstanceHandle_Unknown);
+                            participant_volatile_message_secure_writer_->new_change(ALIVE, c_InstanceHandle_Unknown);
 
                         if(change)
                         {
@@ -2264,12 +2249,7 @@ bool SecurityManager::discovered_writer(const GUID_t& reader_guid, const GUID_t&
                                 remote_writer_data.guid(), reader_guid, local_reader_crypto_tokens);
 
                         CacheChange_ptr change =
-                            participant_volatile_message_secure_writer_->new_change([&message]() -> uint32_t
-                                {
-                                return static_cast<uint32_t>(ParticipantGenericMessageHelper::serialized_size(message)
-                                        + 4 /*encapsulation*/);
-                                }
-                                , ALIVE, c_InstanceHandle_Unknown);
+                            participant_volatile_message_secure_writer_->new_change(ALIVE, c_InstanceHandle_Unknown);
 
                         if(change)
                         {

@@ -120,12 +120,7 @@ class RTPSAsSocketWriter
 
             while(it != msgs.end())
             {
-                eprosima::fastrtps::rtps::CacheChange_ptr ch = writer_->new_change([&]() -> uint32_t
-                        {
-                        size_t current_alignment =  4 + magicword_.size() + 1;
-                        return (uint32_t)(current_alignment + type::getCdrSerializedSize(*it, current_alignment));
-                        }
-                        , eprosima::fastrtps::rtps::ALIVE);
+                eprosima::fastrtps::rtps::CacheChange_ptr ch = writer_->new_change(eprosima::fastrtps::rtps::ALIVE);
 
                 if(ch)
                 {

@@ -28,9 +28,9 @@ namespace fastrtps{
 namespace rtps {
 
 Endpoint::Endpoint(RTPSParticipant::impl& participant, const GUID_t& guid, const EndpointAttributes& att):
-    participant_(participant),
+    att_(att),
     guid_(guid),
-    att_(att)
+    participant_(participant)
 #if HAVE_SECURITY
     ,supports_rtps_protection_(true),
     is_submessage_protected_(false),

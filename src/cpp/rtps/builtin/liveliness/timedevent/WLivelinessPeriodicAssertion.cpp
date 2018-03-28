@@ -94,8 +94,7 @@ bool WLivelinessPeriodicAssertion::AutomaticLivelinessAssertion()
     if(wlp_.m_livAutomaticWriters.size()>0)
     {
         // TODO Reuse change.
-        CacheChange_ptr change = wlp_.mp_builtinWriter->new_change([]() ->
-                uint32_t {return BUILTIN_PARTICIPANT_DATA_MAX_SIZE;}, ALIVE,m_iHandle);
+        CacheChange_ptr change = wlp_.mp_builtinWriter->new_change(ALIVE,m_iHandle);
 
         if(change)
         {
@@ -147,8 +146,7 @@ bool WLivelinessPeriodicAssertion::ManualByRTPSParticipantLivelinessAssertion()
 
     if(livelinessAsserted)
     {
-        CacheChange_ptr change = wlp_.mp_builtinWriter->new_change([]() ->
-                uint32_t {return BUILTIN_PARTICIPANT_DATA_MAX_SIZE;}, ALIVE);
+        CacheChange_ptr change = wlp_.mp_builtinWriter->new_change(ALIVE);
 
         if(change)
         {

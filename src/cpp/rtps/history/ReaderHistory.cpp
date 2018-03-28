@@ -33,7 +33,7 @@ namespace rtps {
 //typedef std::pair<InstanceHandle_t,std::vector<CacheChange_t*>> t_pairKeyChanges;
 //typedef std::vector<t_pairKeyChanges> t_vectorPairKeyChanges;
 
-inline bool sort_ReaderHistoryCache(CacheChange_t*c1, CacheChange_t*c2)
+inline bool sort_ReaderHistoryCache(CacheChange_ptr& c1, CacheChange_ptr& c2)
 {
     return c1->sequence_number < c2->sequence_number;
 }
@@ -52,12 +52,12 @@ ReaderHistory::~ReaderHistory()
     delete(mp_semaphore);
 }
 
-bool ReaderHistory::received_change(CacheChange_t* change, size_t)
+bool ReaderHistory::received_change(CacheChange_ptr& change, size_t)
 {
     return add_change(change);
 }
 
-bool ReaderHistory::add_change(CacheChange_t* a_change)
+bool ReaderHistory::add_change(CacheChange_ptr& a_change)
 {
 
     if(reader_ == nullptr || mp_mutex == nullptr)
@@ -80,7 +80,7 @@ bool ReaderHistory::add_change(CacheChange_t* a_change)
         logError(RTPS_HISTORY,"The Writer GUID_t must be defined");
     }
 
-    m_changes.push_back(a_change);
+    m_changes.push_back(std::move(a_change));
     sortCacheChanges();
     updateMaxMinSeqNum();
     logInfo(RTPS_HISTORY, "Change " << a_change->sequence_number << " added with " << a_change->serialized_payload.length << " bytes");
@@ -103,15 +103,13 @@ bool ReaderHistory::remove_change(CacheChange_t* a_change)
         logError(RTPS_HISTORY,"Pointer is not valid")
         return false;
     }
-    for(std::vector<CacheChange_t*>::iterator chit = m_changes.begin();
-            chit!=m_changes.end();++chit)
+    for(auto chit = m_changes.begin(); chit!=m_changes.end(); ++chit)
     {
         if((*chit)->sequence_number == a_change->sequence_number &&
                 (*chit)->writer_guid == a_change->writer_guid)
         {
             logInfo(RTPS_HISTORY,"Removing change "<< a_change->sequence_number);
             reader_->change_removed_by_history(a_change);
-            m_changePool.release_cache(a_change);
             m_changes.erase(chit);
             sortCacheChanges();
             updateMaxMinSeqNum();
@@ -134,31 +132,40 @@ bool ReaderHistory::remove_changes_with_guid(const GUID_t& a_guid)
 
     {//Lock scope
         std::lock_guard<std::recursive_mutex> guard(*mp_mutex);
-        for(std::vector<CacheChange_t*>::iterator chit = m_changes.begin(); chit!=m_changes.end();++chit)
+        for(auto chit = m_changes.begin(); chit != m_changes.end(); ++chit)
         {
             bool matches = true;
             unsigned int size = a_guid.guidPrefix.size;
             if( !std::equal( (*chit)->writer_guid.guidPrefix.value , (*chit)->writer_guid.guidPrefix.value + size -1, a_guid.guidPrefix.value ) )
+            {
                 matches = false;
+            }
             size = a_guid.entityId.size;
             if( !std::equal( (*chit)->writer_guid.entityId.value , (*chit)->writer_guid.entityId.value + size -1, a_guid.entityId.value ) )
+            {
                     matches = false;
+            }
             if(matches)
-                changes_to_remove.push_back( (*chit) );
+            {
+                changes_to_remove.push_back( &(**chit) );
+            }
         }
     }//End lock scope
 
-    for(std::vector<CacheChange_t*>::iterator chit = changes_to_remove.begin(); chit != changes_to_remove.end(); ++chit)
-        if(!remove_change( (*chit) )){
+    for(auto chit = changes_to_remove.begin(); chit != changes_to_remove.end(); ++chit)
+    {
+        if(!remove_change( (*chit) ))
+        {
             logError(RTPS_HISTORY,"One of the cachechanged in the GUID removal bulk could not be removed");
             return false;
         }
+    }
     return true;
 }
 
 void ReaderHistory::sortCacheChanges()
 {
-    std::sort(m_changes.begin(),m_changes.end(),sort_ReaderHistoryCache);
+    std::sort(m_changes.begin(), m_changes.end(), sort_ReaderHistoryCache);
 }
 
 void ReaderHistory::updateMaxMinSeqNum()
@@ -170,8 +177,8 @@ void ReaderHistory::updateMaxMinSeqNum()
     }
     else
     {
-        mp_minSeqCacheChange = m_changes.front();
-        mp_maxSeqCacheChange = m_changes.back();
+        mp_minSeqCacheChange = &*m_changes.front();
+        mp_maxSeqCacheChange = &*m_changes.back();
     }
 }
 
@@ -194,7 +201,7 @@ bool ReaderHistory::get_min_change_from(CacheChange_t** min_change, const GUID_t
     {
         if((*it)->writer_guid == writerGuid)
         {
-            *min_change = *it;
+            *min_change = &**it;
             ret = true;
             break;
         }

@@ -53,7 +53,7 @@ SubscriberHistory::~SubscriberHistory() {
 
 }
 
-bool SubscriberHistory::received_change(CacheChange_t* a_change, size_t unknown_missing_changes_up_to)
+bool SubscriberHistory::received_change(CacheChange_ptr& a_change, size_t unknown_missing_changes_up_to)
 {
 
     if(reader_ == nullptr || mp_mutex == nullptr)
@@ -95,7 +95,7 @@ bool SubscriberHistory::received_change(CacheChange_t* a_change, size_t unknown_
                     if((*it)->writer_guid == a_change->writer_guid &&
                             (*it)->sequence_number < a_change->sequence_number)
                     {
-                        older = *it;
+                        older = &**it;
                         break;
                     }
                 }
@@ -104,7 +104,7 @@ bool SubscriberHistory::received_change(CacheChange_t* a_change, size_t unknown_
                 {
                     bool read = older->is_read;
 
-                    if(this->remove_change_sub(older))
+                    if(this->remove_change_sub(&*older))
                     {
                         if(!read)
                         {
@@ -156,7 +156,7 @@ bool SubscriberHistory::received_change(CacheChange_t* a_change, size_t unknown_
             return false;
         }
         t_v_Inst_Caches::iterator vit;
-        if(find_Key(a_change,&vit))
+        if(find_Key(&*a_change,&vit))
         {
             //logInfo(RTPS_EDP,"Trying to add change with KEY: "<< vit->first << endl;);
             bool add = false;
@@ -199,7 +199,7 @@ bool SubscriberHistory::received_change(CacheChange_t* a_change, size_t unknown_
                     {
                         bool read = (*older_sample)->is_read;
 
-                        if(this->remove_change_sub(*older_sample, &vit))
+                        if(this->remove_change_sub(&**older_sample, &vit))
                         {
                             if(!read)
                             {
@@ -228,15 +228,15 @@ bool SubscriberHistory::received_change(CacheChange_t* a_change, size_t unknown_
                     //ADD TO KEY VECTOR
                     if(vit->second.size() == 0)
                     {
-                        vit->second.push_back(a_change);
+                        vit->second.push_back(&*a_change);
                     }
                     else if(vit->second.back()->sequence_number < a_change->sequence_number)
                     {
-                        vit->second.push_back(a_change);
+                        vit->second.push_back(&*a_change);
                     }
                     else
                     {
-                        vit->second.push_back(a_change);
+                        vit->second.push_back(&*a_change);
                         std::sort(vit->second.begin(),vit->second.end(),sort_ReaderHistoryCache);
                     }
                     logInfo(SUBSCRIBER,this->reader_->getGuid().entityId

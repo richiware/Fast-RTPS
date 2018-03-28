@@ -51,8 +51,7 @@ class RTPSWriter::impl : public Endpoint
 
         MOCK_METHOD1(matched_reader_remove, bool(RemoteReaderAttributes&));
 
-        MOCK_METHOD3(new_change, CacheChange_ptr(const std::function<uint32_t()>&,
-            ChangeKind_t, const InstanceHandle_t&));
+        MOCK_METHOD2(new_change, CacheChange_ptr(ChangeKind_t, const InstanceHandle_t&));
 
         WriterHistory::impl* history_;
 };

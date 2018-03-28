@@ -65,8 +65,7 @@ class RTPSWriter::impl : public Endpoint
 
         virtual void deinit() = 0;
 
-        CacheChange_ptr new_change(const std::function<uint32_t()>& dataCdrSerializedSize,
-                ChangeKind_t changeKind, const InstanceHandle_t& handle = c_InstanceHandle_Unknown);
+        CacheChange_ptr new_change(ChangeKind_t changeKind, const InstanceHandle_t& handle = c_InstanceHandle_Unknown);
 
         /**
          * Add a matched reader.

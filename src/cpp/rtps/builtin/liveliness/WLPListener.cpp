@@ -70,7 +70,7 @@ void WLPListener::onNewCacheChangeAdded(RTPSReader::impl& reader, const CacheCha
         if((*ch)->instance_handle == change->instance_handle &&
                 (*ch)->sequence_number < change->sequence_number)
         {
-            wlp_.mp_builtinReaderHistory->remove_change(*ch);
+            wlp_.mp_builtinReaderHistory->remove_change(&**ch);
             break;
         }
     }

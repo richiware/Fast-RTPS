@@ -18,12 +18,13 @@
 
 using namespace eprosima::fastrtps::rtps;
 
-CacheChange_t* FragmentedChangePitStop::process(CacheChange_t* incoming_change, uint32_t sampleSize, uint32_t fragmentStartingNum)
+CacheChange_ptr FragmentedChangePitStop::process(CacheChange_ptr& incoming_change, const uint32_t sampleSize,
+        const uint32_t fragmentStartingNum)
 {
-    CacheChange_t* returnedValue = nullptr;
+    CacheChange_ptr returned_value;
 
     // Search CacheChange_t with the sample sequence number.
-    auto range = changes_.equal_range(ChangeInPit(incoming_change));
+    auto range = changes_.equal_range(ChangeInPit(incoming_change->sequence_number));
 
     auto original_change_cit = range.first;
 
@@ -42,15 +43,16 @@ CacheChange_t* FragmentedChangePitStop::process(CacheChange_t* incoming_change, 
     // If not found an existing CacheChange_t, reserve one and insert.
     if(original_change_cit == range.second)
     {
-        CacheChange_t* original_change = nullptr;
+        CacheChange_ptr original_change = parent_.reserveCache();
 
-        if(!parent_.reserveCache(&original_change, sampleSize))
-            return nullptr;
+        if(!original_change)
+        {
+            return returned_value;
+        }
 
         if(original_change->serialized_payload.max_size < sampleSize)
         {
-            parent_.releaseCache(original_change);
-            return nullptr;
+            return returned_value;
         }
 
         //Change comes preallocated (size sampleSize)
@@ -60,7 +62,7 @@ CacheChange_t* FragmentedChangePitStop::process(CacheChange_t* incoming_change, 
         original_change->setFragmentSize(incoming_change->getFragmentSize());
 
         // Insert
-        original_change_cit = changes_.insert(ChangeInPit(original_change));
+        original_change_cit = changes_.insert(ChangeInPit(std::move(original_change)));
     }
 
     bool was_updated = false;
@@ -100,14 +102,16 @@ CacheChange_t* FragmentedChangePitStop::process(CacheChange_t* incoming_change, 
         // If it is completed, return CacheChange_t and remove information.
         if(fit == original_change_cit->getChange()->getDataFragments()->end())
         {
-            returnedValue = original_change_cit->getChange();
+            returned_value = original_change_cit->release();
             changes_.erase(original_change_cit);
         }
     }
 
-    return returnedValue;
+    return returned_value;
 }
 
+//TODO(Ricardo) Por lo que he visto usada en heartbeat a vers si hay que enviar heartbeat frag.
+//No me gusta que devuelva punter. modificar.
 CacheChange_t* FragmentedChangePitStop::find(const SequenceNumber_t& sequence_number, const GUID_t& writer_guid)
 {
     CacheChange_t* returnedValue = nullptr;
@@ -123,7 +127,7 @@ CacheChange_t* FragmentedChangePitStop::find(const SequenceNumber_t& sequence_nu
         {
             if(cit->getChange()->writer_guid == writer_guid)
             {
-                returnedValue = cit->getChange();
+                returnedValue = &*cit->getChange();
                 break;
             }
         }
@@ -148,7 +152,7 @@ bool FragmentedChangePitStop::try_to_remove(const SequenceNumber_t& sequence_num
             if(cit->getChange()->writer_guid == writer_guid)
             {
                 // Destroy CacheChange_t.
-                parent_.releaseCache(cit->getChange());
+                CacheChange_ptr to_remove(cit->release());
                 changes_.erase(cit);
                 returnedValue = true;
                 break;
@@ -170,12 +174,14 @@ bool FragmentedChangePitStop::try_to_remove_until(const SequenceNumber_t& sequen
                 cit->getChange()->writer_guid == writer_guid)
         {
             // Destroy CacheChange_t.
-            parent_.releaseCache(cit->getChange());
+            CacheChange_ptr to_remove(cit->release());
             cit = changes_.erase(cit);
             returnedValue = true;
         }
         else
+        {
             ++cit;
+        }
     }
 
     return returnedValue;

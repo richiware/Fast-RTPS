@@ -105,7 +105,7 @@ RTPSWriter::impl::impl(RTPSParticipant::impl& participant, const GUID_t& guid, c
     listener_(listen),
     is_async_(att.mode == SYNCHRONOUS_WRITER ? false : true),
     cachechange_pool_(history_.attributes().initialReservedCaches, history_.attributes().payloadMaxSize,
-            history_.attributes().maximumReservedCaches, history_.attributes().memoryPolicy)
+            history_.attributes().maximumReservedCaches)
 {
     history_.call_after_adding_change(std::bind(&RTPSWriter::impl::unsent_change_added_to_history, this,
             std::placeholders::_1));
@@ -123,34 +123,34 @@ void RTPSWriter::impl::deinit_()
     history_.clear();
 }
 
-CacheChange_ptr RTPSWriter::new_change(const std::function<uint32_t()>& data_cdr_serialize_size,
-        ChangeKind_t change_kind, const InstanceHandle_t& handle)
+CacheChange_ptr RTPSWriter::new_change(ChangeKind_t change_kind, const InstanceHandle_t& handle)
 {
-    return impl_->new_change(data_cdr_serialize_size, change_kind, handle);
+    return impl_->new_change(change_kind, handle);
 }
 
-CacheChange_ptr RTPSWriter::impl::new_change(const std::function<uint32_t()>& data_cdr_serialize_size,
-        ChangeKind_t change_kind, const InstanceHandle_t& handle)
+CacheChange_ptr RTPSWriter::impl::new_change(ChangeKind_t change_kind, const InstanceHandle_t& handle)
 {
     logInfo(RTPS_WRITER,"Creating new change");
-    CacheChange_t* cachechange = nullptr;
+    CacheChange_ptr cachechange = cachechange_pool_.reserve_cache();
 
-    if(!cachechange_pool_.reserve_cache(&cachechange, data_cdr_serialize_size))
+    if(cachechange)
+    {
+        cachechange->kind = change_kind;
+        if(att_.topicKind == WITH_KEY && !handle.is_unknown())
+        {
+            logWarning(RTPS_WRITER,"Changes in KEYED Writers need a valid instanceHandle");
+        }
+        cachechange->instance_handle = handle;
+        cachechange->writer_guid = guid_;
+        cachechange->write_params = WriteParams();
+    }
+    else
     {
         logWarning(RTPS_WRITER,"Problem reserving Cache from the History");
         return CacheChange_ptr();
     }
-    assert(cachechange != nullptr);
 
-    cachechange->kind = change_kind;
-    if(att_.topicKind == WITH_KEY && !handle.is_unknown())
-    {
-        logWarning(RTPS_WRITER,"Changes in KEYED Writers need a valid instanceHandle");
-    }
-    cachechange->instance_handle = handle;
-    cachechange->writer_guid = guid_;
-    cachechange->write_params = WriteParams();
-    return CacheChange_ptr(&cachechange_pool_, cachechange);
+    return cachechange;
 }
 
 uint32_t RTPSWriter::impl::getTypeMaxSerialized() const

@@ -49,21 +49,11 @@ class History
          * @param[out] change Pointer to pointer to the CacheChange_t to reserve
          * @return True is reserved
          */
-        RTPS_DllAPI inline bool reserve_Cache(CacheChange_t** change, const std::function<uint32_t()>& calculateSizeFunc)
+        //TODO(Ricardo) Remove after change ReaderHistory.
+        RTPS_DllAPI inline CacheChange_ptr reserve_Cache()
         {
-            return m_changePool.reserve_cache(change, calculateSizeFunc);
+            return m_changePool.reserve_cache();
         }
-
-        RTPS_DllAPI inline bool reserve_Cache(CacheChange_t** change, uint32_t dataSize)
-        {
-            return m_changePool.reserve_cache(change, dataSize);
-        }
-
-        /**
-         * release a previously reserved CacheChange_t.
-         * @param ch Pointer to the CacheChange_t.
-         */
-        RTPS_DllAPI inline void release_Cache(CacheChange_t* ch) { return m_changePool.release_cache(ch); }
 
         /**
          * Check if the history is full
@@ -95,12 +85,12 @@ class History
          * Get the beginning of the changes history iterator.
          * @return Iterator to the beginning of the vector.
          */
-        RTPS_DllAPI std::vector<CacheChange_t*>::iterator changesBegin(){ return m_changes.begin(); }
+        RTPS_DllAPI std::vector<CacheChange_ptr>::iterator changesBegin(){ return m_changes.begin(); }
         /**
          * Get the end of the changes history iterator.
          * @return Iterator to the end of the vector.
          */
-        RTPS_DllAPI std::vector<CacheChange_t*>::iterator changesEnd(){ return m_changes.end(); }
+        RTPS_DllAPI std::vector<CacheChange_ptr>::iterator changesEnd(){ return m_changes.end(); }
         /**
          * Get the minimum CacheChange_t.
          * @param min_change Pointer to pointer to the minimum change.
@@ -131,7 +121,7 @@ class History
 
     protected:
         //!Vector of pointers to the CacheChange_t.
-        std::vector<CacheChange_t*> m_changes;
+        std::vector<CacheChange_ptr> m_changes;
         //!Variable to know if the history is full without needing to block the History mutex.
         bool m_isHistoryFull;
         //!Pointer to and invalid cacheChange used to return the maximum and minimum when no changes are stored in the history.

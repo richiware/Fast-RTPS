@@ -192,7 +192,7 @@ class RTPSAsSocketReader
             std::unique_lock<std::recursive_mutex> lock(*history_->getMutex());
             while(history_->changesBegin() != history_->changesEnd())
             {
-                eprosima::fastrtps::rtps::CacheChange_t* change = *history_->changesBegin();
+                eprosima::fastrtps::rtps::CacheChange_t* change = &**history_->changesBegin();
                 receive_one(*reader_, change);
             }
         }

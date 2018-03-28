@@ -174,7 +174,7 @@ class SecurityAuthenticationTest : public ::testing::Test
                         Ref(remote_identity_handle_),_,_)).Times(1).
                 WillOnce(DoAll(SetArgPointee<0>(&handshake_handle_), 
                             SetArgPointee<1>(&handshake_message), Return(ValidationResult_t::VALIDATION_PENDING_HANDSHAKE_MESSAGE)));
-            EXPECT_CALL(*stateless_writer_, new_change(_,_,_)).Times(1).
+            EXPECT_CALL(*stateless_writer_, new_change(_,_)).Times(1).
                 WillOnce(Return(ByMove(CacheChange_ptr(nullptr, change))));
             // TODO Check cachechange
             EXPECT_CALL(*stateless_writer_->history_, add_change_mock(_)).Times(1).
@@ -236,7 +236,7 @@ class SecurityAuthenticationTest : public ::testing::Test
                         Ref(local_identity_handle_),_,_)).Times(1).
                 WillOnce(DoAll(SetArgPointee<0>(&handshake_handle_), 
                             SetArgPointee<1>(&handshake_message), Return(ValidationResult_t::VALIDATION_PENDING_HANDSHAKE_MESSAGE)));
-            EXPECT_CALL(*stateless_writer_, new_change(_,_,_)).Times(1).
+            EXPECT_CALL(*stateless_writer_, new_change(_,_)).Times(1).
                 WillOnce(Return(ByMove(CacheChange_ptr(nullptr, change2))));
             EXPECT_CALL(*stateless_writer_->history_, add_change_mock(_)).Times(1).
                 WillOnce(Return(SequenceNumber_t{0, 1}));
@@ -302,7 +302,7 @@ class SecurityAuthenticationTest : public ::testing::Test
 
             EXPECT_CALL(*auth_plugin_, process_handshake_rvr(_,_, Ref(handshake_handle_),_)).Times(1).
                 WillOnce(DoAll(SetArgPointee<0>(&handshake_message), Return(ValidationResult_t::VALIDATION_OK_WITH_FINAL_MESSAGE)));
-            EXPECT_CALL(*stateless_writer_, new_change(_,_,_)).Times(1).
+            EXPECT_CALL(*stateless_writer_, new_change(_,_)).Times(1).
                 WillOnce(Return(ByMove(CacheChange_ptr(nullptr, change2))));
             EXPECT_CALL(*stateless_writer_->history_, add_change_mock(_)).Times(1).
                 WillOnce(Return(SequenceNumber_t{0, 1}));
@@ -319,7 +319,7 @@ class SecurityAuthenticationTest : public ::testing::Test
             EXPECT_CALL(crypto_plugin_->cryptokeyexchange_, create_local_participant_crypto_tokens(_,
                         Ref(local_participant_crypto_handle_), Ref(participant_crypto_handle),_)).Times(1).
                 WillOnce(Return(true));
-            EXPECT_CALL(*volatile_writer_, new_change(_,_,_)).Times(1).
+            EXPECT_CALL(*volatile_writer_, new_change(_,_)).Times(1).
                 WillOnce(Return(ByMove(CacheChange_ptr(nullptr, &change_volatile))));
             EXPECT_CALL(*volatile_writer_->history_, add_change_mock(_)).Times(1).
                 WillOnce(Return(SequenceNumber_t{0, 1}));
@@ -645,7 +645,7 @@ TEST_F(SecurityAuthenticationTest, discovered_participant_validation_remote_iden
     EXPECT_CALL(crypto_plugin_->cryptokeyexchange_, create_local_participant_crypto_tokens(_,
                 Ref(local_participant_crypto_handle_), Ref(participant_crypto_handle),_)).Times(1).
            WillOnce(Return(true));
-    EXPECT_CALL(*volatile_writer_, new_change(_,_,_)).Times(1).
+    EXPECT_CALL(*volatile_writer_, new_change(_,_)).Times(1).
         WillOnce(Return(ByMove(CacheChange_ptr(nullptr, &change_volatile))));
     EXPECT_CALL(*volatile_writer_->history_, add_change_mock(_)).Times(1).
         WillOnce(Return(SequenceNumber_t{0, 1}));
@@ -674,7 +674,7 @@ TEST_F(SecurityAuthenticationTest, discovered_participant_validation_remote_iden
                 Ref(remote_identity_handle),_,_)).Times(1).
         WillOnce(DoAll(SetArgPointee<0>(&handshake_handle), 
                     SetArgPointee<1>(&handshake_message), Return(ValidationResult_t::VALIDATION_PENDING_HANDSHAKE_MESSAGE)));
-    EXPECT_CALL(*stateless_writer_, new_change(_,_,_)).Times(1).WillOnce(Return(ByMove(CacheChange_ptr())));
+    EXPECT_CALL(*stateless_writer_, new_change(_,_)).Times(1).WillOnce(Return(ByMove(CacheChange_ptr())));
     EXPECT_CALL(*auth_plugin_, return_identity_handle(&local_identity_handle_,_)).Times(1).
         WillRepeatedly(Return(true));
     EXPECT_CALL(*auth_plugin_, return_identity_handle(&remote_identity_handle,_)).Times(1).
@@ -703,7 +703,7 @@ TEST_F(SecurityAuthenticationTest, discovered_participant_validation_remote_iden
                 Ref(remote_identity_handle),_,_)).Times(1).
         WillOnce(DoAll(SetArgPointee<0>(&handshake_handle), 
                     SetArgPointee<1>(&handshake_message), Return(ValidationResult_t::VALIDATION_PENDING_HANDSHAKE_MESSAGE)));
-    EXPECT_CALL(*stateless_writer_, new_change(_,_,_)).Times(1).
+    EXPECT_CALL(*stateless_writer_, new_change(_,_)).Times(1).
         WillOnce(Return(ByMove(CacheChange_ptr(nullptr, change))));
     EXPECT_CALL(*stateless_writer_->history_, add_change_mock(_)).Times(1).
         WillOnce(Return(SequenceNumber_t::unknown()));
@@ -775,7 +775,7 @@ TEST_F(SecurityAuthenticationTest, discovered_participant_validation_remote_iden
                 Ref(remote_identity_handle),_,_)).Times(1).
         WillOnce(DoAll(SetArgPointee<0>(&handshake_handle), 
                     SetArgPointee<1>(&handshake_message), Return(ValidationResult_t::VALIDATION_OK_WITH_FINAL_MESSAGE)));
-    EXPECT_CALL(*stateless_writer_, new_change(_,_,_)).Times(1).
+    EXPECT_CALL(*stateless_writer_, new_change(_,_)).Times(1).
                 WillOnce(Return(ByMove(CacheChange_ptr(nullptr, change))));
     EXPECT_CALL(*stateless_writer_->history_, add_change_mock(_)).Times(1).
         WillOnce(Return(SequenceNumber_t{0, 1}));
@@ -797,7 +797,7 @@ TEST_F(SecurityAuthenticationTest, discovered_participant_validation_remote_iden
     EXPECT_CALL(crypto_plugin_->cryptokeyexchange_, create_local_participant_crypto_tokens(_,
                 Ref(local_participant_crypto_handle_), Ref(participant_crypto_handle),_)).Times(1).
            WillOnce(Return(true));
-    EXPECT_CALL(*volatile_writer_, new_change(_,_,_)).Times(1).
+    EXPECT_CALL(*volatile_writer_, new_change(_,_)).Times(1).
         WillOnce(Return(ByMove(CacheChange_ptr(nullptr, &change_volatile))));
     EXPECT_CALL(*volatile_writer_->history_, add_change_mock(_)).Times(1).
         WillOnce(Return(SequenceNumber_t{0, 1}));
@@ -829,7 +829,7 @@ TEST_F(SecurityAuthenticationTest, discovered_participant_ok)
                 Ref(remote_identity_handle),_,_)).Times(1).
         WillOnce(DoAll(SetArgPointee<0>(&handshake_handle), 
                     SetArgPointee<1>(&handshake_message), Return(ValidationResult_t::VALIDATION_PENDING_HANDSHAKE_MESSAGE)));
-    EXPECT_CALL(*stateless_writer_, new_change(_,_,_)).Times(1).
+    EXPECT_CALL(*stateless_writer_, new_change(_,_)).Times(1).
                 WillOnce(Return(ByMove(CacheChange_ptr(nullptr, change))));
     EXPECT_CALL(*stateless_writer_->history_, add_change_mock(_)).Times(1).
         WillOnce(Return(SequenceNumber_t{0, 1}));
@@ -875,7 +875,7 @@ TEST_F(SecurityAuthenticationTest, discovered_participant_validate_remote_fail_a
                 Ref(remote_identity_handle),_,_)).Times(1).
         WillOnce(DoAll(SetArgPointee<0>(&handshake_handle), 
                     SetArgPointee<1>(&handshake_message), Return(ValidationResult_t::VALIDATION_PENDING_HANDSHAKE_MESSAGE)));
-    EXPECT_CALL(*stateless_writer_, new_change(_,_,_)).Times(1).
+    EXPECT_CALL(*stateless_writer_, new_change(_,_)).Times(1).
         WillOnce(Return(ByMove(CacheChange_ptr(nullptr, change))));
     EXPECT_CALL(*stateless_writer_->history_, add_change_mock(_)).Times(1).
         WillOnce(Return(SequenceNumber_t{0, 1}));
@@ -922,7 +922,7 @@ TEST_F(SecurityAuthenticationTest, discovered_participant_begin_handshake_reques
                 Ref(remote_identity_handle),_,_)).Times(1).
         WillOnce(DoAll(SetArgPointee<0>(&handshake_handle), 
                     SetArgPointee<1>(&handshake_message), Return(ValidationResult_t::VALIDATION_PENDING_HANDSHAKE_MESSAGE)));
-    EXPECT_CALL(*stateless_writer_, new_change(_,_,_)).Times(1).WillOnce(Return(ByMove(CacheChange_ptr(nullptr, change))));
+    EXPECT_CALL(*stateless_writer_, new_change(_,_)).Times(1).WillOnce(Return(ByMove(CacheChange_ptr(nullptr, change))));
     EXPECT_CALL(*stateless_writer_->history_, add_change_mock(_)).Times(1).
         WillOnce(Return(SequenceNumber_t{0, 1}));
     EXPECT_CALL(*auth_plugin_, return_identity_handle(&local_identity_handle_,_)).Times(1).
@@ -1212,7 +1212,7 @@ TEST_F(SecurityAuthenticationTest, discovered_participant_process_message_ok_beg
     EXPECT_CALL(crypto_plugin_->cryptokeyexchange_, create_local_participant_crypto_tokens(_,
                 Ref(local_participant_crypto_handle_), Ref(participant_crypto_handle),_)).Times(1).
            WillOnce(Return(true));
-    EXPECT_CALL(*volatile_writer_, new_change(_,_,_)).Times(1).
+    EXPECT_CALL(*volatile_writer_, new_change(_,_)).Times(1).
         WillOnce(Return(ByMove(CacheChange_ptr(nullptr, &change_volatile))));
     EXPECT_CALL(*volatile_writer_->history_, add_change_mock(_)).Times(1).
         WillOnce(Return(SequenceNumber_t{0, 1}));
@@ -1280,7 +1280,7 @@ TEST_F(SecurityAuthenticationTest, discovered_participant_process_message_new_ch
         WillRepeatedly(Return(true));
     EXPECT_CALL(*auth_plugin_, return_identity_handle(&remote_identity_handle,_)).Times(1).
         WillRepeatedly(Return(true));
-    EXPECT_CALL(*stateless_writer_, new_change(_,_,_)).Times(1).WillOnce(Return(ByMove(CacheChange_ptr())));
+    EXPECT_CALL(*stateless_writer_, new_change(_,_)).Times(1).WillOnce(Return(ByMove(CacheChange_ptr())));
     EXPECT_CALL(*auth_plugin_, return_handshake_handle(&handshake_handle,_)).Times(1).
         WillOnce(Return(true));
     EXPECT_CALL(*stateless_reader_->history_, remove_change_mock(change)).Times(1).
@@ -1344,7 +1344,7 @@ TEST_F(SecurityAuthenticationTest, discovered_participant_process_message_add_ch
         WillRepeatedly(Return(true));
     EXPECT_CALL(*auth_plugin_, return_identity_handle(&remote_identity_handle,_)).Times(1).
         WillRepeatedly(Return(true));
-    EXPECT_CALL(*stateless_writer_, new_change(_,_,_)).Times(1).
+    EXPECT_CALL(*stateless_writer_, new_change(_,_)).Times(1).
         WillOnce(Return(ByMove(CacheChange_ptr(nullptr, change2))));
     EXPECT_CALL(*stateless_writer_->history_, add_change_mock(_)).Times(1).
         WillOnce(Return(SequenceNumber_t::unknown()));
@@ -1450,7 +1450,7 @@ TEST_F(SecurityAuthenticationTest, discovered_participant_process_message_pendin
         WillRepeatedly(Return(true));
     EXPECT_CALL(*auth_plugin_, return_identity_handle(&remote_identity_handle,_)).Times(1).
         WillRepeatedly(Return(true));
-    EXPECT_CALL(*stateless_writer_, new_change(_,_,_)).Times(1).
+    EXPECT_CALL(*stateless_writer_, new_change(_,_)).Times(1).
         WillOnce(Return(ByMove(CacheChange_ptr(nullptr, &change2))));
     EXPECT_CALL(*stateless_writer_->history_, add_change_mock(_)).Times(1).
         WillOnce(Return(SequenceNumber_t{0, 1}));
@@ -1470,7 +1470,7 @@ TEST_F(SecurityAuthenticationTest, discovered_participant_process_message_pendin
     EXPECT_CALL(crypto_plugin_->cryptokeyexchange_, create_local_participant_crypto_tokens(_,
                 Ref(local_participant_crypto_handle_), Ref(participant_crypto_handle),_)).Times(1).
            WillOnce(Return(true));
-    EXPECT_CALL(*volatile_writer_, new_change(_,_,_)).Times(1).
+    EXPECT_CALL(*volatile_writer_, new_change(_,_)).Times(1).
         WillOnce(Return(ByMove(CacheChange_ptr(nullptr, &change_volatile))));
     EXPECT_CALL(*volatile_writer_->history_, add_change_mock(_)).Times(1).
         WillOnce(Return(SequenceNumber_t{0, 1}));
@@ -1607,7 +1607,7 @@ TEST_F(SecurityAuthenticationTest, discovered_participant_process_message_ok_pro
     EXPECT_CALL(crypto_plugin_->cryptokeyexchange_, create_local_participant_crypto_tokens(_,
                 Ref(local_participant_crypto_handle_), Ref(participant_crypto_handle),_)).Times(1).
            WillOnce(Return(true));
-    EXPECT_CALL(*volatile_writer_, new_change(_,_,_)).Times(1).
+    EXPECT_CALL(*volatile_writer_, new_change(_,_)).Times(1).
         WillOnce(Return(ByMove(CacheChange_ptr(nullptr, &change_volatile))));
     EXPECT_CALL(*volatile_writer_->history_, add_change_mock(_)).Times(1).
         WillOnce(Return(SequenceNumber_t{0, 1}));
@@ -1672,7 +1672,7 @@ TEST_F(SecurityAuthenticationTest, discovered_participant_process_message_proces
         WillRepeatedly(Return(true));
     EXPECT_CALL(*auth_plugin_, return_identity_handle(&remote_identity_handle_,_)).Times(1).
         WillRepeatedly(Return(true));
-    EXPECT_CALL(*stateless_writer_, new_change(_,_,_)).Times(1).
+    EXPECT_CALL(*stateless_writer_, new_change(_,_)).Times(1).
         WillOnce(Return(ByMove(CacheChange_ptr())));
     EXPECT_CALL(*auth_plugin_, return_handshake_handle(&handshake_handle_,_)).Times(1).
         WillOnce(Return(true));
@@ -1733,7 +1733,7 @@ TEST_F(SecurityAuthenticationTest, discovered_participant_process_message_proces
         WillRepeatedly(Return(true));
     EXPECT_CALL(*auth_plugin_, return_identity_handle(&remote_identity_handle_,_)).Times(1).
         WillRepeatedly(Return(true));
-    EXPECT_CALL(*stateless_writer_, new_change(_,_,_)).Times(1).
+    EXPECT_CALL(*stateless_writer_, new_change(_,_)).Times(1).
     WillOnce(Return(ByMove(CacheChange_ptr(nullptr, change2))));
     EXPECT_CALL(*stateless_writer_->history_, add_change_mock(_)).Times(1).
         WillOnce(Return(SequenceNumber_t::unknown()));
@@ -2037,7 +2037,7 @@ TEST_F(SecurityAuthenticationTest, discovered_participant_process_message_ok_pro
     EXPECT_CALL(crypto_plugin_->cryptokeyexchange_, create_local_participant_crypto_tokens(_,
                 Ref(local_participant_crypto_handle_), Ref(participant_crypto_handle),_)).Times(1).
            WillOnce(Return(true));
-    EXPECT_CALL(*volatile_writer_, new_change(_,_,_)).Times(1).
+    EXPECT_CALL(*volatile_writer_, new_change(_,_)).Times(1).
         WillOnce(Return(ByMove(CacheChange_ptr(nullptr, &change_volatile))));
     EXPECT_CALL(*volatile_writer_->history_, add_change_mock(_)).Times(1).
         WillOnce(Return(SequenceNumber_t{0, 1}));

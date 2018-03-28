@@ -145,7 +145,7 @@ class RTPSWithRegistrationWriter
 
         while(it != msgs.end())
         {
-            eprosima::fastrtps::rtps::CacheChange_ptr ch = writer_->new_change(*it, eprosima::fastrtps::rtps::ALIVE);
+            eprosima::fastrtps::rtps::CacheChange_ptr ch = writer_->new_change(eprosima::fastrtps::rtps::ALIVE);
 
             eprosima::fastcdr::FastBuffer buffer((char*)ch->serialized_payload.data,
                     ch->serialized_payload.max_size);

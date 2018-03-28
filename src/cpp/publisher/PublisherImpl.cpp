@@ -181,7 +181,7 @@ bool Publisher::impl::create_new_change_with_params(ChangeKind_t change_kind, vo
     //NOTA Cuando se vaya a eliminar un dato por KEEP_ALL, antes se usaba try_to_remove. Ahora llamar al
     //remove_min_change del historial que devuelve si ha podido o no.
 
-    CacheChange_ptr change = writer_->new_change(type_->getSerializedSizeProvider(data), change_kind, handle);
+    CacheChange_ptr change = writer_->new_change(change_kind, handle);
 
     if(change)
     {

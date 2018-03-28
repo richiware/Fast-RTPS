@@ -21,6 +21,7 @@
 
 #include <fastrtps/rtps/reader/RTPSReader.h>
 #include <fastrtps/rtps/Endpoint.h>
+#include <fastrtps/rtps/common/CacheChange.h>
 
 namespace eprosima {
 namespace fastrtps {
@@ -29,7 +30,6 @@ namespace rtps {
 // Forward declarations
 class ReaderListener;
 class ReaderHistory;
-struct CacheChange_t;
 class WriterProxy;
 struct SequenceNumber_t;
 class SequenceNumberSet_t;
@@ -163,12 +163,7 @@ class RTPSReader::impl : public Endpoint
          * @param change Pointer to pointer to the Cache.
          * @return True if correctly reserved.
          */
-        bool reserveCache(CacheChange_t** change, uint32_t dataCdrSerializedSize);
-
-        /**
-         * Release a cacheChange.
-         */
-        void releaseCache(CacheChange_t* change);
+        CacheChange_ptr reserveCache();
 
         /**
          * Read the next unread CacheChange_t from the history

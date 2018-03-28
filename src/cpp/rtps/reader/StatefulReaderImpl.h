@@ -125,7 +125,7 @@ class StatefulReader::impl : public RTPSReader::impl
          * @param lock mutex protecting the StatefulReader.
          * @return True if added.
          */
-        bool change_received(CacheChange_t* a_change, WriterProxy* prox);
+        bool change_received(CacheChange_ptr& a_change, WriterProxy* prox);
 
         /**
          * Read the next unread CacheChange_t from the history

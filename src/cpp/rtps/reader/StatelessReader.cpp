@@ -14,7 +14,6 @@
 
 /*
  * @file StatelessReader.cpp
- *             	
  */
 
 #include "StatelessReaderImpl.h"
@@ -126,19 +125,20 @@ bool StatelessReader::impl::matched_writer_is_matched(const RemoteWriterAttribut
     return false;
 }
 
-bool StatelessReader::impl::change_received(CacheChange_t* change)
+bool StatelessReader::impl::change_received(CacheChange_ptr& change)
 {
     // Only make visible the change if there is not other with bigger sequence number.
     // TODO Revisar si no hay que incluirlo.
     if(!thereIsUpperRecordOf(change->writer_guid, change->sequence_number))
     {
+        const CacheChange_t* change_ptr = &*change;
         if(mp_history->received_change(change, 0))
         {
-            m_historyRecord[change->writer_guid] = change->sequence_number;
+            m_historyRecord[change_ptr->writer_guid] = change_ptr->sequence_number;
 
             if(getListener() != nullptr)
             {
-                getListener()->onNewCacheChangeAdded(*this, change);
+                getListener()->onNewCacheChangeAdded(*this, &*change_ptr);
             }
 
             mp_history->postSemaphore();
@@ -170,7 +170,7 @@ bool StatelessReader::impl::nextUnreadCache(CacheChange_t** change,WriterProxy**
     std::lock_guard<std::recursive_mutex> guard(*mp_mutex);
     //m_reader_cache.sortCacheChangesBySeqNum();
     bool found = false;
-    std::vector<CacheChange_t*>::iterator it;
+    std::vector<CacheChange_ptr>::iterator it;
     //TODO PROTEGER ACCESO A HISTORIA AQUI??? YO CREO QUE NO, YA ESTA EL READER PROTEGIDO
     for(it = mp_history->changesBegin();
             it!=mp_history->changesEnd();++it)
@@ -183,7 +183,7 @@ bool StatelessReader::impl::nextUnreadCache(CacheChange_t** change,WriterProxy**
     }
     if(found)
     {
-        *change = *it;
+        *change = &**it;
         return true;
     }
     logInfo(RTPS_READER,"No Unread elements left");
@@ -206,8 +206,9 @@ bool StatelessReader::impl::processDataMsg(CacheChange_t *change)
     {
         logInfo(RTPS_MSG_IN,IDSTRING"Trying to add change " << change->sequence_number <<" TO reader: "<< getGuid().entityId);
 
-        CacheChange_t* change_to_add;
-        if(reserveCache(&change_to_add, change->serialized_payload.length)) //Reserve a new cache from the corresponding cache pool
+        CacheChange_ptr change_to_add = reserveCache();
+
+        if(change_to_add) //Reserve a new cache from the corresponding cache pool
         {
 #if HAVE_SECURITY
             if(is_payload_protected())
@@ -216,7 +217,6 @@ bool StatelessReader::impl::processDataMsg(CacheChange_t *change)
                 if(!participant().security_manager().decode_serialized_payload(change->serialized_payload,
                         change_to_add->serialized_payload, guid_, change->writer_guid))
                 {
-                    releaseCache(change_to_add);
                     logWarning(RTPS_MSG_IN, "Cannont decode serialized payload");
                     return false;
                 }
@@ -224,11 +224,11 @@ bool StatelessReader::impl::processDataMsg(CacheChange_t *change)
             else
             {
 #endif
+                //TODO(Ricardo) Now not resizing if necessary. Study.
                 if (!change_to_add->copy(*change))
                 {
                     logWarning(RTPS_MSG_IN,IDSTRING"Problem copying CacheChange, received data is: " << change->serialized_payload.length
                             << " bytes and max size in reader " << getGuid().entityId << " is " << change_to_add->serialized_payload.max_size);
-                    releaseCache(change_to_add);
                     return false;
                 }
 #if HAVE_SECURITY
@@ -244,7 +244,6 @@ bool StatelessReader::impl::processDataMsg(CacheChange_t *change)
         if(!change_received(change_to_add))
         {
             logInfo(RTPS_MSG_IN,IDSTRING"MessageReceiver not add change " << change_to_add->sequence_number);
-            releaseCache(change_to_add);
 
             if(getGuid().entityId == c_EntityId_SPDPReader)
             {
@@ -270,18 +269,18 @@ bool StatelessReader::impl::processDataFragMsg(CacheChange_t *incomingChange, ui
             logInfo(RTPS_MSG_IN, IDSTRING"Trying to add fragment " << incomingChange->sequence_number.to64long()
                     << " TO reader: " << getGuid().entityId);
 
-            CacheChange_t* change_to_add = incomingChange;
+            CacheChange_ptr change_to_add(nullptr, incomingChange);
 
 #if HAVE_SECURITY
             if(is_payload_protected())
             {
-                if(reserveCache(&change_to_add, incomingChange->serialized_payload.length)) //Reserve a new cache from the corresponding cache pool
+                change_to_add = reserveCache(); //Reserve a new cache from the corresponding cache pool
+                if(change_to_add)
                 {
                     change_to_add->copy_not_memcpy(*incomingChange);
                     if(!participant().security_manager().decode_serialized_payload(incomingChange->serialized_payload,
                                 change_to_add->serialized_payload, guid_, incomingChange->writer_guid))
                     {
-                        releaseCache(change_to_add);
                         logWarning(RTPS_MSG_IN, "Cannont decode serialized payload");
                         return false;
                     }
@@ -291,15 +290,11 @@ bool StatelessReader::impl::processDataFragMsg(CacheChange_t *incomingChange, ui
 
             // Fragments manager has to process incomming fragments.
             // If CacheChange_t is completed, it will be returned;
-            CacheChange_t* change_completed = fragmentedChangePitStop_->process(change_to_add, sampleSize, fragmentStartingNum);
-
-#if HAVE_SECURITY
-            if(is_payload_protected())
-                releaseCache(change_to_add);
-#endif
+            CacheChange_ptr change_completed = fragmentedChangePitStop_->process(change_to_add, sampleSize,
+                    fragmentStartingNum);
 
             // If the change was completed, process it.
-            if(change_completed != nullptr)
+            if(change_completed)
             {
                 // Try to remove previous CacheChange_t from PitStop.
                 fragmentedChangePitStop_->try_to_remove_until(incomingChange->sequence_number, incomingChange->writer_guid);
@@ -313,9 +308,6 @@ bool StatelessReader::impl::processDataFragMsg(CacheChange_t *incomingChange, ui
                     {
                         participant().assertRemoteRTPSParticipantLiveliness(incomingChange->writer_guid.guidPrefix);
                     }
-
-                    // Release CacheChange_t.
-                    releaseCache(change_completed);
                 }
             }
         }

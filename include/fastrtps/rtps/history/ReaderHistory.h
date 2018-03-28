@@ -54,14 +54,14 @@ class ReaderHistory : public History
          * @param change Pointer to the change
          * @return True if added.
          */
-        RTPS_DllAPI virtual bool received_change(CacheChange_t* change, size_t);
+        RTPS_DllAPI virtual bool received_change(CacheChange_ptr& change, size_t);
 
         /**
          * Add a CacheChange_t to the ReaderHistory.
          * @param a_change Pointer to the CacheChange to add.
          * @return True if added.
          */
-        RTPS_DllAPI bool add_change(CacheChange_t* a_change);
+        RTPS_DllAPI bool add_change(CacheChange_ptr& a_change);
 
         /**
          * Remove a CacheChange_t from the ReaderHistory.
