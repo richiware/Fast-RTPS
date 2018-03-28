@@ -17,8 +17,8 @@
  *
  */
 
-#ifndef _RTPS_HISTORY_WRITERHISTORY_H_
-#define _RTPS_HISTORY_WRITERHISTORY_H_
+#ifndef __RTPS_HISTORY_WRITERHISTORY_H__
+#define __RTPS_HISTORY_WRITERHISTORY_H__
 
 #include "../../fastrtps_dll.h"
 #include "CacheChangePool.h"
@@ -77,4 +77,4 @@ class WriterHistory
 } //namespace fastrtps
 } //namespace eprosima
 
-#endif /* _RTPS_HISTORY_WRITERHISTORY_H_ */
+#endif // __RTPS_HISTORY_WRITERHISTORY_H__

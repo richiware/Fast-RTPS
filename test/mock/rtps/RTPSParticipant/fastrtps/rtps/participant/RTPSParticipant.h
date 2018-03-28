@@ -13,35 +13,25 @@
 // limitations under the License.
 
 /**
- * @file Endpoint.h
+ * @file RTPSParticipantImpl.h
  */
 
-#ifndef __RTPS_ENDPOINT_H__
-#define __RTPS_ENDPOINT_H__
-
-#include <gmock/gmock.h>
+#ifndef __RTPS_PARTICIPANT_RTPSPARTICIPANT_H__
+#define __RTPS_PARTICIPANT_RTPSPARTICIPANT_H__
 
 namespace eprosima {
 namespace fastrtps {
 namespace rtps {
 
-class Endpoint
+class RTPSParticipant
 {
     public:
 
-        virtual ~Endpoint() = default;
-
-        const GUID_t& getGuid() { return guid_; }
-
-        GUID_t& guid() { return guid_; }
-
-    private:
-
-        GUID_t guid_;
+        class impl;
 };
 
 } // namespace rtps
 } // namespace fastrtps
 } // namespace eprosima
 
-#endif // __RTPS_ENDPOINT_H__
+#endif // __RTPS_PARTICIPANT_RTPSPARTICIPANT_H__

@@ -44,7 +44,7 @@ class ParListener : public ParticipantListener
          * @param p Pointer to the Participant
          * @param info DiscoveryInfo.
          */
-        void onParticipantDiscovery(Participant* /*p*/, ParticipantDiscoveryInfo info) override
+        void onParticipantDiscovery(Participant& /*participant*/, const ParticipantDiscoveryInfo& info) override
         {
             if(info.rtps.m_status == DISCOVERED_RTPSPARTICIPANT)
                 std::cout << "Published discovered a participant" << std::endl;
@@ -73,7 +73,7 @@ class PubListener : public PublisherListener
 
         ~PubListener() {};
 
-        void onPublicationMatched(Publisher* /*publisher*/, MatchingInfo& info) override
+        void onPublicationMatched(Publisher& /*publisher*/, const MatchingInfo& info) override
         {
             std::unique_lock<std::mutex> lock(mutex_);
             if(info.status == MATCHED_MATCHING)

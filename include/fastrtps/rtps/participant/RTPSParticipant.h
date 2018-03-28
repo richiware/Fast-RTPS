@@ -17,8 +17,8 @@
  */
 
 
-#ifndef __RTPS_PARTICIPANT_RTPSPARTICIPANT__
-#define __RTPS_PARTICIPANT_RTPSPARTICIPANT__
+#ifndef __RTPS_PARTICIPANT_RTPSPARTICIPANT_H__
+#define __RTPS_PARTICIPANT_RTPSPARTICIPANT_H__
 
 #include <cstdlib>
 #include <memory>
@@ -162,4 +162,4 @@ class RTPS_DllAPI RTPSParticipant
 } //namespace fastrtps
 } //namespace eprosima
 
-#endif //__RTPS_PARTICIPANT_RTPSPARTICIPANT__
+#endif //__RTPS_PARTICIPANT_RTPSPARTICIPANT_H__

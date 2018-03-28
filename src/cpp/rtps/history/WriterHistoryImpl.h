@@ -17,8 +17,8 @@
  *
  */
 
-#ifndef _RTPS_HISTORY_WRITERHISTORYIMPL_H_
-#define _RTPS_HISTORY_WRITERHISTORYIMPL_H_
+#ifndef __RTPS_HISTORY_WRITERHISTORYIMPL_H__
+#define __RTPS_HISTORY_WRITERHISTORYIMPL_H__
 
 #include <fastrtps/rtps/history/WriterHistory.h>
 #include <fastrtps/rtps/attributes/HistoryAttributes.h>
@@ -126,4 +126,4 @@ inline WriterHistory::impl& get_implementation(WriterHistory& history)
 } //namespace rtps
 } //namespace fastrtps
 } //namespace eprosima
-#endif // _RTPS_HISTORY_WRITERHISTORYIMPL_H_
+#endif // __RTPS_HISTORY_WRITERHISTORYIMPL_H__

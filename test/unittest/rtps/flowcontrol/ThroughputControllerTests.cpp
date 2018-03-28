@@ -12,10 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#include <rtps/flowcontrol/ThroughputController.h>
 #include <fastrtps/rtps/writer/ReaderLocator.h>
 
 #include <gtest/gtest.h>
+
+// Class to test
+#include <rtps/flowcontrol/ThroughputController.cpp>
 
 using namespace std;
 using namespace eprosima::fastrtps::rtps;
@@ -32,7 +34,7 @@ class ThroughputControllerTests: public ::testing::Test
    public:
 
    ThroughputControllerTests():
-      sController(testDescriptor, (const RTPSWriter*)nullptr)
+      sController(testDescriptor, (const RTPSWriter::impl*)nullptr)
    {
       for (unsigned int i = 0; i < numberOfTestChanges; i++)
       {

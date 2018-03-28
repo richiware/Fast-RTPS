@@ -20,7 +20,6 @@
 #define RTPS_BUILTIN_DISCOVERY_PARTICIPANT_PDPSIMPLE_H_
 
 #include <fastrtps/rtps/builtin/data/ParticipantProxyData.h>
-#include <fastrtps/rtps/builtin/BuiltinProtocols.h>
 #include <fastrtps/rtps/messages/CDRMessage.h>
 #include <fastrtps/rtps/builtin/discovery/endpoint/EDP.h>
 

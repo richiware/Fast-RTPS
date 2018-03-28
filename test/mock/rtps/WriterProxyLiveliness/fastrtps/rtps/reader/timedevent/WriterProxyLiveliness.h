@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef _RTPS_READER_TIMEDEVENT_WRITERPROXYLIVELINESS_H_
-#define _RTPS_READER_TIMEDEVENT_WRITERPROXYLIVELINESS_H_
+#ifndef __RTPS_READER_TIMEDEVENT_WRITERPROXYLIVELINESS_H__
+#define __RTPS_READER_TIMEDEVENT_WRITERPROXYLIVELINESS_H__
 
 #include <gmock/gmock.h>
 
@@ -30,7 +30,7 @@ namespace eprosima
             {
                 public:
 
-                    WriterProxyLiveliness(WriterProxy* /*wp*/, double /*interval*/)
+                    WriterProxyLiveliness(WriterProxy& /*wp*/, double /*interval*/)
                     {
                     }
 
@@ -42,4 +42,4 @@ namespace eprosima
     } //namespace fastrtps
 } //namespace eprosima
 
-#endif // _RTPS_READER_TIMEDEVENT_WRITERPROXYLIVELINESS_H_
+#endif // __RTPS_READER_TIMEDEVENT_WRITERPROXYLIVELINESS_H__

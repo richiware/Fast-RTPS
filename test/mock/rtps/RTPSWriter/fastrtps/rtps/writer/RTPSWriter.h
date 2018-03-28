@@ -16,40 +16,23 @@
  * @file RTPSWriter.h
  */
 
-#ifndef _RTPS_WRITER_RTPSWRITER_H_
-#define _RTPS_WRITER_RTPSWRITER_H_
-
-#include <fastrtps/rtps/attributes/WriterAttributes.h>
-#include <fastrtps/rtps/Endpoint.h>
-#include <fastrtps/rtps/history/CacheChangePool.h>
-#include <fastrtps/rtps/history/WriterHistory.h>
-
-#include <gmock/gmock.h>
+#ifndef __RTPS_WRITER_RTPSWRITER_H__
+#define __RTPS_WRITER_RTPSWRITER_H__
 
 namespace eprosima {
 namespace fastrtps {
 namespace rtps {
 
-class RTPSWriter : public Endpoint
+class RTPSWriter
 {
     public:
 
-        virtual ~RTPSWriter() = default;
-
-        virtual bool matched_reader_add(RemoteReaderAttributes& ratt) = 0;
-
-        virtual bool matched_reader_remove(RemoteReaderAttributes& ratt) = 0;
-
-        MOCK_METHOD3(new_change, CacheChange_ptr(const std::function<uint32_t()>&,
-            ChangeKind_t, InstanceHandle_t));
-
-        MOCK_METHOD1(reuse_change, void(CacheChange_ptr&));
-
-        WriterHistory* history_;
+        class impl;
 };
+
 
 } // namespace rtps
 } // namespace fastrtps
 } // namespace eprosima
 
-#endif // _RTPS_WRITER_RTPSWRITER_H_
+#endif // __RTPS_WRITER_RTPSWRITER_H__

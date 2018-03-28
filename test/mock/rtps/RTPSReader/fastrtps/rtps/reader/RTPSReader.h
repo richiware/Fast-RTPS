@@ -16,46 +16,22 @@
  * @file RTPSReader.h
  */
 
-#ifndef _RTPS_READER_RTPSREADER_H_
-#define _RTPS_READER_RTPSREADER_H_
-
-#include <fastrtps/rtps/Endpoint.h>
-#include <fastrtps/rtps/history/ReaderHistory.h>
-#include <fastrtps/rtps/reader/ReaderListener.h>
-
-#include <gmock/gmock.h>
+#ifndef __RTPS_READER_RTPSREADER_H__
+#define __RTPS_READER_RTPSREADER_H__
 
 namespace eprosima {
 namespace fastrtps {
 namespace rtps {
 
-class RTPSReader : public Endpoint
+class RTPSReader
 {
     public:
 
-        virtual ~RTPSReader() = default;
-
-        virtual bool matched_writer_add(RemoteWriterAttributes& wdata) = 0;
-
-        virtual bool matched_writer_remove(RemoteWriterAttributes& wdata) = 0;
-
-        MOCK_METHOD0(getHistory_mock, ReaderHistory*());
-
-        MOCK_CONST_METHOD0(getGuid, const GUID_t&());
-
-        ReaderHistory* getHistory()
-        {
-            getHistory_mock();
-            return history_;
-        }
-
-        ReaderHistory* history_;
-
-        ReaderListener* listener_;
+        class impl;
 };
 
 } // namespace rtps
 } // namespace fastrtps
 } // namespace eprosima
 
-#endif // _RTPS_READER_RTPSREADER_H_
+#endif // __RTPS_READER_RTPSREADER_H__

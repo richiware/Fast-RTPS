@@ -24,6 +24,7 @@
 #include <fastrtps/rtps/messages/RTPSMessageGroup.h>
 #include <fastrtps/rtps/attributes/WriterAttributes.h>
 #include <fastrtps/rtps/history/WriterHistory.h>
+#include <fastrtps/rtps/common/MatchingInfo.h>
 
 #include <vector>
 #include <memory>
@@ -65,7 +66,7 @@ class RTPSWriter::impl : public Endpoint
         virtual void deinit() = 0;
 
         CacheChange_ptr new_change(const std::function<uint32_t()>& dataCdrSerializedSize,
-                ChangeKind_t changeKind, InstanceHandle_t handle = c_InstanceHandle_Unknown);
+                ChangeKind_t changeKind, const InstanceHandle_t& handle = c_InstanceHandle_Unknown);
 
         /**
          * Add a matched reader.

@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef _RTPS_READER_TIMEDEVENT_HEARTBEATRESPONSEDELAY_H_
-#define _RTPS_READER_TIMEDEVENT_HEARTBEATRESPONSEDELAY_H_
+#ifndef __RTPS_READER_TIMEDEVENT_HEARTBEATRESPONSEDELAY_H__
+#define __RTPS_READER_TIMEDEVENT_HEARTBEATRESPONSEDELAY_H__
 
 namespace eprosima
 {
@@ -28,11 +28,11 @@ namespace eprosima
             {
                 public:
 
-                    HeartbeatResponseDelay(WriterProxy* /*wp*/,double /*interval*/)
+                    HeartbeatResponseDelay(WriterProxy& /*wp*/,double /*interval*/)
                     {
                     }
             };
         } // namespace rtps
     } // namespace fastrtps
 } // namespace eprosima
-#endif // _RTPS_READER_TIMEDEVENT_HEARTBEATRESPONSEDELAY_H_
+#endif // __RTPS_READER_TIMEDEVENT_HEARTBEATRESPONSEDELAY_H__

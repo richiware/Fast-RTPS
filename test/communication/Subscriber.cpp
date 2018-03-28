@@ -24,6 +24,7 @@
 #include <fastrtps/subscriber/SubscriberListener.h>
 #include <fastrtps/Domain.h>
 #include <fastrtps/subscriber/SampleInfo.h>
+#include <fastrtps/rtps/common/MatchingInfo.h>
 #include <fastrtps/utils/eClock.h>
 
 #include <types/HelloWorldType.h>
@@ -41,7 +42,7 @@ class SubListener : public SubscriberListener
 
         ~SubListener() {}
 
-        void onSubscriptionMatched(Subscriber* /*subscriber*/, MatchingInfo& info) override
+        void onSubscriptionMatched(Subscriber& /*subscriber*/, const MatchingInfo& info) override
         {
             if(info.status == MATCHED_MATCHING)
                 std::cout << "Publisher matched" << std::endl;
@@ -49,12 +50,12 @@ class SubListener : public SubscriberListener
                 std::cout << "Publisher unmatched" << std::endl;
         }
 
-        void onNewDataMessage(Subscriber* subscriber) override
+        void onNewDataMessage(Subscriber& subscriber) override
         {
             HelloWorld sample;
             SampleInfo_t info;
 
-            if(subscriber->takeNextData((void*)&sample, &info))
+            if(subscriber.takeNextData((void*)&sample, &info))
             {
                 if(info.sampleKind == ALIVE)
                 {
@@ -87,14 +88,12 @@ int main(int argc, char** argv)
     ParticipantAttributes participant_attributes;
     participant_attributes.rtps.builtin.leaseDuration.seconds = 3;
     participant_attributes.rtps.builtin.leaseDuration_announcementperiod.seconds = 1;
-    Participant* participant = Domain::create_participant(participant_attributes);
-    if(participant==nullptr)
-        return 1;
+    Participant participant(participant_attributes);
 
     //REGISTER THE TYPE
 
     HelloWorldType type;
-    Domain::register_type(*participant, &type);
+    participant.register_type(&type);
 
     SubListener listener;
 
@@ -104,13 +103,7 @@ int main(int argc, char** argv)
     subscriber_attributes.topic.topicDataType = type.getName();
     subscriber_attributes.topic.topicName = "HelloWorldTopic";
     subscriber_attributes.qos.m_reliability.kind = RELIABLE_RELIABILITY_QOS;
-    Subscriber* subscriber = Domain::createSubscriber(participant, subscriber_attributes, &listener);
-
-    if(subscriber == nullptr)
-    {
-        Domain::remove_participant(participant);
-        return 1;
-    }
+    Subscriber subscriber(participant, subscriber_attributes, &listener);
 
     while(notexit)
     {
@@ -121,8 +114,6 @@ int main(int argc, char** argv)
         std::unique_lock<std::mutex> lock(listener.mutex_);
         listener.cv_.wait(lock, [&]{ return listener.number_samples_ >= 4; });
     }
-
-    Domain::remove_participant(participant);
 
     return 0;
 }

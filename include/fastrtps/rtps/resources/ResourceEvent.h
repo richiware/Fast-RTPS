@@ -22,7 +22,7 @@
 
 #ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
 
-#include <fastrtps/rtps/participant/RTPSParticipant.h>
+#include "../participant/RTPSParticipant.h"
 
 #include <thread>
 #include <asio.hpp>

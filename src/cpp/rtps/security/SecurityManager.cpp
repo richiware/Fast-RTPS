@@ -20,10 +20,10 @@
 
 #include <fastrtps/rtps/security/authentication/Authentication.h>
 #include <fastrtps/log/Log.h>
-#include <rtps/participant/RTPSParticipantImpl.h>
+#include "../participant/RTPSParticipantImpl.h"
 #include <fastrtps/rtps/participant/RTPSParticipantListener.h>
-#include <rtps/writer/RTPSWriterImpl.h>
-#include <rtps/history/WriterHistoryImpl.h>
+#include "../writer/RTPSWriterImpl.h"
+#include "..//history/WriterHistoryImpl.h"
 #include <fastrtps/rtps/history/ReaderHistory.h>
 #include <fastrtps/rtps/attributes/HistoryAttributes.h>
 #include <fastrtps/rtps/builtin/data/ParticipantProxyData.h>

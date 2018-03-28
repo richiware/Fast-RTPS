@@ -21,8 +21,10 @@
     FRIEND_TEST(WriterProxyTests, ReceivedChangeSet); \
     FRIEND_TEST(WriterProxyTests, IrrelevantChangeSet);
 
-#include <fastrtps/rtps/reader/WriterProxy.h>
-#include <fastrtps/rtps/reader/StatefulReader.h>
+#include <rtps/reader/StatefulReaderImpl.h>
+
+// Class to test
+#include <rtps/reader/WriterProxy.cpp>
 
 //using namespace eprosima::fastrtps::rtps;
 namespace eprosima
@@ -35,8 +37,8 @@ namespace eprosima
             TEST(WriterProxyTests, MissingChangesUpdate)
             {
                 RemoteWriterAttributes wattr;
-                StatefulReader readerMock;
-                WriterProxy wproxy(wattr, &readerMock);
+                StatefulReader::impl readerMock;
+                WriterProxy wproxy(readerMock, wattr);
 
                 // Update MISSING changes util sequence number 3.
                 wproxy.missing_changes_update(SequenceNumber_t(0, 3));
@@ -105,8 +107,8 @@ namespace eprosima
             TEST(WriterProxyTests, LostChangesUpdate)
             {
                 RemoteWriterAttributes wattr;
-                StatefulReader readerMock;
-                WriterProxy wproxy(wattr, &readerMock);
+                StatefulReader::impl readerMock;
+                WriterProxy wproxy(readerMock, wattr);
 
                 // Update LOST changes util sequence number 3.
                 wproxy.lost_changes_update(SequenceNumber_t(0, 3));
@@ -153,8 +155,8 @@ namespace eprosima
             TEST(WriterProxyTests, ReceivedChangeSet)
             {
                 RemoteWriterAttributes wattr;
-                StatefulReader readerMock;
-                WriterProxy wproxy(wattr, &readerMock);
+                StatefulReader::impl readerMock;
+                WriterProxy wproxy(readerMock, wattr);
 
                 // Set received change with sequence number 3.
                 wproxy.received_change_set(SequenceNumber_t(0, 3));
@@ -235,8 +237,8 @@ namespace eprosima
             TEST(WriterProxyTests, IrrelevantChangeSet)
             {
                 RemoteWriterAttributes wattr;
-                StatefulReader readerMock;
-                WriterProxy wproxy(wattr, &readerMock);
+                StatefulReader::impl readerMock;
+                WriterProxy wproxy(readerMock, wattr);
 
                 // Set irrelevant change with sequence number 3.
                 wproxy.irrelevant_change_set(SequenceNumber_t(0, 3));

@@ -19,20 +19,19 @@
 #ifndef _RTPS_RESOURCES_ASYNCWRITERTHREAD_H_
 #define _RTPS_RESOURCES_ASYNCWRITERTHREAD_H_
 
+#include <rtps/writer/RTPSWriterImpl.h>
+
 namespace eprosima {
 namespace fastrtps {
 namespace rtps {
-
-class RTPSParticipantImpl;
-class RTPSWriter;
 
 class AsyncWriterThread
 {
     public:
 
-        static void wakeUp(const RTPSParticipantImpl*) {}
+        static void wakeUp(const RTPSParticipant::impl&) {}
 
-        static void wakeUp(const RTPSWriter*) {}
+        static void wakeUp(const RTPSWriter::impl&) {}
 };
 
 } // namespace rtps

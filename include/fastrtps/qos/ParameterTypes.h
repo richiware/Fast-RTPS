@@ -19,8 +19,12 @@
 #ifndef PARAMETERTYPES_H_
 #define PARAMETERTYPES_H_
 #ifndef DOXYGEN_SHOULD_SKIP_THIS_PUBLIC
-#include "../rtps/common/all_common.h"
 #include "../rtps/common/Token.h"
+#include "../rtps/common/InstanceHandle.h"
+#include "../rtps/common/Locator.h"
+#include "../rtps/common/Time_t.h"
+#include "../rtps/common/SampleIdentity.h"
+#include "../rtps/common/FragmentNumber.h"
 
 
 #include <string>

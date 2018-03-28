@@ -21,8 +21,11 @@
 
 namespace eprosima {
 namespace fastrtps {
+
 namespace rtps {
+
 class MatchingInfo;
+
 } /* namespace rtps */
 
 class Subscriber;

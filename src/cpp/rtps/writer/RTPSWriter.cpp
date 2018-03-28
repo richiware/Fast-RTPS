@@ -124,20 +124,17 @@ void RTPSWriter::impl::deinit_()
 }
 
 CacheChange_ptr RTPSWriter::new_change(const std::function<uint32_t()>& data_cdr_serialize_size,
-        ChangeKind_t change_kind, InstanceHandle_t handle)
+        ChangeKind_t change_kind, const InstanceHandle_t& handle)
 {
     return impl_->new_change(data_cdr_serialize_size, change_kind, handle);
 }
 
 CacheChange_ptr RTPSWriter::impl::new_change(const std::function<uint32_t()>& data_cdr_serialize_size,
-        ChangeKind_t change_kind, InstanceHandle_t handle)
+        ChangeKind_t change_kind, const InstanceHandle_t& handle)
 {
     logInfo(RTPS_WRITER,"Creating new change");
     CacheChange_t* cachechange = nullptr;
 
-    std::lock_guard<std::mutex> guard(mutex_);
-
-    // TODO(Ricardo) Two protections, here with writer's mutex and with cachechantpool's mutex. Review
     if(!cachechange_pool_.reserve_cache(&cachechange, data_cdr_serialize_size))
     {
         logWarning(RTPS_WRITER,"Problem reserving Cache from the History");

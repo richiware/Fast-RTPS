@@ -16,10 +16,10 @@
  * @file ReaderHistory.h
  */
 
-#ifndef _RTPS_HISTORY_READERHISTORY_H_
-#define _RTPS_HISTORY_READERHISTORY_H_
+#ifndef __RTPS_HISTORY_READERHISTORY_H__
+#define __RTPS_HISTORY_READERHISTORY_H__
 
-#include <fastrtps/rtps/attributes/HistoryAttributes.h>
+#include <fastrtps/rtps/common/CacheChange.h>
 
 #include <gmock/gmock.h>
 
@@ -27,11 +27,13 @@ namespace eprosima {
 namespace fastrtps {
 namespace rtps {
 
+class HistoryAttributes;
+
 class ReaderHistory
 {
     public:
 
-        ReaderHistory(const HistoryAttributes& /*att*/){}
+        ReaderHistory(const HistoryAttributes& /*att*/) {}
 
         MOCK_METHOD1(remove_change_mock, bool(CacheChange_t*));
 
@@ -47,4 +49,4 @@ class ReaderHistory
 } // namespace fastrtps
 } // namespace eprosima
 
-#endif // _RTPS_HISTORY_READERHISTORY_H_
+#endif // __RTPS_HISTORY_READERHISTORY_H__

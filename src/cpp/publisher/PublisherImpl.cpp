@@ -170,7 +170,12 @@ bool Publisher::impl::create_new_change_with_params(ChangeKind_t change_kind, vo
             return false;
         }
 
-        changes_by_instance_.emplace(std::piecewise_construct, std::make_tuple(handle), std::make_tuple());
+        map_it = changes_by_instance_.emplace(std::piecewise_construct, std::make_tuple(handle), std::make_tuple()).first;
+    }
+
+    if(att_.topic.resourceLimitsQos.max_samples_per_instance > 0 &&
+            static_cast<int32_t>(map_it->second.size()) == att_.topic.resourceLimitsQos.max_samples_per_instance)
+    {
     }
 
     //NOTA Cuando se vaya a eliminar un dato por KEEP_ALL, antes se usaba try_to_remove. Ahora llamar al

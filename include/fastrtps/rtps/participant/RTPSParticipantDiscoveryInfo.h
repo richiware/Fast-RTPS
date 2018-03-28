@@ -87,11 +87,11 @@ class RTPSParticipantAuthenticationInfo
 
         ~RTPSParticipantAuthenticationInfo() {}
 
-        RTPSParticipantAuthenticationInfo* operator=(const RTPSParticipantAuthenticationInfo& info)
+        RTPSParticipantAuthenticationInfo& operator=(const RTPSParticipantAuthenticationInfo& info)
         {
             status_ = info.status_;
             guid_ = info.guid_;
-            return this;
+            return *this;
         }
 
         void status(AUTHENTICATION_STATUS status)
@@ -131,8 +131,7 @@ class RTPSParticipantAuthenticationInfo
 
         bool operator==(const RTPSParticipantAuthenticationInfo& info) const
         {
-            return status_ == info.status_ &&
-                guid_ == info.guid_;
+            return status_ == info.status_ && guid_ == info.guid_;
         }
 
     private:

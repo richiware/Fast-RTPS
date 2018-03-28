@@ -39,9 +39,9 @@ class RTPS_DllAPI ReaderListener
 {
     public:
 
-        ReaderListener(){};
+        ReaderListener() {};
 
-        virtual ~ReaderListener(){};
+        virtual ~ReaderListener() {};
 
         /**
          * This method is invoked when a new reader matches

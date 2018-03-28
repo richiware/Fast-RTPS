@@ -21,7 +21,6 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
         find_package(Threads REQUIRED)
 
         set(WRITERPROXYTESTS_SOURCE WriterProxyTests.cpp
-            ${PROJECT_SOURCE_DIR}/src/cpp/rtps/reader/WriterProxy.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/log/Log.cpp
             ${PROJECT_SOURCE_DIR}/src/cpp/log/StdoutConsumer.cpp
             )
@@ -41,7 +40,9 @@ if(NOT ((MSVC OR MSVC_IDE) AND EPROSIMA_INSTALLER))
             ${PROJECT_SOURCE_DIR}/test/mock/rtps/HeartbeatResponseDelay
             ${PROJECT_SOURCE_DIR}/test/mock/rtps/WriterProxyLiveliness
             ${PROJECT_SOURCE_DIR}/test/mock/rtps/InitialAckNack
-            ${PROJECT_SOURCE_DIR}/include ${PROJECT_BINARY_DIR}/include/${PROJECT_NAME})
+            ${PROJECT_SOURCE_DIR}/test/mock/rtps/ReaderHistory
+            ${PROJECT_SOURCE_DIR}/include ${PROJECT_BINARY_DIR}/include/${PROJECT_NAME}
+            ${PROJECT_SOURCE_DIR}/src/cpp)
         target_link_libraries(WriterProxyTests
             ${GTEST_LIBRARIES} ${GMOCK_LIBRARIES}
             ${CMAKE_THREAD_LIBS_INIT})

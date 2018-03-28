@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#ifndef _RTPS_READER_STATEFULREADER_H_
-#define _RTPS_READER_STATEFULREADER_H_
+#ifndef __RTPS_READER_STATEFULREADER_H__
+#define __RTPS_READER_STATEFULREADER_H__
 
 #include <fastrtps/rtps/reader/RTPSReader.h>
 #include <fastrtps/rtps/attributes/ReaderAttributes.h>
@@ -24,29 +24,14 @@ namespace fastrtps {
 namespace rtps{
 
 class StatefulReader : public RTPSReader
-    {
-        public:
+{
+    public:
 
-            virtual ~StatefulReader() {}
-
-            MOCK_METHOD1(matched_writer_add, bool(RemoteWriterAttributes&));
-
-            MOCK_METHOD1(matched_writer_remove, bool(RemoteWriterAttributes&));
-
-            // In real class, inherited from Endpoint base class.
-            inline const GUID_t& getGuid() const { return guid_; };
-
-            inline ReaderTimes& getTimes(){return times_;};
-
-        private:
-
-            GUID_t guid_;
-
-            ReaderTimes times_;
-    };
+        class impl;
+};
 
 } // namespace rtps
 } // namespace fastrtps
 } // namespace eprosima
 
-#endif // _RTPS_READER_STATEFULREADER_H_
+#endif // __RTPS_READER_STATEFULREADER_H__
